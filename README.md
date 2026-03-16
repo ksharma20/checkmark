@@ -34,12 +34,26 @@ src/
 │   ├── me/                     # User PWA — requires session (Phase 3)
 │   ├── ws/                     # Org PWA — requires admin session (Phase 4)
 │   └── api/
-│       └── auth/
-│           ├── login/route.ts      # POST — email check + password verify
-│           ├── otp/send/route.ts   # POST — send OTP
-│           ├── otp/verify/route.ts # POST — verify OTP code
-│           ├── register/route.ts   # POST — create account
-│           └── logout/route.ts     # POST — clear session
+│       ├── auth/
+│       │   ├── login/route.ts      # POST — email check + password verify
+│       │   ├── otp/send/route.ts   # POST — send OTP
+│       │   ├── otp/verify/route.ts # POST — verify OTP code
+│       │   ├── register/route.ts   # POST — create account
+│       │   └── logout/route.ts     # POST — clear session
+│       ├── checkin/
+│       │   ├── route.ts            # POST — create presence event
+│       │   └── checkout/route.ts   # POST — check out of most recent open event
+│       ├── events/
+│       │   ├── route.ts            # GET — user's events (paginated, date-filtered)
+│       │   └── [id]/route.ts       # PATCH note · DELETE (within 5 min)
+│       ├── me/
+│       │   ├── route.ts            # GET profile · PATCH name · DELETE account
+│       │   ├── password/route.ts   # POST — change password
+│       │   ├── consent/route.ts    # POST — accept/decline workspace invite
+│       │   └── workspaces/[workspaceId]/route.ts  # DELETE — leave workspace
+│       └── tokens/
+│           ├── route.ts            # GET list · POST create (returns plain token once)
+│           └── [id]/route.ts       # DELETE — revoke
 ├── lib/
 │   ├── db/
 │   │   ├── index.ts       # DB abstraction (SQLite ↔ Postgres)
@@ -50,13 +64,18 @@ src/
 │   │       ├── workspaces.ts
 │   │       ├── signals.ts
 │   │       └── stats.ts
-│   ├── auth.ts            # JWT, cookies, bcrypt, OTP
+│   ├── auth.ts            # JWT, cookies, bcrypt, OTP, getServerUser()
 │   ├── email.ts           # Resend email helpers (OTP + consent)
-│   ├── geo.ts             # Haversine, IP geolocation
+│   ├── geo.ts             # Haversine, IP geolocation, extractIp()
 │   ├── timezone.ts        # UTC ↔ IANA timezone helpers
 │   ├── plans.ts           # Plan limits (free / starter / growth)
 │   ├── signals.ts         # Core dashboard query (signal matching)
 │   └── stats.ts           # User stats computation
+├── components/
+│   └── user/
+│       ├── BottomNav.tsx       # Fixed bottom nav (client — uses usePathname)
+│       ├── CheckinButtons.tsx  # "I'm here" + "I'm leaving" (client — GPS + API)
+│       └── EventCard.tsx       # Presence event card with inline note edit (client)
 ├── proxy.ts               # Route protection (Next.js 16 — previously middleware.ts)
 scripts/
 └── migrate.js             # DB migration runner (plain Node.js)
@@ -205,6 +224,46 @@ Plan limits are enforced server-side in `lib/plans.ts`.
 
 ---
 
+## User PWA — `/me/*`
+
+All routes require a valid session cookie. The proxy redirects to `/login` if missing.
+
+### `/me` — Home
+
+Server-rendered. Shows:
+- Today's date + status line ("Checked in at 9:42 AM" or "Not checked in yet")
+- **"I'm here"** button (64px, full width) — always visible. Triggers GPS collection → check-in API call.
+- **"I'm leaving"** button — appears below when an active (unchecked-out) event exists.
+- Three stat chips: **days / hrs / places** this calendar month
+- Today's check-in list (server-rendered, refreshed via `router.refresh()` after mutations)
+- Workspace strip: each workspace the user is active in, with days count
+
+**GPS flow in CheckinButtons:** `navigator.geolocation.getCurrentPosition()` is called on button tap. If denied, check-in still proceeds with null GPS — a toast explains why. WiFi SSID is read from `navigator.connection?.ssid` (Chrome desktop/Android only).
+
+### `/me/timeline`
+
+Client component. Fetches from `GET /api/events`. Features:
+- Date range pickers (default: current month, resets on page load)
+- Events grouped by date, newest first
+- Inline note editing on any event
+- Delete button — only appears within 5 minutes of check-in creation
+
+### `/me/orgs`
+
+Server + client split. Shows:
+- **Pending consent invites** — Accept / Decline buttons
+- **Active workspace memberships** — with Leave button (blocked if sole admin)
+
+### `/me/settings`
+
+Client component with four sections:
+- **Profile** — update display name
+- **Password** — change with current password verification
+- **API Tokens** — create named tokens (plain token shown once), revoke existing
+- **Danger zone** — delete account (cascade-deletes all data via FK constraints)
+
+---
+
 ## Login Page — `/login`
 
 Single entry point for all authentication. A client-side state machine handles four steps:
@@ -285,7 +344,7 @@ All times stored as UTC in the DB. These helpers convert for display:
 |---|---|---|
 | **Phase 1** | ✅ Complete | DB schema, abstraction layer, all lib modules, route protection, migration |
 | **Phase 2** | ✅ Complete | Auth API routes, `/login` page with full OTP + password flows |
-| Phase 3 | Pending | User PWA — `/me` check-in, timeline, orgs, settings |
+| **Phase 3** | ✅ Complete | User PWA — check-in, timeline, orgs, settings pages + all supporting APIs |
 | Phase 4 | Pending | Org PWA — `/ws` dashboard, monthly grid, people, signals, settings |
 | Phase 5 | Pending | Landing page, PWA manifests, domain verification, invite flow |
 

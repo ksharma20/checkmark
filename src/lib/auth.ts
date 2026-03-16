@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose'
 import bcrypt from 'bcryptjs'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { NextRequest } from 'next/server'
 
 const COOKIE_NAME = 'cm_session'
@@ -108,4 +108,15 @@ export function generateOtp(): string {
 
 export function otpExpiresAt(): string {
   return new Date(Date.now() + 10 * 60 * 1000).toISOString()
+}
+
+// ─── Server component helper ──────────────────────────────────────────────────
+
+/** Read the user identity set by proxy.ts — only valid in Server Components and Route Handlers. */
+export async function getServerUser(): Promise<{ userId: string; email: string } | null> {
+  const h = await headers()
+  const userId = h.get('x-user-id')
+  const email = h.get('x-user-email')
+  if (!userId || !email) return null
+  return { userId, email }
 }

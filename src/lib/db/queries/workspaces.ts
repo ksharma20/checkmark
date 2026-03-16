@@ -252,6 +252,47 @@ export async function getUserWorkspaces(userId: string): Promise<WorkspaceMember
   )
 }
 
+export async function getWorkspacesByIds(ids: string[]): Promise<Workspace[]> {
+  if (ids.length === 0) return []
+  const placeholders = ids.map(() => '?').join(', ')
+  return db.query<Workspace>(`SELECT * FROM workspaces WHERE id IN (${placeholders})`, ids)
+}
+
+export async function getMembershipsByEmail(email: string): Promise<WorkspaceMember[]> {
+  return db.query<WorkspaceMember>(
+    'SELECT * FROM workspace_members WHERE email = ? ORDER BY added_at DESC',
+    [email.toLowerCase()]
+  )
+}
+
+export async function leaveWorkspace(workspaceId: string, userId: string): Promise<boolean> {
+  // Cannot leave if you are the sole admin
+  const admins = await db.query<{ user_id: string }>(
+    `SELECT user_id FROM workspace_members WHERE workspace_id = ? AND role = 'admin' AND status = 'active'`,
+    [workspaceId]
+  )
+  if (admins.length === 1 && admins[0].user_id === userId) return false
+  await db.execute(
+    `UPDATE workspace_members SET status = 'revoked' WHERE workspace_id = ? AND user_id = ?`,
+    [workspaceId, userId]
+  )
+  return true
+}
+
+export async function acceptConsent(memberId: string, userId: string): Promise<void> {
+  await db.execute(
+    `UPDATE workspace_members SET status = 'active', user_id = ? WHERE id = ?`,
+    [userId, memberId]
+  )
+}
+
+export async function declineConsent(memberId: string): Promise<void> {
+  await db.execute(
+    `UPDATE workspace_members SET status = 'declined' WHERE id = ?`,
+    [memberId]
+  )
+}
+
 // ─── Overrides ────────────────────────────────────────────────────────────────
 
 export async function createAdminOverride(params: {
