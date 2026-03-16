@@ -320,6 +320,26 @@ export async function getWorkspaceOverrides(workspaceId: string): Promise<AdminO
   )
 }
 
+export interface MemberWithUser {
+  member_id: string
+  workspace_id: string
+  user_id: string
+  email: string
+  role: string
+  full_name: string | null
+}
+
+export async function getActiveMembersWithDetails(workspaceId: string): Promise<MemberWithUser[]> {
+  return db.query<MemberWithUser>(
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name
+     FROM workspace_members wm
+     LEFT JOIN users u ON u.id = wm.user_id
+     WHERE wm.workspace_id = ? AND wm.status = 'active' AND wm.user_id IS NOT NULL
+     ORDER BY u.full_name ASC, wm.email ASC`,
+    [workspaceId]
+  )
+}
+
 export async function getOverrideEventIds(workspaceId: string): Promise<Set<string>> {
   const rows = await db.query<{ presence_event_id: string }>(
     'SELECT presence_event_id FROM admin_overrides WHERE workspace_id = ?',
