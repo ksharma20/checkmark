@@ -1,0 +1,147 @@
+import { db } from '../index'
+
+export interface User {
+  id: string
+  email: string
+  email_verified: number
+  password_hash: string
+  full_name: string | null
+  avatar_url: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OtpCode {
+  id: string
+  email: string
+  code: string
+  purpose: string
+  expires_at: string
+  used: number
+  created_at: string
+}
+
+export async function getUserByEmail(email: string): Promise<User | null> {
+  return db.queryOne<User>('SELECT * FROM users WHERE email = ?', [email])
+}
+
+export async function getUserById(id: string): Promise<User | null> {
+  return db.queryOne<User>('SELECT * FROM users WHERE id = ?', [id])
+}
+
+export async function createUser(params: {
+  email: string
+  passwordHash: string
+  fullName?: string
+}): Promise<User> {
+  const id = crypto.randomUUID().replace(/-/g, '')
+  await db.execute(
+    `INSERT INTO users (id, email, password_hash, full_name, email_verified)
+     VALUES (?, ?, ?, ?, 1)`,
+    [id, params.email, params.passwordHash, params.fullName ?? null]
+  )
+  return db.queryOne<User>('SELECT * FROM users WHERE id = ?', [id]) as Promise<User>
+}
+
+export async function updateUserName(userId: string, fullName: string): Promise<void> {
+  await db.execute(
+    `UPDATE users SET full_name = ?, updated_at = datetime('now') WHERE id = ?`,
+    [fullName, userId]
+  )
+}
+
+export async function updateUserPassword(userId: string, passwordHash: string): Promise<void> {
+  await db.execute(
+    `UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
+    [passwordHash, userId]
+  )
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  await db.execute('DELETE FROM users WHERE id = ?', [userId])
+}
+
+// ─── OTP ─────────────────────────────────────────────────────────────────────
+
+export async function createOtp(params: {
+  email: string
+  code: string
+  purpose: string
+  expiresAt: string
+}): Promise<void> {
+  const id = crypto.randomUUID().replace(/-/g, '')
+  await db.execute(
+    `INSERT INTO otp_codes (id, email, code, purpose, expires_at) VALUES (?, ?, ?, ?, ?)`,
+    [id, params.email, params.code, params.purpose, params.expiresAt]
+  )
+}
+
+export async function getValidOtp(email: string, code: string, purpose: string): Promise<OtpCode | null> {
+  return db.queryOne<OtpCode>(
+    `SELECT * FROM otp_codes
+     WHERE email = ? AND code = ? AND purpose = ? AND used = 0
+       AND expires_at > datetime('now')
+     ORDER BY created_at DESC LIMIT 1`,
+    [email, code, purpose]
+  )
+}
+
+export async function markOtpUsed(id: string): Promise<void> {
+  await db.execute('UPDATE otp_codes SET used = 1 WHERE id = ?', [id])
+}
+
+export async function countRecentOtps(email: string, withinMinutes: number = 60): Promise<number> {
+  const result = await db.queryOne<{ count: number }>(
+    `SELECT COUNT(*) as count FROM otp_codes
+     WHERE email = ? AND created_at > datetime('now', ?)`,
+    [email, `-${withinMinutes} minutes`]
+  )
+  return result?.count ?? 0
+}
+
+// ─── API Tokens ───────────────────────────────────────────────────────────────
+
+export interface UserApiToken {
+  id: string
+  user_id: string
+  name: string
+  token_hash: string
+  scopes: string
+  last_used_at: string | null
+  revoked_at: string | null
+  created_at: string
+}
+
+export async function getUserApiTokens(userId: string): Promise<UserApiToken[]> {
+  return db.query<UserApiToken>(
+    `SELECT * FROM user_api_tokens WHERE user_id = ? AND revoked_at IS NULL ORDER BY created_at DESC`,
+    [userId]
+  )
+}
+
+export async function createApiToken(params: {
+  userId: string
+  name: string
+  tokenHash: string
+}): Promise<UserApiToken> {
+  const id = crypto.randomUUID().replace(/-/g, '')
+  await db.execute(
+    `INSERT INTO user_api_tokens (id, user_id, name, token_hash) VALUES (?, ?, ?, ?)`,
+    [id, params.userId, params.name, params.tokenHash]
+  )
+  return db.queryOne<UserApiToken>('SELECT * FROM user_api_tokens WHERE id = ?', [id]) as Promise<UserApiToken>
+}
+
+export async function revokeApiToken(tokenId: string, userId: string): Promise<void> {
+  await db.execute(
+    `UPDATE user_api_tokens SET revoked_at = datetime('now') WHERE id = ? AND user_id = ?`,
+    [tokenId, userId]
+  )
+}
+
+export async function getApiTokenByHash(tokenHash: string): Promise<UserApiToken | null> {
+  return db.queryOne<UserApiToken>(
+    `SELECT * FROM user_api_tokens WHERE token_hash = ? AND revoked_at IS NULL`,
+    [tokenHash]
+  )
+}
