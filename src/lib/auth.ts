@@ -110,6 +110,43 @@ export function otpExpiresAt(): string {
   return new Date(Date.now() + 10 * 60 * 1000).toISOString()
 }
 
+// ─── OTP verification cookie ─────────────────────────────────────────────────
+
+const OTP_COOKIE_NAME = 'cm_otp_ok'
+
+export async function setOtpVerifiedCookie(email: string): Promise<void> {
+  const token = await new SignJWT({ email, purpose: 'otp_verified' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('15m')
+    .sign(getJwtSecret())
+  const cookieStore = await cookies()
+  cookieStore.set(OTP_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 15,
+  })
+}
+
+export async function verifyOtpCookie(email: string): Promise<boolean> {
+  const cookieStore = await cookies()
+  const token = cookieStore.get(OTP_COOKIE_NAME)?.value
+  if (!token) return false
+  try {
+    const { payload } = await jwtVerify(token, getJwtSecret())
+    return payload.email === email && payload.purpose === 'otp_verified'
+  } catch {
+    return false
+  }
+}
+
+export async function clearOtpCookie(): Promise<void> {
+  const cookieStore = await cookies()
+  cookieStore.delete(OTP_COOKIE_NAME)
+}
+
 // ─── Server component helper ──────────────────────────────────────────────────
 
 /** Read the user identity set by proxy.ts — only valid in Server Components and Route Handlers. */

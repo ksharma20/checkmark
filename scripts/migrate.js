@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   plan TEXT NOT NULL DEFAULT 'free',
+  org_type TEXT,
   display_timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
   domain_verified INTEGER NOT NULL DEFAULT 0,
   verification_token TEXT,
@@ -173,6 +174,19 @@ for (const statement of statements) {
     console.error(`Failed on statement:\n${statement}\n`)
     console.error(err)
     process.exit(1)
+  }
+}
+
+// Additive column migrations (idempotent — ignore "duplicate column" errors)
+const COLUMN_MIGRATIONS = [
+  `ALTER TABLE workspaces ADD COLUMN org_type TEXT`,
+]
+for (const stmt of COLUMN_MIGRATIONS) {
+  try {
+    db.prepare(stmt).run()
+    ran++
+  } catch {
+    // Column already exists — safe to ignore
   }
 }
 

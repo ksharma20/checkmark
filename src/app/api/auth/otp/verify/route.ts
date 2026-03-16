@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getValidOtp, markOtpUsed } from '@/lib/db/queries/users'
+import { setOtpVerifiedCookie } from '@/lib/auth'
 
 function apiError(message: string, code: string, status: number) {
   return NextResponse.json({ error: message, code }, { status })
@@ -26,6 +27,7 @@ export async function POST(request: NextRequest) {
   }
 
   await markOtpUsed(otp.id)
+  await setOtpVerifiedCookie(email)
 
   return NextResponse.json({ verified: true })
 }

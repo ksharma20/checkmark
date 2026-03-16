@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   slug TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   plan TEXT NOT NULL DEFAULT 'free',
+  org_type TEXT,
   display_timezone TEXT NOT NULL DEFAULT 'Asia/Kolkata',
   domain_verified INTEGER NOT NULL DEFAULT 0,
   verification_token TEXT,
