@@ -152,14 +152,26 @@ interface SignalRow {
 function WorkspaceSection({ slug }: { slug: string }) {
   const [name, setName] = useState('')
   const [tz, setTz] = useState('UTC')
+  const [fetching, setFetching] = useState(true)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
 
-  // Load current timezone from signals endpoint piggyback — we patch it via PATCH /api/ws/[slug]
-  // For the tz selector, we start at UTC and let user change it
   useEffect(() => {
-    // Pre-populate timezone from the settings saved previously (best-effort)
-  }, [])
+    fetch(`/api/ws/${slug}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return
+        setName(data.name ?? '')
+        // Use stored timezone if it's in our list; otherwise keep UTC
+        if (data.display_timezone && TIMEZONES.includes(data.display_timezone)) {
+          setTz(data.display_timezone)
+        } else if (data.display_timezone) {
+          // Add it dynamically so it's selectable even if not in the static list
+          setTz(data.display_timezone)
+        }
+      })
+      .finally(() => setFetching(false))
+  }, [slug])
 
   async function save() {
     setLoading(true)
@@ -168,7 +180,7 @@ function WorkspaceSection({ slug }: { slug: string }) {
       const res = await fetch(`/api/ws/${slug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name || undefined, displayTimezone: tz }),
+        body: JSON.stringify({ name: name.trim() || undefined, displayTimezone: tz }),
       })
       setStatus(res.ok ? { text: 'Settings saved', ok: true } : { text: 'Save failed', ok: false })
     } finally {
@@ -176,8 +188,14 @@ function WorkspaceSection({ slug }: { slug: string }) {
     }
   }
 
+  const tzOptions = TIMEZONES.includes(tz) ? TIMEZONES : [tz, ...TIMEZONES]
+
   return (
     <SectionCard title="Workspace details">
+      {fetching ? (
+        <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif', marginBottom: '14px' }}>Loading…</p>
+      ) : (
+        <>
       <FieldGroup label="Workspace name">
         <input
           type="text"
@@ -193,7 +211,7 @@ function WorkspaceSection({ slug }: { slug: string }) {
           onChange={(e) => setTz(e.target.value)}
           style={{ ...inputStyle, cursor: 'pointer' }}
         >
-          {TIMEZONES.map((t) => (
+          {tzOptions.map((t) => (
             <option key={t} value={t}>{t}</option>
           ))}
         </select>
@@ -211,6 +229,8 @@ function WorkspaceSection({ slug }: { slug: string }) {
       </p>
       <PrimaryBtn onClick={save} loading={loading}>Save settings</PrimaryBtn>
       <StatusLine msg={status} />
+        </>
+      )}
     </SectionCard>
   )
 }

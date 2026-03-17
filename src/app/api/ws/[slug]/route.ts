@@ -4,6 +4,17 @@ import { updateWorkspace } from '@/lib/db/queries/workspaces'
 
 interface Props { params: Promise<{ slug: string }> }
 
+export async function GET(request: NextRequest, { params }: Props) {
+  const { slug } = await params
+  const ctx = await requireWsAdmin(request, slug)
+  if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+
+  return NextResponse.json({
+    name: ctx.workspace.name,
+    display_timezone: ctx.workspace.display_timezone,
+  })
+}
+
 export async function PATCH(request: NextRequest, { params }: Props) {
   const { slug } = await params
   const ctx = await requireWsAdmin(request, slug)

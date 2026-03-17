@@ -1,8 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
 import { fmtTime, durationLabel, isWithinMinutes } from '@/lib/client/format-time'
+
+function useReverseGeo(lat: number | null, lng: number | null): string | null {
+  const [label, setLabel] = useState<string | null>(null)
+  useEffect(() => {
+    if (lat === null || lng === null) return
+    let cancelled = false
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=14&addressdetails=1`,
+      { headers: { 'Accept-Language': 'en' } }
+    )
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (cancelled || !data?.address) return
+        const a = data.address
+        // Build a short readable label: suburb/neighbourhood + city/town, country
+        const part1 = a.suburb ?? a.neighbourhood ?? a.quarter ?? a.village ?? a.town ?? a.city_district ?? ''
+        const part2 = a.city ?? a.town ?? a.county ?? a.state ?? ''
+        const parts = [part1, part2].filter(Boolean)
+        setLabel(parts.length > 0 ? parts.join(', ') : data.display_name?.split(',').slice(0, 2).join(',').trim() ?? null)
+      })
+      .catch(() => {/* fail silently, fallback to coords */})
+    return () => { cancelled = true }
+  }, [lat, lng])
+  return label
+}
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   office_checkin: 'Office',
@@ -17,6 +42,7 @@ interface EventCardProps {
 }
 
 export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardProps) {
+  const geoLabel = useReverseGeo(event.gps_lat ?? null, event.gps_lng ?? null)
   const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(event.note ?? '')
   const [saving, setSaving] = useState(false)
@@ -207,12 +233,12 @@ export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardPr
             rel="noopener noreferrer"
             style={{
               fontSize: '11px',
-              fontFamily: 'JetBrains Mono, monospace',
+              fontFamily: geoLabel ? 'DM Sans, sans-serif' : 'JetBrains Mono, monospace',
               color: 'var(--brand)',
               textDecoration: 'none',
             }}
           >
-            ◉ {event.gps_lat.toFixed(4)}, {event.gps_lng.toFixed(4)}
+            ◉ {geoLabel ?? `${event.gps_lat.toFixed(4)}, ${event.gps_lng.toFixed(4)}`}
           </a>
         )}
 

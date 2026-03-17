@@ -5,6 +5,7 @@ import { queryWorkspaceEvents } from '@/lib/signals'
 import type { PresenceEventWithMatch, MatchedBy } from '@/lib/signals'
 import type { MemberWithUser } from '@/lib/db/queries/workspaces'
 import { todayInTz, localMidnightToUtc, formatInTz, durationHours } from '@/lib/timezone'
+import { getPlanLimits } from '@/lib/plans'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -317,6 +318,12 @@ export default async function WsTodayPage({ params }: Props) {
     day: 'numeric',
   })
 
+  // Plan limit banner
+  const planLimits = getPlanLimits(workspace.plan)
+  const memberCount = members.length
+  const atLimit = planLimits.maxUsers !== null && memberCount >= planLimits.maxUsers
+  const nearLimit = planLimits.maxUsers !== null && !atLimit && memberCount >= planLimits.maxUsers - 2
+
   return (
     <div
       style={{
@@ -325,6 +332,28 @@ export default async function WsTodayPage({ params }: Props) {
         padding: '24px 20px',
       }}
     >
+      {/* Plan limit banner */}
+      {(atLimit || nearLimit) && (
+        <div
+          style={{
+            background: atLimit
+              ? 'color-mix(in srgb, var(--danger) 8%, transparent)'
+              : 'color-mix(in srgb, var(--amber) 10%, transparent)',
+            border: `1px solid ${atLimit ? 'var(--danger)' : 'var(--amber)'}`,
+            borderRadius: 'var(--radius-md)',
+            padding: '10px 14px',
+            marginBottom: '16px',
+            fontSize: '13px',
+            fontFamily: 'DM Sans, sans-serif',
+            color: atLimit ? 'var(--danger)' : 'var(--text-secondary)',
+          }}
+        >
+          {atLimit
+            ? `Member limit reached — ${memberCount}/${planLimits.maxUsers} on the ${workspace.plan} plan. Upgrade to add more members.`
+            : `Approaching member limit — ${memberCount}/${planLimits.maxUsers} on the ${workspace.plan} plan.`}
+        </div>
+      )}
+
       {/* Date + meta row */}
       <div
         style={{

@@ -2,11 +2,9 @@ import { getServerUser } from '@/lib/auth'
 import { getOpenEventToday, getUserEvents } from '@/lib/db/queries/events'
 import { getUserStats } from '@/lib/db/queries/stats'
 import { getUserWorkspaces, getWorkspacesByIds } from '@/lib/db/queries/workspaces'
-import { getUserById } from '@/lib/db/queries/users'
 import CheckinButtons from '@/components/user/CheckinButtons'
 import EventCard from '@/components/user/EventCard'
 import TimezoneReporter from '@/components/user/TimezoneReporter'
-import TimezoneBanner from '@/components/user/TimezoneBanner'
 
 export default async function MePage() {
   const user = await getServerUser()
@@ -17,13 +15,12 @@ export default async function MePage() {
   const monthStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
   const nextMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
 
-  const [activeEvent, todayResult, monthResult, stats, memberships, fullUser] = await Promise.all([
+  const [activeEvent, todayResult, monthResult, stats, memberships] = await Promise.all([
     getOpenEventToday(user.userId),
     getUserEvents({ userId: user.userId, start: `${todayStr}T00:00:00.000Z`, end: `${todayStr}T23:59:59.999Z` }),
     getUserEvents({ userId: user.userId, start: `${monthStr}T00:00:00.000Z`, end: nextMonthDate.toISOString(), limit: 500 }),
     getUserStats(user.userId),
     getUserWorkspaces(user.userId),
-    getUserById(user.userId),
   ])
 
   const todayEvents = todayResult.events
@@ -57,14 +54,8 @@ export default async function MePage() {
         padding: '20px 16px',
       }}
     >
-      {/* Silent timezone reporter — updates DB on every visit */}
+      {/* Silent timezone reporter — keeps DB in sync with browser timezone */}
       <TimezoneReporter />
-
-      {/* Timezone confirmation banner — shown once until user confirms */}
-      <TimezoneBanner
-        storedTimezone={fullUser?.timezone ?? null}
-        confirmed={fullUser?.timezone_confirmed === 1}
-      />
 
       {/* Check-in / checkout buttons (includes status line + active indicator) */}
       <CheckinButtons activeEvent={activeEvent} />

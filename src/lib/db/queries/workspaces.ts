@@ -125,6 +125,25 @@ export async function markDomainVerified(domainId: string): Promise<void> {
   )
 }
 
+/**
+ * Find active users whose email matches a domain and are NOT already
+ * active members of the given workspace. Used for auto-enrolment on domain verify.
+ */
+export async function getUsersMatchingDomainNotInWorkspace(
+  workspaceId: string,
+  domain: string
+): Promise<{ id: string; email: string }[]> {
+  return db.query<{ id: string; email: string }>(
+    `SELECT u.id, u.email FROM users u
+     WHERE u.email LIKE ? AND u.email_verified = 1
+     AND u.id NOT IN (
+       SELECT user_id FROM workspace_members
+       WHERE workspace_id = ? AND user_id IS NOT NULL AND status = 'active'
+     )`,
+    [`%@${domain}`, workspaceId]
+  )
+}
+
 export async function getVerifiedDomainsForEmail(email: string): Promise<string[]> {
   const domain = email.split('@')[1]?.toLowerCase()
   if (!domain) return []

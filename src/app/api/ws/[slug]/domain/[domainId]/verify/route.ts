@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
-import { getWorkspaceDomains, markDomainVerified } from '@/lib/db/queries/workspaces'
+import {
+  getWorkspaceDomains,
+  markDomainVerified,
+  getUsersMatchingDomainNotInWorkspace,
+  addWorkspaceMember,
+} from '@/lib/db/queries/workspaces'
 import { domainVerifyToken, checkDnsVerification } from '@/lib/domain-verify'
 
 interface Props { params: Promise<{ slug: string; domainId: string }> }
@@ -23,7 +28,22 @@ export async function POST(request: NextRequest, { params }: Props) {
 
   if (found) {
     await markDomainVerified(domainId)
-    return NextResponse.json({ verified: true })
+
+    // Auto-enrol existing users whose email matches the now-verified domain
+    const unregistered = await getUsersMatchingDomainNotInWorkspace(ctx.workspace.id, domain.domain)
+    await Promise.all(
+      unregistered.map((u) =>
+        addWorkspaceMember({
+          workspaceId: ctx.workspace.id,
+          userId: u.id,
+          email: u.email,
+          role: 'member',
+          status: 'active',
+        })
+      )
+    )
+
+    return NextResponse.json({ verified: true, enrolled: unregistered.length })
   }
 
   return NextResponse.json({
