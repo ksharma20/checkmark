@@ -6,6 +6,7 @@ export interface PresenceEvent {
   event_type: string
   checkin_at: string
   checkout_at: string | null
+  checkout_reason: string | null
   note: string | null
   wifi_ssid: string | null
   ip_address: string
@@ -79,11 +80,13 @@ export async function checkoutEvent(
     checkoutIpAddress?: string | null
     checkoutIpGeoLat?: number | null
     checkoutIpGeoLng?: number | null
+    checkoutReason?: string | null
   }
 ): Promise<PresenceEvent | null> {
   await db.execute(
     `UPDATE presence_events
      SET checkout_at = datetime('now'),
+         checkout_reason = ?,
          checkout_gps_lat = ?,
          checkout_gps_lng = ?,
          checkout_gps_accuracy_m = ?,
@@ -93,6 +96,7 @@ export async function checkoutEvent(
          checkout_ip_geo_lng = ?
      WHERE id = ? AND user_id = ? AND checkout_at IS NULL`,
     [
+      signals?.checkoutReason ?? null,
       signals?.checkoutGpsLat ?? null,
       signals?.checkoutGpsLng ?? null,
       signals?.checkoutGpsAccuracyM ?? null,

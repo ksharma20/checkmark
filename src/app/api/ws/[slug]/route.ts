@@ -12,6 +12,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   return NextResponse.json({
     name: ctx.workspace.name,
     display_timezone: ctx.workspace.display_timezone,
+    archived_at: ctx.workspace.archived_at,
   })
 }
 

@@ -1,9 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PresenceEvent } from '@/lib/db/queries/events'
-import { fmtTime, fmtTimeOnDate } from '@/lib/client/format-time'
+import { fmtTimeOnDate } from '@/lib/client/format-time'
+
+// Notification schedule (hours from check-in): 8, 12, 16, 18, 20, 22 — then auto-checkout at 24h
+const NOTIFICATION_SCHEDULE_H = [8, 12, 16, 18, 20, 22]
+const AUTO_CHECKOUT_H = 24
+const STALE_NOTIF_KEY = 'cm_stale_notif_count'
+const STALE_NOTIF_EVENT_KEY = 'cm_stale_notif_event'
+
+const NOTIFICATION_MESSAGES: Record<number, { title: string; body: string }> = {
+  8:  { title: 'CheckMark — time to wrap up?', body: "It's been 8 hours. Work-life balance matters — feel free to head out!" },
+  12: { title: 'CheckMark — still going?', body: "12 hours in! Dedication noted, but rest is important too. Time to head home." },
+  16: { title: 'CheckMark — seriously though', body: "16 hours checked in. Even the most committed need sleep. Please check out!" },
+  18: { title: 'CheckMark — we are worried', body: "18 hours! Your productivity has left the building. Be kind to yourself — go home." },
+  20: { title: 'CheckMark — this is getting serious', body: "20 hours and counting. We genuinely recommend a bed over your desk right now." },
+  22: { title: 'CheckMark — final warning', body: "22 hours! Auto-checkout happens in 2 hours. This is your last chance to do it yourself." },
+}
 
 interface CheckinButtonsProps {
   activeEvent: PresenceEvent | null
@@ -13,38 +28,145 @@ type ToastType = 'success' | 'info' | 'error'
 
 export default function CheckinButtons({ activeEvent: initialActiveEvent }: CheckinButtonsProps) {
   const router = useRouter()
-  // Track state locally so button switches instantly on action success;
-  // server refresh then confirms the ground truth.
   const [state, setState] = useState<'checked_in' | 'checked_out'>(
     initialActiveEvent ? 'checked_in' : 'checked_out'
   )
   const [activeEvent, setActiveEvent] = useState(initialActiveEvent)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null)
+  const notifTimers = useRef<ReturnType<typeof setTimeout>[]>([])
+
+  // Schedule browser notifications at 8h, 12h, 16h, 18h, 20h, 22h; auto-checkout at 24h
+  useEffect(() => {
+    if (!activeEvent) return
+
+    const checkinMs = new Date(
+      activeEvent.checkin_at.includes('T')
+        ? activeEvent.checkin_at
+        : activeEvent.checkin_at.replace(' ', 'T') + 'Z'
+    ).getTime()
+
+    notifTimers.current.forEach(clearTimeout)
+    notifTimers.current = []
+
+    try {
+      const storedEventId = localStorage.getItem(STALE_NOTIF_EVENT_KEY)
+      if (storedEventId !== activeEvent.id) {
+        localStorage.setItem(STALE_NOTIF_EVENT_KEY, activeEvent.id)
+        localStorage.setItem(STALE_NOTIF_KEY, '0')
+      }
+    } catch { /* localStorage may be unavailable */ }
+
+    let sentSoFar = 0
+    try {
+      sentSoFar = parseInt(localStorage.getItem(STALE_NOTIF_KEY) ?? '0', 10)
+    } catch { /* ignore */ }
+
+    // Schedule the 6 notifications
+    NOTIFICATION_SCHEDULE_H.slice(sentSoFar).forEach((hour, i) => {
+      const fireAt = checkinMs + hour * 60 * 60 * 1000
+      const delay = fireAt - Date.now()
+      if (delay <= 0) return
+      const notifIndex = sentSoFar + i + 1
+      const timer = setTimeout(() => {
+        try { localStorage.setItem(STALE_NOTIF_KEY, String(notifIndex)) } catch { /* ignore */ }
+        fireStaleNotification(hour)
+      }, delay)
+      notifTimers.current.push(timer)
+    })
+
+    // Schedule auto-checkout at 24h
+    const autoCheckoutAt = checkinMs + AUTO_CHECKOUT_H * 60 * 60 * 1000
+    const autoDelay = autoCheckoutAt - Date.now()
+    if (autoDelay > 0) {
+      const timer = setTimeout(() => { void triggerAutoCheckout() }, autoDelay)
+      notifTimers.current.push(timer)
+    } else {
+      // Already past 24h — trigger immediately
+      void triggerAutoCheckout()
+    }
+
+    return () => {
+      notifTimers.current.forEach(clearTimeout)
+      notifTimers.current = []
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEvent?.id])
+
+  function fireStaleNotification(hour: number) {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission !== 'granted') return
+    const msg = NOTIFICATION_MESSAGES[hour] ?? {
+      title: 'CheckMark — still checked in?',
+      body: `You've been checked in for ${hour} hours. Did you forget to check out?`,
+    }
+    new Notification(msg.title, {
+      body: msg.body,
+      icon: '/favicon.ico',
+      tag: 'cm-stale-checkin',
+    })
+  }
+
+  async function triggerAutoCheckout() {
+    try {
+      const res = await fetch('/api/checkin/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'maximum_hours_exceeded' }),
+      })
+      if (res.ok) {
+        setState('checked_out')
+        setActiveEvent(null)
+        try {
+          localStorage.removeItem(STALE_NOTIF_KEY)
+          localStorage.removeItem(STALE_NOTIF_EVENT_KEY)
+        } catch { /* ignore */ }
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          new Notification('CheckMark — auto checked out', {
+            body: 'You were automatically checked out after 24 hours.',
+            icon: '/favicon.ico',
+            tag: 'cm-auto-checkout',
+          })
+        }
+        router.refresh()
+      }
+    } catch { /* silent — will retry on next page load */ }
+  }
+
+  async function requestNotificationPermission() {
+    if (typeof window === 'undefined' || !('Notification' in window)) return
+    if (Notification.permission === 'default') {
+      await Notification.requestPermission()
+    }
+  }
 
   function showToast(message: string, type: ToastType = 'success') {
     setToast({ message, type })
     setTimeout(() => setToast(null), 4000)
   }
 
-  async function collectGps(): Promise<{ lat: number; lng: number; accuracy: number } | null> {
+  type GpsResult =
+    | { ok: true; lat: number; lng: number; accuracy: number }
+    | { ok: false; reason: 'denied' | 'timeout' | 'unavailable' }
+
+  async function collectGps(): Promise<GpsResult> {
     return new Promise((resolve) => {
       if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        resolve(null)
+        resolve({ ok: false, reason: 'unavailable' })
         return
       }
       navigator.geolocation.getCurrentPosition(
         (pos) =>
           resolve({
+            ok: true,
             lat: pos.coords.latitude,
             lng: pos.coords.longitude,
             accuracy: pos.coords.accuracy,
           }),
         (err) => {
-          if (err.code === 1) {
-            // PERMISSION_DENIED — surface this in the toast after action
-          }
-          resolve(null)
+          if (err.code === 1) resolve({ ok: false, reason: 'denied' })
+          else if (err.code === 3) resolve({ ok: false, reason: 'timeout' })
+          else resolve({ ok: false, reason: 'unavailable' })
         },
         { timeout: 8000, maximumAge: 30000 }
       )
@@ -63,14 +185,15 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
     try {
       const gps = await collectGps()
       const wifi = getWifiSsid()
+      const gpsCoords = gps.ok ? gps : null
 
       const res = await fetch('/api/checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          gps_lat: gps?.lat,
-          gps_lng: gps?.lng,
-          gps_accuracy_m: gps?.accuracy ? Math.round(gps.accuracy) : undefined,
+          gps_lat: gpsCoords?.lat,
+          gps_lng: gpsCoords?.lng,
+          gps_accuracy_m: gpsCoords?.accuracy ? Math.round(gpsCoords.accuracy) : undefined,
           wifi_ssid: wifi ?? undefined,
         }),
       })
@@ -78,16 +201,20 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
       const data = await res.json()
 
       if (res.ok) {
-        // Switch state immediately — don't wait for server refresh
         setState('checked_in')
         setActiveEvent(data.event)
-        showToast(
-          gps ? 'Checked in!' : 'Checked in without GPS — location helps orgs verify your presence.',
-          gps ? 'success' : 'info'
-        )
-        router.refresh() // server re-renders to confirm
+        await requestNotificationPermission()
+        if (gps.ok) {
+          showToast('Checked in!', 'success')
+        } else if (gps.reason === 'denied') {
+          showToast('Checked in without GPS. Location access was blocked — enable it in browser settings to verify your presence.', 'info')
+        } else if (gps.reason === 'timeout') {
+          showToast("Checked in without GPS. Couldn't get your location in time.", 'info')
+        } else {
+          showToast('Checked in without GPS — location helps orgs verify your presence.', 'info')
+        }
+        router.refresh()
       } else if (res.status === 409) {
-        // Already checked in — re-sync state
         setState('checked_in')
         showToast(data.error || 'Already checked in.', 'info')
         router.refresh()
@@ -105,17 +232,17 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
     if (state !== 'checked_in' || loading) return
     setLoading(true)
     try {
-      // Capture location signals at checkout time
       const gps = await collectGps()
       const wifi = getWifiSsid()
+      const gpsCoords = gps.ok ? gps : null
 
       const res = await fetch('/api/checkin/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          gps_lat: gps?.lat,
-          gps_lng: gps?.lng,
-          gps_accuracy_m: gps?.accuracy ? Math.round(gps.accuracy) : undefined,
+          gps_lat: gpsCoords?.lat,
+          gps_lng: gpsCoords?.lng,
+          gps_accuracy_m: gpsCoords?.accuracy ? Math.round(gpsCoords.accuracy) : undefined,
           wifi_ssid: wifi ?? undefined,
         }),
       })
@@ -126,10 +253,15 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
         const hrs = data.duration_hours ? `${data.duration_hours.toFixed(1)}h` : ''
         setState('checked_out')
         setActiveEvent(null)
+        notifTimers.current.forEach(clearTimeout)
+        notifTimers.current = []
+        try {
+          localStorage.removeItem(STALE_NOTIF_KEY)
+          localStorage.removeItem(STALE_NOTIF_EVENT_KEY)
+        } catch { /* ignore */ }
         showToast(`Checked out${hrs ? ` — ${hrs} logged` : ''}`, 'success')
         router.refresh()
       } else if (res.status === 409) {
-        // Not checked in — re-sync
         setState('checked_out')
         setActiveEvent(null)
         showToast(data.error || "You're not checked in.", 'info')
@@ -153,7 +285,6 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
 
   const isCheckedIn = state === 'checked_in'
 
-  // Today's date for the header — browser local timezone
   const todayDisplay = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
@@ -174,7 +305,7 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
         {todayDisplay}
       </p>
 
-      {/* Status line — single source of truth, client-rendered */}
+      {/* Status line */}
       <p
         style={{
           fontSize: '15px',

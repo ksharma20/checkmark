@@ -1,0 +1,210 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { requireWsAdmin } from '@/lib/ws-admin'
+import { getActiveMemberIds } from '@/lib/db/queries/workspaces'
+import { getEventsForUsers } from '@/lib/db/queries/events'
+import { queryWorkspaceEvents } from '@/lib/signals'
+
+interface Props { params: Promise<{ slug: string }> }
+
+export type InsightInterval = 'today' | 'week' | 'month' | '3month' | '6month' | 'year'
+
+export interface InsightBucket {
+  label: string    // display label (e.g. "9 AM", "Mon 17", "Mar")
+  key: string      // sort key (ISO string or hour number)
+  unique_users: number   // distinct users who had at least one check-in
+  total_checkins: number // total events (could be multiple per user per day)
+  total_hours: number    // sum of all session durations (completed events only)
+}
+
+export interface InsightsResponse {
+  interval: InsightInterval
+  buckets: InsightBucket[]
+  total_members: number
+  peak_bucket: string | null   // key of the highest unique_users bucket
+  avg_daily_users: number
+}
+
+/** Zero-pad to 2 digits */
+function zp(n: number) { return String(n).padStart(2, '0') }
+
+/** ISO date from UTC components */
+function isoDate(y: number, m: number, d: number) {
+  return `${y}-${zp(m)}-${zp(d)}`
+}
+
+/** Sum session hours for completed events */
+function sessionHours(events: { checkin_at: string; checkout_at: string | null }[]): number {
+  let total = 0
+  for (const ev of events) {
+    if (!ev.checkout_at) continue
+    const cin = new Date(ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z').getTime()
+    const cout = new Date(ev.checkout_at.includes('T') ? ev.checkout_at : ev.checkout_at.replace(' ', 'T') + 'Z').getTime()
+    total += Math.max(0, (cout - cin) / (1000 * 60 * 60))
+  }
+  return Math.round(total * 10) / 10
+}
+
+/**
+ * GET /api/ws/[slug]/insights?interval=today|week|month|3month|6month|year
+ *
+ * Returns time-bucketed check-in data for the insights charts.
+ */
+export async function GET(request: NextRequest, { params }: Props) {
+  const { slug } = await params
+  const ctx = await requireWsAdmin(request, slug)
+  if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+
+  const url = new URL(request.url)
+  const interval = (url.searchParams.get('interval') ?? 'month') as InsightInterval
+
+  const now = new Date()
+  const todayStr = now.toISOString().slice(0, 10)
+
+  // Compute date range and bucket definitions based on interval
+  let startDate: string
+  let endDate: string
+  type BucketDef = { key: string; label: string; match: (dt: Date) => boolean }
+  let bucketDefs: BucketDef[] = []
+
+  if (interval === 'today') {
+    startDate = todayStr + 'T00:00:00Z'
+    endDate = todayStr + 'T23:59:59Z'
+    // Hourly buckets: 12 AM to 11 PM
+    for (let h = 0; h < 24; h++) {
+      const label = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`
+      bucketDefs.push({
+        key: zp(h),
+        label,
+        match: (dt) => dt.getUTCHours() === h && dt.toISOString().slice(0, 10) === todayStr,
+      })
+    }
+  } else if (interval === 'week') {
+    const weekAgo = new Date(now)
+    weekAgo.setUTCDate(weekAgo.getUTCDate() - 6)
+    startDate = weekAgo.toISOString().slice(0, 10) + 'T00:00:00Z'
+    endDate = todayStr + 'T23:59:59Z'
+    // Daily buckets for last 7 days
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now)
+      d.setUTCDate(d.getUTCDate() - i)
+      const dayStr = d.toISOString().slice(0, 10)
+      const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' })
+      bucketDefs.push({
+        key: dayStr,
+        label,
+        match: (dt) => dt.toISOString().slice(0, 10) === dayStr,
+      })
+    }
+  } else if (interval === 'month') {
+    const year = now.getUTCFullYear()
+    const month = now.getUTCMonth() + 1
+    startDate = isoDate(year, month, 1) + 'T00:00:00Z'
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    endDate = isoDate(year, month, lastDay) + 'T23:59:59Z'
+    // Daily buckets 1..lastDay
+    for (let d = 1; d <= lastDay; d++) {
+      const dayStr = isoDate(year, month, d)
+      bucketDefs.push({ key: dayStr, label: String(d), match: (dt) => dt.toISOString().slice(0, 10) === dayStr })
+    }
+  } else if (interval === '3month') {
+    const start = new Date(now)
+    start.setUTCMonth(start.getUTCMonth() - 2, 1)
+    startDate = isoDate(start.getUTCFullYear(), start.getUTCMonth() + 1, 1) + 'T00:00:00Z'
+    endDate = todayStr + 'T23:59:59Z'
+    // Weekly buckets
+    const cur = new Date(start)
+    while (cur <= now) {
+      const weekStart = cur.toISOString().slice(0, 10)
+      const weekEnd = new Date(cur)
+      weekEnd.setUTCDate(weekEnd.getUTCDate() + 6)
+      const weekEndStr = weekEnd.toISOString().slice(0, 10)
+      const label = `${cur.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`
+      const ws = weekStart, we = weekEndStr
+      bucketDefs.push({
+        key: ws,
+        label,
+        match: (dt) => dt.toISOString().slice(0, 10) >= ws && dt.toISOString().slice(0, 10) <= we,
+      })
+      cur.setUTCDate(cur.getUTCDate() + 7)
+    }
+  } else if (interval === '6month') {
+    const start = new Date(now)
+    start.setUTCMonth(start.getUTCMonth() - 5, 1)
+    startDate = isoDate(start.getUTCFullYear(), start.getUTCMonth() + 1, 1) + 'T00:00:00Z'
+    endDate = todayStr + 'T23:59:59Z'
+    // Monthly buckets
+    const cur = new Date(start)
+    while (cur.getUTCFullYear() < now.getUTCFullYear() ||
+           (cur.getUTCFullYear() === now.getUTCFullYear() && cur.getUTCMonth() <= now.getUTCMonth())) {
+      const y = cur.getUTCFullYear(), m = cur.getUTCMonth() + 1
+      const monthKey = isoDate(y, m, 1)
+      const label = cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+      const lastD = new Date(Date.UTC(y, m, 0)).getUTCDate()
+      const monthEnd = isoDate(y, m, lastD)
+      bucketDefs.push({
+        key: monthKey,
+        label,
+        match: (dt) => dt.toISOString().slice(0, 10) >= monthKey && dt.toISOString().slice(0, 10) <= monthEnd,
+      })
+      cur.setUTCMonth(cur.getUTCMonth() + 1)
+    }
+  } else {
+    // year — 12 monthly buckets
+    const year = now.getUTCFullYear()
+    startDate = `${year}-01-01T00:00:00Z`
+    endDate = `${year}-12-31T23:59:59Z`
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+    for (let m = 1; m <= 12; m++) {
+      const monthKey = isoDate(year, m, 1)
+      const lastD = new Date(Date.UTC(year, m, 0)).getUTCDate()
+      const monthEnd = isoDate(year, m, lastD)
+      bucketDefs.push({
+        key: monthKey,
+        label: months[m - 1],
+        match: (dt) => dt.toISOString().slice(0, 10) >= monthKey && dt.toISOString().slice(0, 10) <= monthEnd,
+      })
+    }
+  }
+
+  // Fetch events using queryWorkspaceEvents (applies plan + signal matching)
+  const events = await queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, {
+    startDate,
+    endDate,
+  })
+
+  const total_members = (await getActiveMemberIds(ctx.workspace.id)).length
+
+  // Build buckets
+  const buckets: InsightBucket[] = bucketDefs.map((def) => {
+    const matching = events.filter((ev) => def.match(new Date(
+      ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z'
+    )))
+    const unique_users = new Set(matching.map((e) => e.user_id)).size
+    return {
+      label: def.label,
+      key: def.key,
+      unique_users,
+      total_checkins: matching.length,
+      total_hours: sessionHours(matching),
+    }
+  })
+
+  const maxBucket = buckets.reduce<InsightBucket | null>(
+    (best, b) => b.unique_users > (best?.unique_users ?? -1) ? b : best, null
+  )
+
+  const daysWithData = buckets.filter((b) => b.unique_users > 0).length
+  const avg_daily_users = daysWithData > 0
+    ? Math.round((buckets.reduce((s, b) => s + b.unique_users, 0) / daysWithData) * 10) / 10
+    : 0
+
+  const response: InsightsResponse = {
+    interval,
+    buckets,
+    total_members,
+    peak_bucket: maxBucket?.unique_users ? maxBucket.key : null,
+    avg_daily_users,
+  }
+
+  return NextResponse.json(response)
+}

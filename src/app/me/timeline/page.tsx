@@ -60,11 +60,6 @@ export default function TimelinePage() {
     fetchEvents()
   }, [fetchEvents])
 
-  function handleDelete(id: string) {
-    setEvents((prev) => prev.filter((e) => e.id !== id))
-    setTotal((t) => t - 1)
-  }
-
   function handleNoteUpdate(id: string, note: string) {
     setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, note } : e)))
   }
@@ -227,7 +222,6 @@ export default function TimelinePage() {
               <EventCard
                 key={event.id}
                 event={event}
-                onDelete={handleDelete}
                 onNoteUpdate={handleNoteUpdate}
               />
             ))}

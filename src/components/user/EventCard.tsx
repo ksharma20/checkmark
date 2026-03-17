@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
-import { fmtTime, durationLabel, isWithinMinutes } from '@/lib/client/format-time'
+import { fmtTime, durationLabel } from '@/lib/client/format-time'
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   office_checkin: 'Office',
@@ -12,18 +12,14 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 
 interface EventCardProps {
   event: PresenceEvent
-  onDelete?: (id: string) => void
   onNoteUpdate?: (id: string, note: string) => void
 }
 
-export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardProps) {
+export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
   const geoLabel = event.location_label ?? null
   const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(event.note ?? '')
   const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  // 5-minute delete window — computed once on mount (client-side clock)
-  const [canDelete] = useState(() => isWithinMinutes(event.created_at, 5))
 
   const duration = durationLabel(event.checkin_at, event.checkout_at)
   const typeLabel = EVENT_TYPE_LABELS[event.event_type] ?? event.event_type
@@ -47,22 +43,6 @@ export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardPr
       }
     } finally {
       setSaving(false)
-    }
-  }
-
-  async function handleDelete() {
-    if (!confirm('Delete this check-in? This cannot be undone.')) return
-    setDeleting(true)
-    try {
-      const res = await fetch(`/api/events/${event.id}`, { method: 'DELETE' })
-      if (res.ok) {
-        onDelete?.(event.id)
-      } else {
-        const data = await res.json()
-        alert(data.error || 'Delete failed')
-      }
-    } finally {
-      setDeleting(false)
     }
   }
 
@@ -180,7 +160,7 @@ export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardPr
         )}
       </div>
 
-      {/* Meta: WiFi + GPS + delete */}
+      {/* Meta: WiFi + GPS */}
       <div
         style={{
           display: 'flex',
@@ -215,25 +195,6 @@ export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardPr
           >
             ◉ {geoLabel ?? `${event.gps_lat.toFixed(4)}, ${event.gps_lng.toFixed(4)}`}
           </a>
-        )}
-
-        {canDelete && onDelete && (
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            style={{
-              marginLeft: 'auto',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '11px',
-              color: 'var(--danger)',
-              fontFamily: 'DM Sans, sans-serif',
-              padding: 0,
-            }}
-          >
-            {deleting ? 'Deleting…' : 'Delete'}
-          </button>
         )}
       </div>
     </div>

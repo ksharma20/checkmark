@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 
 // ─── Timezone options ─────────────────────────────────────────────────────────
 
@@ -754,6 +754,168 @@ function DomainsSection({ slug }: { slug: string }) {
   )
 }
 
+// ─── Archive / Restore workspace section ──────────────────────────────────────
+
+function ArchiveSection({ slug }: { slug: string }) {
+  const router = useRouter()
+  const [isArchived, setIsArchived] = useState<boolean | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/ws/${slug}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data) setIsArchived(!!data.archived_at)
+      })
+  }, [slug])
+
+  async function archive() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/ws/${slug}/archive`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        router.push('/ws')
+      } else {
+        setError(data.error || 'Archive failed')
+        setConfirming(false)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function restore() {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/ws/${slug}/restore`, { method: 'POST' })
+      const data = await res.json()
+      if (res.ok) {
+        setIsArchived(false)
+        setConfirming(false)
+        router.refresh()
+      } else {
+        setError(data.error || 'Restore failed')
+        setConfirming(false)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (isArchived === null) return null
+
+  return (
+    <SectionCard title={isArchived ? 'Restore workspace' : 'Archive workspace'}>
+      {isArchived ? (
+        <>
+          <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
+            This workspace is currently archived. Restoring it will make it active again (subject to the 1 active workspace limit).
+          </p>
+          {error && (
+            <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--danger)', marginBottom: '12px' }}>{error}</p>
+          )}
+          {!confirming ? (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              style={{
+                height: '44px', padding: '0 20px',
+                background: 'var(--brand)', color: '#fff',
+                border: 'none', borderRadius: 'var(--radius-md)',
+                fontSize: '14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Restore workspace
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-primary)', margin: 0 }}>
+                Restore this workspace?
+              </p>
+              <button
+                type="button"
+                onClick={restore}
+                disabled={loading}
+                style={{
+                  height: '36px', padding: '0 16px',
+                  background: 'var(--brand)', color: '#fff', border: 'none',
+                  borderRadius: 'var(--radius-md)', fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                  cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+                }}
+              >
+                {loading ? '…' : 'Confirm restore'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                style={{ background: 'none', border: 'none', fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
+        <>
+          <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
+            Archiving hides this workspace from your active list. Members and all presence data are preserved. The workspace can be restored at any time from /ws.
+          </p>
+          {error && (
+            <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--danger)', marginBottom: '12px' }}>{error}</p>
+          )}
+          {!confirming ? (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              style={{
+                height: '44px', padding: '0 20px',
+                background: 'transparent', color: 'var(--text-secondary)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                fontSize: '14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 500,
+                cursor: 'pointer',
+              }}
+            >
+              Archive workspace
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-primary)', margin: 0 }}>
+                Archive this workspace?
+              </p>
+              <button
+                type="button"
+                onClick={archive}
+                disabled={loading}
+                style={{
+                  height: '36px', padding: '0 16px',
+                  background: 'var(--danger)', color: '#fff', border: 'none',
+                  borderRadius: 'var(--radius-md)', fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                  cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+                }}
+              >
+                {loading ? '…' : 'Confirm archive'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                style={{ background: 'none', border: 'none', fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </>
+      )}
+    </SectionCard>
+  )
+}
+
 // ─── Logout section ───────────────────────────────────────────────────────────
 
 function LogoutSection() {
@@ -802,6 +964,7 @@ export default function SettingsPage() {
       <WorkspaceSection slug={slug} />
       <SignalsSection slug={slug} />
       <DomainsSection slug={slug} />
+      <ArchiveSection slug={slug} />
       <LogoutSection />
     </div>
   )

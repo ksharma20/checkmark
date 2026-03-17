@@ -504,37 +504,53 @@ function TokensSection() {
 // ─── Organisation features section ────────────────────────────────────────────
 
 function OrgSection() {
+  const [activeWs, setActiveWs] = useState<{ id: string; slug: string; name: string }[] | null>(null)
+
+  useEffect(() => {
+    fetch('/api/workspace')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setActiveWs(d.active ?? []) })
+      .catch(() => setActiveWs([]))
+  }, [])
+
+  // Still loading — render nothing to avoid flash
+  if (activeWs === null) return null
+
+  // Has active workspace — don't show "Switch" prompt
+  if (activeWs.length > 0) return null
+
   return (
     <SectionCard title="Organisation features">
       <p
         style={{
-          fontSize: '13px',
-          fontFamily: 'DM Sans, sans-serif',
-          color: 'var(--text-secondary)',
-          marginBottom: '16px',
+          fontSize: "13px",
+          fontFamily: "DM Sans, sans-serif",
+          color: "var(--text-secondary)",
+          marginBottom: "16px",
           lineHeight: 1.5,
         }}
       >
-        Need to manage your team&apos;s attendance? Create a workspace to track who shows up, view real-time dashboards, and configure location signals.
+        Switch to an organisation account to manage your team&apos;s attendance,
+        view dashboards, and configure location signals for your workspace.
       </p>
       <Link
-        href="/ws/new"
+        href="/ws"
         style={{
-          display: 'inline-flex',
-          alignItems: 'center',
-          height: '44px',
-          padding: '0 20px',
-          background: 'var(--brand)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          fontSize: '14px',
-          fontFamily: 'DM Sans, sans-serif',
+          display: "inline-flex",
+          alignItems: "center",
+          height: "44px",
+          padding: "0 20px",
+          background: "var(--brand)",
+          color: "#fff",
+          border: "none",
+          borderRadius: "var(--radius-md)",
+          fontSize: "14px",
+          fontFamily: "DM Sans, sans-serif",
           fontWeight: 500,
-          textDecoration: 'none',
+          textDecoration: "none",
         }}
       >
-        + Create a workspace
+        Switch to organisation account →
       </Link>
     </SectionCard>
   )

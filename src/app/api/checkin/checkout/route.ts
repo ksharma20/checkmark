@@ -18,12 +18,13 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // Parse optional location body
+  // Parse optional location + reason body
   let body: {
     gps_lat?: number
     gps_lng?: number
     gps_accuracy_m?: number
     wifi_ssid?: string
+    reason?: string
   } = {}
   try {
     body = await request.json()
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
     checkoutIpAddress: ip,
     checkoutIpGeoLat: geo?.lat ?? null,
     checkoutIpGeoLng: geo?.lng ?? null,
+    checkoutReason: body.reason ?? null,
   })
 
   if (!event) {

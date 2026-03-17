@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getEventByIdForUser, updateEventNote, deleteEvent } from '@/lib/db/queries/events'
+import { getEventByIdForUser, updateEventNote } from '@/lib/db/queries/events'
 
 export async function PATCH(
   request: NextRequest,
@@ -31,24 +31,10 @@ export async function PATCH(
   return NextResponse.json({ event: updated })
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  const userId = request.headers.get('x-user-id')
-  if (!userId) {
-    return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
-  }
-
-  const { id } = await params
-  const deleted = await deleteEvent(id, userId)
-
-  if (!deleted) {
-    return NextResponse.json(
-      { error: 'Event not found or cannot be deleted after 5 minutes', code: 'DELETE_FORBIDDEN' },
-      { status: 403 }
-    )
-  }
-
-  return NextResponse.json({ success: true })
+// Presence data is never permanently deleted — soft-delete only
+export async function DELETE() {
+  return NextResponse.json(
+    { error: 'Presence data cannot be deleted', code: 'NOT_SUPPORTED' },
+    { status: 405 }
+  )
 }

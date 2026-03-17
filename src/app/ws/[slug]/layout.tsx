@@ -78,23 +78,42 @@ export default async function WsSlugLayout({ children, params }: Props) {
           >
             {workspace.name}
           </span>
-          <Link
-            href="/me"
-            style={{
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: '13px',
-              color: 'var(--text-secondary)',
-              textDecoration: 'none',
-              height: '32px',
-              padding: '0 10px',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            Personal →
-          </Link>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <Link
+              href="/ws"
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                textDecoration: 'none',
+                height: '32px',
+                padding: '0 10px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              ⊞ Workspaces
+            </Link>
+            <Link
+              href="/me"
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '13px',
+                color: 'var(--text-secondary)',
+                textDecoration: 'none',
+                height: '32px',
+                padding: '0 10px',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-sm)',
+                display: 'flex',
+                alignItems: 'center',
+              }}
+            >
+              Personal →
+            </Link>
+          </div>
         </div>
 
         {/* Nav tabs */}
@@ -105,8 +124,9 @@ export default async function WsSlugLayout({ children, params }: Props) {
             gap: '2px',
           }}
         >
-          <NavTab href={`/ws/${slug}`} label="Today" />
+          <NavTab href={`/ws/${slug}`} label="Dashboard" />
           <NavTab href={`/ws/${slug}/people`} label="People" />
+          <NavTab href={`/ws/${slug}/insights`} label="Insights" />
           <NavTab href={`/ws/${slug}/settings`} label="Settings" />
         </nav>
       </header>

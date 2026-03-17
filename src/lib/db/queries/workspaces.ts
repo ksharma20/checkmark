@@ -9,6 +9,7 @@ export interface Workspace {
   domain_verified: number
   verification_token: string | null
   verification_token_expires_at: string | null
+  archived_at: string | null
   created_at: string
   updated_at: string
 }
@@ -184,6 +185,16 @@ export async function getWorkspaceMember(
   )
 }
 
+export async function getWorkspaceMemberByRecordId(
+  memberId: string,
+  workspaceId: string
+): Promise<WorkspaceMember | null> {
+  return db.queryOne<WorkspaceMember>(
+    'SELECT * FROM workspace_members WHERE id = ? AND workspace_id = ?',
+    [memberId, workspaceId]
+  )
+}
+
 export async function getWorkspaceMemberByEmail(
   workspaceId: string,
   email: string
@@ -258,9 +269,33 @@ export async function getAdminWorkspacesForUser(userId: string): Promise<Workspa
   return db.query<Workspace>(
     `SELECT w.* FROM workspaces w
      JOIN workspace_members wm ON wm.workspace_id = w.id
-     WHERE wm.user_id = ? AND wm.role = 'admin' AND wm.status = 'active'
+     WHERE wm.user_id = ? AND wm.role = 'admin' AND wm.status = 'active' AND w.archived_at IS NULL
      ORDER BY w.created_at ASC`,
     [userId]
+  )
+}
+
+export async function getArchivedAdminWorkspacesForUser(userId: string): Promise<Workspace[]> {
+  return db.query<Workspace>(
+    `SELECT w.* FROM workspaces w
+     JOIN workspace_members wm ON wm.workspace_id = w.id
+     WHERE wm.user_id = ? AND wm.role = 'admin' AND wm.status = 'active' AND w.archived_at IS NOT NULL
+     ORDER BY w.archived_at DESC`,
+    [userId]
+  )
+}
+
+export async function archiveWorkspace(workspaceId: string): Promise<void> {
+  await db.execute(
+    `UPDATE workspaces SET archived_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
+    [workspaceId]
+  )
+}
+
+export async function restoreWorkspace(workspaceId: string): Promise<void> {
+  await db.execute(
+    `UPDATE workspaces SET archived_at = NULL, updated_at = datetime('now') WHERE id = ?`,
+    [workspaceId]
   )
 }
 

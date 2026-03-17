@@ -9,11 +9,12 @@ interface Workspace {
   slug: string
   name: string
   plan: string
+  archived_at: string | null
 }
 
 interface Props {
   workspaces: Workspace[]
-  forceCreate?: boolean
+  archivedWorkspaces: Workspace[]
 }
 
 const inputStyle: React.CSSProperties = {
@@ -174,43 +175,133 @@ function CreateWorkspaceForm({ onCreated }: { onCreated: (slug: string) => void 
   )
 }
 
-export default function WsClient({ workspaces, forceCreate }: Props) {
+export default function WsClient({ workspaces, archivedWorkspaces }: Props) {
   const router = useRouter()
-  const [showForm, setShowForm] = useState(forceCreate ?? false)
+  const [showForm, setShowForm] = useState(false)
 
   function handleCreated(slug: string) {
     router.push(`/ws/${slug}`)
   }
 
-  if (workspaces.length === 0 && !showForm) {
-    return (
-      <div
-        style={{
-          minHeight: '100dvh',
-          background: 'var(--surface-1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px 16px',
-        }}
-      >
-        <div style={{ width: '100%', maxWidth: '480px' }}>
-          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--brand)', marginBottom: '24px' }}>
-            CheckMark
-          </p>
-          <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--navy)', marginBottom: '8px' }}>
-            No workspaces yet
+  const hasAny = workspaces.length > 0 || archivedWorkspaces.length > 0
+
+  return (
+    <div
+      style={{
+        minHeight: '100dvh',
+        background: 'var(--surface-1)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        justifyContent: 'center',
+        padding: '40px 16px 40px',
+      }}
+    >
+      <div style={{ width: '100%', maxWidth: '480px' }}>
+        <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--brand)', marginBottom: '32px' }}>
+          CheckMark
+        </p>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--navy)', margin: 0 }}>
+            {hasAny ? 'Your workspaces' : 'No workspaces yet'}
           </h1>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '24px' }}>
+        </div>
+
+        {!hasAny && !showForm && (
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
             Create a workspace to start managing your team&apos;s presence data.
           </p>
+        )}
 
+        {hasAny && !showForm && (
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+            Select a workspace or create a new one.
+          </p>
+        )}
+
+        {/* Active workspaces */}
+        {workspaces.length > 0 && !showForm && (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+              Active
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {workspaces.map((ws) => (
+                <Link
+                  key={ws.id}
+                  href={`/ws/${ws.slug}`}
+                  style={{
+                    display: 'block',
+                    background: 'var(--surface-0)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '16px 18px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: '15px', color: 'var(--navy)', marginBottom: '2px' }}>
+                    {ws.name}
+                  </p>
+                  <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    /ws/{ws.slug}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Archived workspaces */}
+        {archivedWorkspaces.length > 0 && !showForm && (
+          <div style={{ marginBottom: '16px' }}>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '8px' }}>
+              Archived
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {archivedWorkspaces.map((ws) => (
+                <Link
+                  key={ws.id}
+                  href={`/ws/${ws.slug}`}
+                  style={{
+                    display: 'block',
+                    background: 'var(--surface-1)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '16px 18px',
+                    textDecoration: 'none',
+                    opacity: 0.65,
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '2px' }}>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)', margin: 0 }}>
+                      {ws.name}
+                    </p>
+                    <span style={{
+                      fontSize: '10px', fontFamily: 'DM Sans, sans-serif', fontWeight: 600,
+                      color: 'var(--text-muted)', background: 'var(--surface-2)',
+                      border: '1px solid var(--border)', borderRadius: '20px', padding: '1px 7px',
+                      textTransform: 'uppercase', letterSpacing: '0.05em',
+                    }}>
+                      Archived
+                    </span>
+                  </div>
+                  <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-muted)' }}>
+                    /ws/{ws.slug}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Big "+" create button — always visible when not showing form */}
+        {!showForm && (
           <button
             type="button"
             onClick={() => setShowForm(true)}
             style={{
               width: '100%',
-              height: '80px',
+              height: hasAny ? '60px' : '80px',
               background: 'var(--surface-0)',
               border: '2px dashed var(--border)',
               borderRadius: 'var(--radius-lg)',
@@ -220,40 +311,19 @@ export default function WsClient({ workspaces, forceCreate }: Props) {
               justifyContent: 'center',
               gap: '10px',
               fontFamily: 'DM Sans, sans-serif',
-              fontSize: '15px',
+              fontSize: hasAny ? '14px' : '15px',
               fontWeight: 500,
               color: 'var(--brand)',
               marginBottom: '20px',
             }}
           >
-            <span style={{ fontSize: '24px', lineHeight: 1 }}>+</span>
-            Create a workspace
+            <span style={{ fontSize: hasAny ? '20px' : '24px', lineHeight: 1 }}>+</span>
+            {hasAny ? 'New workspace' : 'Create a workspace'}
           </button>
+        )}
 
-          <Link href="/me" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', textDecoration: 'none' }}>
-            ← Back to personal dashboard
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  if (workspaces.length === 0 || showForm) {
-    return (
-      <div
-        style={{
-          minHeight: '100dvh',
-          background: 'var(--surface-1)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '24px 16px',
-        }}
-      >
-        <div style={{ width: '100%', maxWidth: '480px' }}>
-          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--brand)', marginBottom: '24px' }}>
-            CheckMark
-          </p>
+        {/* Create form */}
+        {showForm && (
           <div
             style={{
               background: 'var(--surface-0)',
@@ -270,103 +340,12 @@ export default function WsClient({ workspaces, forceCreate }: Props) {
               Create workspace
             </h2>
             <CreateWorkspaceForm onCreated={handleCreated} />
-          </div>
-          <button
-            type="button"
-            onClick={() => setShowForm(false)}
-            style={{ background: 'none', border: 'none', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0 }}
-          >
-            ← Back
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // Multiple workspaces — picker + add more
-  return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        background: 'var(--surface-1)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px 16px',
-      }}
-    >
-      <div style={{ width: '100%', maxWidth: '480px' }}>
-        <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--brand)', marginBottom: '24px' }}>
-          CheckMark
-        </p>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--navy)', marginBottom: '8px' }}>
-          Your workspaces
-        </h1>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-          Select a workspace to view its dashboard.
-        </p>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
-          {workspaces.map((ws) => (
-            <Link
-              key={ws.id}
-              href={`/ws/${ws.slug}`}
-              style={{
-                display: 'block',
-                background: 'var(--surface-0)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)',
-                padding: '16px 18px',
-                textDecoration: 'none',
-              }}
-            >
-              <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 600, fontSize: '15px', color: 'var(--navy)', marginBottom: '2px' }}>
-                {ws.name}
-              </p>
-              <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-muted)' }}>
-                /ws/{ws.slug}
-              </p>
-            </Link>
-          ))}
-
-          {!showForm && (
-            <button
-              type="button"
-              onClick={() => setShowForm(true)}
-              style={{
-                height: '60px',
-                background: 'var(--surface-0)',
-                border: '2px dashed var(--border)',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '14px',
-                fontWeight: 500,
-                color: 'var(--text-secondary)',
-              }}
-            >
-              <span style={{ fontSize: '20px', lineHeight: 1 }}>+</span>
-              Add workspace
-            </button>
-          )}
-        </div>
-
-        {showForm && (
-          <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '24px', marginBottom: '12px' }}>
-            <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: '16px', fontWeight: 700, color: 'var(--navy)', marginBottom: '16px' }}>
-              New workspace
-            </h2>
-            <CreateWorkspaceForm onCreated={handleCreated} />
             <button
               type="button"
               onClick={() => setShowForm(false)}
-              style={{ marginTop: '12px', background: 'none', border: 'none', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0 }}
+              style={{ marginTop: '14px', background: 'none', border: 'none', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', padding: 0 }}
             >
-              Cancel
+              ← Cancel
             </button>
           </div>
         )}

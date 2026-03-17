@@ -61,6 +61,7 @@ src/
 │       ├── ws/
 │       │   └── [slug]/
 │       │       ├── route.ts                          # PATCH — update workspace name/timezone
+│       │       ├── archive/route.ts                   # POST — archive workspace (admin, soft)
 │       │       ├── domain/route.ts                   # GET domains · POST add domain
 │       │       ├── domain/[domainId]/route.ts         # DELETE domain
 │       │       ├── domain/[domainId]/verify/route.ts  # POST — DNS TXT verification
@@ -71,7 +72,7 @@ src/
 │       │   └── checkout/route.ts       # POST — check out of most recent open event
 │       ├── events/
 │       │   ├── route.ts                # GET — user's events (paginated, date-filtered)
-│       │   └── [id]/route.ts           # PATCH note · DELETE (within 5 min)
+│       │   └── [id]/route.ts           # PATCH note · DELETE returns 405 (data never deleted)
 │       ├── me/
 │       │   ├── route.ts                # GET profile · PATCH name · DELETE account
 │       │   ├── password/route.ts       # POST — change password
@@ -167,7 +168,7 @@ App runs at `http://localhost:3000`.
 
 ## Database
 
-### Schema (11 tables + 3 column additions)
+### Schema (11 tables + 5 column additions)
 
 | Table | Purpose |
 |---|---|
@@ -175,7 +176,7 @@ App runs at `http://localhost:3000`.
 | `otp_codes` | 6-digit OTPs for signup and verification |
 | `user_api_tokens` | Personal API tokens for programmatic check-ins |
 | `presence_events` | Core table — every check-in/check-out, GPS, WiFi, IP |
-| `workspaces` | Organisations — slug, name, plan, org_type, timezone |
+| `workspaces` | Organisations — slug, name, plan, org_type, timezone, `archived_at` |
 | `workspace_domains` | Email domains for auto-enrolment |
 | `workspace_members` | User ↔ workspace membership, role, consent status |
 | `workspace_signal_config` | GPS / WiFi / IP signal configs for presence matching |
@@ -271,13 +272,15 @@ Server-rendered shell + client-rendered state. Shows:
 
 **GPS flow in CheckinButtons:** `navigator.geolocation.getCurrentPosition()` is called on button tap. If denied, check-in still proceeds with null GPS — a toast explains why. WiFi SSID is read from `navigator.connection?.ssid` (Chrome desktop/Android only).
 
+**Stale check-in notifications:** On first check-in, the browser is asked for Notification permission. If granted, browser notifications are scheduled at 8h and 16h from check-in time. After the 3rd interval (24h) the client automatically calls `POST /api/checkin/checkout` with `reason: maximum_hours_exceeded`. The reason is stored in `presence_events.checkout_reason`. Notification timers are cancelled on manual checkout.
+
 ### `/me/timeline`
 
 Client component. Fetches from `GET /api/events`. Features:
 - Date range pickers (default: current month, resets on page load)
 - Events grouped by date, newest first
 - Inline note editing on any event
-- Delete button — only appears within 5 minutes of check-in creation
+- Notes editable inline on any event — presence data is never deleted
 
 ### `/me/orgs`
 
@@ -301,7 +304,10 @@ All routes require a valid session cookie AND admin membership of the workspace.
 
 ### `/ws` — Workspace picker
 
-Shown to admins of 2+ workspaces. Admins of a single workspace are redirected directly to `/ws/:slug` at login. If the user has no admin roles, redirects to `/me`.
+Always accessible to authenticated users (never auto-redirects). Shows:
+- **Active workspaces** — clickable cards
+- **Archived workspaces** — greyed out with "Archived" badge (still accessible)
+- **Big "+" create button** — always visible, opens the workspace creation form inline
 
 ### `/ws/:slug/people` — People tab
 
@@ -485,7 +491,7 @@ All times stored as UTC in the DB. These helpers convert for display:
 
 ## Middleware (Route Protection)
 
-`src/middleware.ts` re-exports `proxy` from `src/proxy.ts` and runs on every matched request via Next.js Edge middleware:
+`src/proxy.ts` runs on every matched request via Next.js 16 Edge middleware (Next.js 16 uses `proxy.ts` natively instead of `middleware.ts`):
 
 | Path | Requirement |
 |---|---|
@@ -513,6 +519,7 @@ The middleware verifies the JWT signature (Edge-compatible via `jose`). Token re
 | **Phase C** | ✅ Complete | Domain verification, consent flow (email + in-app), invite pages, PWA manifest, landing page |
 | **Phase D** | ✅ Complete | `/ws` workspace picker with creation form, `POST /api/workspace`, GPS signal config + timezone auto-detect, `POST /api/v1/checkin` Bearer auth, dual PWA manifests, signal config UI in settings |
 | **E2E Test** | ✅ All 10 steps pass | Registration (personal + org), existing login, workspace creation from personal account, GPS timezone auto-detect, domain verification, consent accept, PWA manifests, API token checkin |
+| **QA §4 + §3.9** | ✅ Complete | **Three explicit platform decisions implemented.** (1) **Browser notifications for stale check-in (§4.10):** Replaced localStorage amber banner with Web Notifications API. On first check-in, browser notification permission is requested. `setTimeout` schedules notifications at +8h and +16h; at +24h auto-checkout fires with `reason: maximum_hours_exceeded` stored in new `presence_events.checkout_reason` column. Timers cancelled on manual checkout. (2) **No permanent data deletion (§4.9 + platform policy):** Removed `DELETE /api/cron/cleanup` route entirely. `DELETE /api/events/[id]` now returns `405 NOT_SUPPORTED`. Event delete button removed from `EventCard`. `handleDelete` removed from timeline. All presence data is permanent — only query-level soft filtering (`deleted_at IS NULL`). (3) **Workspace archive + `/ws` always accessible:** New `workspaces.archived_at TEXT` column (migrate-v7). `POST /api/ws/[slug]/archive` admin route soft-archives a workspace. `getAdminWorkspacesForUser` now filters `archived_at IS NULL`; new `getArchivedAdminWorkspacesForUser` query returns the rest. `/ws` page removed the single-workspace auto-redirect — all users always land on the picker. `WsClient` rewritten to show active workspaces, archived workspaces (greyed + badge), and a big "+" create button always visible. Archive action in workspace Settings tab with confirmation step. |
 | **QA §3.8** | ✅ Complete | **Slug injection at workspace creation.** `RESERVED_SLUGS` was only enforced in `POST /api/workspace/check-slug` (the live-check during the form). Both `POST /api/workspace` (existing user creating a workspace) and `POST /api/auth/register` (org registration) skipped it entirely — only checking uniqueness via `getWorkspaceBySlug`. Fix: extracted slug rules into `src/lib/slug.ts` — single source of truth for all three routes. `validateSlug(slug)` checks: minimum 3 chars, maximum 50, lowercase+digits+hyphens only, no leading/trailing hyphen, and the full reserved set (added `join`, `consent`, `verify`, `about`, `pricing`, `open-source`, `new` to the existing list). All three routes now call `validateSlug` before the DB uniqueness check. The regex is also consistent across all three (was divergent before). |
 | **QA §3.6** | ✅ Complete | **Password requirements server-side.** Length check (≥8 chars) was already enforced in both `POST /api/auth/register` and `POST /api/me/password`. Added the missing **weak-password block list** (`password`, `12345678`, `qwerty123`, `checkmark`, etc.) extracted into `src/lib/password.ts` — `validatePassword(password)` returns a typed result used by both routes. Both registration and password-change now reject weak passwords with `400 WEAK_PASSWORD`. |
 | **QA §3.7** | ✅ Complete | **Presence events from other users visible.** Audited all event-touching routes. `GET /api/events` — safe: `userId` always from JWT header, `getUserEvents` hardcodes `user_id = ?`. `DELETE /api/events/[id]` — safe: `deleteEvent(id, userId)` scoped at DB level. `POST /api/checkin*` — safe: all use authenticated `userId` directly. **Fix:** `getEventById(eventId)` was unscoped (`WHERE id = ?` only) — replaced with `getEventByIdForUser(eventId, userId)` (`WHERE id = ? AND user_id = ? AND deleted_at IS NULL`); `PATCH /api/events/[id]` updated to use the scoped version, eliminating the separate ownership check that was previously the only guard. The DB function itself now enforces user scoping — no caller can accidentally skip it. **§3.6 note:** Password minimum length (8 chars) is already enforced server-side in both `POST /api/auth/register` and `POST /api/me/password`. No change needed. |
@@ -557,7 +564,7 @@ Your presence dashboard. Everything here belongs to you:
 
 **Timeline — `/me/timeline`**
 
-Fetches `GET /api/events?start=&end=` with date pickers (default: current month). Events grouped by date, newest first. Inline note editing on any event. Delete only available within 5 minutes of creation.
+Fetches `GET /api/events?start=&end=` with date pickers (default: current month). Events grouped by date, newest first. Inline note editing on any event. Presence data is never deleted.
 
 **Orgs — `/me/orgs`**
 
@@ -608,6 +615,7 @@ All members: active, invited, declined. Invite by email → consent email sent. 
 - Edit workspace name and timezone
 - **Signal config**: add GPS (lat/lng + radius, auto-detects workspace timezone from coordinates), WiFi SSID (bcrypt-hashed, shown as `abc***`), or IP (geocoded from your server-side IP)
 - **Domain verification**: add a domain → DNS TXT record generated → click "Check verification" → server resolves DNS, marks domain verified (scoped `WHERE id = ? AND workspace_id = ?` at DB level), auto-enrolls any existing users whose email matches
+- **Archive workspace**: soft-archives the workspace (`archived_at` stamped). All data preserved. Workspace moves to "Archived" section in `/ws` picker.
 
 ---
 
@@ -618,7 +626,7 @@ All members: active, invited, declined. Invite by email → consent email sent. 
 | Register personal | `users`, `otp_codes` |
 | Register org | `users`, `workspaces`, `workspace_members`, `workspace_domains` |
 | Check in | `presence_events` (insert), `user_stats` (upsert), `presence_events.location_label` (async update) |
-| Check out | `presence_events` (stamp `checkout_at` + checkout signals) |
+| Check out | `presence_events` (stamp `checkout_at` + `checkout_reason` + checkout signals) |
 | Dashboard query | Read-only: `workspace_members`, `presence_events`, `workspace_signal_config`, `admin_overrides` |
 | Invite member | `workspace_members` (upsert with consent token + expiry) |
 | Accept invite | `workspace_members` (status → active, link `user_id`) |
