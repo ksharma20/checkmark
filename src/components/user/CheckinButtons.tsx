@@ -10,8 +10,14 @@ interface CheckinButtonsProps {
 
 type ToastType = 'success' | 'info' | 'error'
 
-export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
+export default function CheckinButtons({ activeEvent: initialActiveEvent }: CheckinButtonsProps) {
   const router = useRouter()
+  // Track state locally so button switches instantly on action success;
+  // server refresh then confirms the ground truth.
+  const [state, setState] = useState<'checked_in' | 'checked_out'>(
+    initialActiveEvent ? 'checked_in' : 'checked_out'
+  )
+  const [activeEvent, setActiveEvent] = useState(initialActiveEvent)
   const [loading, setLoading] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: ToastType } | null>(null)
 
@@ -33,7 +39,12 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
             lng: pos.coords.longitude,
             accuracy: pos.coords.accuracy,
           }),
-        () => resolve(null),
+        (err) => {
+          if (err.code === 1) {
+            // PERMISSION_DENIED — surface this in the toast after action
+          }
+          resolve(null)
+        },
         { timeout: 8000, maximumAge: 30000 }
       )
     })
@@ -46,6 +57,7 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
   }
 
   async function handleCheckin() {
+    if (state !== 'checked_out' || loading) return
     setLoading(true)
     try {
       const gps = await collectGps()
@@ -62,11 +74,23 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
         }),
       })
 
+      const data = await res.json()
+
       if (res.ok) {
-        showToast(gps ? 'Checked in!' : "Checked in without GPS — location helps orgs verify your presence.", gps ? 'success' : 'info')
+        // Switch state immediately — don't wait for server refresh
+        setState('checked_in')
+        setActiveEvent(data.event)
+        showToast(
+          gps ? 'Checked in!' : 'Checked in without GPS — location helps orgs verify your presence.',
+          gps ? 'success' : 'info'
+        )
+        router.refresh() // server re-renders to confirm
+      } else if (res.status === 409) {
+        // Already checked in — re-sync state
+        setState('checked_in')
+        showToast(data.error || 'Already checked in.', 'info')
         router.refresh()
       } else {
-        const data = await res.json()
         showToast(data.error || 'Check-in failed', 'error')
       }
     } catch {
@@ -77,20 +101,40 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
   }
 
   async function handleCheckout() {
+    if (state !== 'checked_in' || loading) return
     setLoading(true)
     try {
+      // Capture location signals at checkout time
+      const gps = await collectGps()
+      const wifi = getWifiSsid()
+
       const res = await fetch('/api/checkin/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gps_lat: gps?.lat,
+          gps_lng: gps?.lng,
+          gps_accuracy_m: gps?.accuracy ? Math.round(gps.accuracy) : undefined,
+          wifi_ssid: wifi ?? undefined,
+        }),
       })
 
+      const data = await res.json()
+
       if (res.ok) {
-        const data = await res.json()
         const hrs = data.duration_hours ? `${data.duration_hours.toFixed(1)}h` : ''
+        setState('checked_out')
+        setActiveEvent(null)
         showToast(`Checked out${hrs ? ` — ${hrs} logged` : ''}`, 'success')
         router.refresh()
+      } else if (res.status === 409) {
+        // Not checked in — re-sync
+        setState('checked_out')
+        setActiveEvent(null)
+        showToast(data.error || "You're not checked in.", 'info')
+        router.refresh()
       } else {
-        showToast('Checkout failed', 'error')
+        showToast(data.error || 'Checkout failed', 'error')
       }
     } catch {
       showToast('Network error. Please try again.', 'error')
@@ -105,6 +149,8 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
       : toast?.type === 'info'
       ? 'var(--amber)'
       : 'var(--teal)'
+
+  const isCheckedIn = state === 'checked_in'
 
   return (
     <div>
@@ -126,8 +172,8 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
         </div>
       )}
 
-      {/* Active check-in status */}
-      {activeEvent && (
+      {/* Active check-in status — shown when checked in */}
+      {isCheckedIn && activeEvent && (
         <div
           style={{
             padding: '10px 14px',
@@ -151,36 +197,37 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
         </div>
       )}
 
-      {/* I'm here button — always shown */}
-      <button
-        onClick={handleCheckin}
-        disabled={loading}
-        style={{
-          width: '100%',
-          height: '64px',
-          background: loading ? 'var(--brand-hover)' : 'var(--brand)',
-          color: '#fff',
-          border: 'none',
-          borderRadius: 'var(--radius-md)',
-          fontSize: '18px',
-          fontWeight: 700,
-          fontFamily: 'Syne, sans-serif',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          marginBottom: activeEvent ? '8px' : '0',
-          letterSpacing: '-0.2px',
-        }}
-      >
-        {loading && !activeEvent ? 'Getting location…' : "I'm here"}
-      </button>
+      {/* "I'm here" — only when CHECKED_OUT */}
+      {!isCheckedIn && (
+        <button
+          onClick={handleCheckin}
+          disabled={loading}
+          style={{
+            width: '100%',
+            height: '64px',
+            background: loading ? 'var(--brand-hover)' : 'var(--brand)',
+            color: '#fff',
+            border: 'none',
+            borderRadius: 'var(--radius-md)',
+            fontSize: '18px',
+            fontWeight: 700,
+            fontFamily: 'Syne, sans-serif',
+            cursor: loading ? 'not-allowed' : 'pointer',
+            letterSpacing: '-0.2px',
+          }}
+        >
+          {loading ? 'Getting location…' : "I'm here"}
+        </button>
+      )}
 
-      {/* I'm leaving button — only if active check-in */}
-      {activeEvent && (
+      {/* "I'm leaving" — only when CHECKED_IN */}
+      {isCheckedIn && (
         <button
           onClick={handleCheckout}
           disabled={loading}
           style={{
             width: '100%',
-            height: '48px',
+            height: '64px',
             background: 'transparent',
             color: 'var(--text-secondary)',
             border: '1px solid var(--border)',
@@ -191,7 +238,7 @@ export default function CheckinButtons({ activeEvent }: CheckinButtonsProps) {
             cursor: loading ? 'not-allowed' : 'pointer',
           }}
         >
-          {loading ? 'Checking out…' : "I'm leaving"}
+          {loading ? 'Getting location…' : "I'm leaving"}
         </button>
       )}
     </div>

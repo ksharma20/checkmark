@@ -23,73 +23,61 @@ export default function LandingPage() {
   return (
     <div
       style={{
-        minHeight: '100dvh',
-        background: 'var(--surface-1)',
-        fontFamily: 'DM Sans, sans-serif',
+        minHeight: "100dvh",
+        background: "var(--surface-1)",
+        fontFamily: "DM Sans, sans-serif",
       }}
     >
       {/* Nav */}
       <nav
         style={{
-          position: 'sticky',
+          position: "sticky",
           top: 0,
-          background: 'var(--surface-0)',
-          borderBottom: '1px solid var(--border)',
+          background: "var(--surface-0)",
+          borderBottom: "1px solid var(--border)",
           zIndex: 10,
         }}
       >
         <div
           style={{
-            maxWidth: '1100px',
-            margin: '0 auto',
-            padding: '0 24px',
-            height: '56px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            maxWidth: "1100px",
+            margin: "0 auto",
+            padding: "0 24px",
+            height: "56px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
           <span
             style={{
-              fontFamily: 'Syne, sans-serif',
+              fontFamily: "Syne, sans-serif",
               fontWeight: 700,
-              fontSize: '18px',
-              color: 'var(--brand)',
-              letterSpacing: '-0.3px',
+              fontSize: "18px",
+              color: "var(--brand)",
+              letterSpacing: "-0.3px",
             }}
           >
             CheckMark
           </span>
-          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <Link
               href="/login"
               style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
-                textDecoration: 'none',
+                height: "40px",
+                padding: "0 28px",
+                background: "transparent",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                fontSize: "14px",
+                fontFamily: "DM Sans, sans-serif",
+                textDecoration: "none",
+                display: "inline-flex",
+                alignItems: "center",
               }}
             >
               Sign in
-            </Link>
-            <Link
-              href="/login"
-              style={{
-                height: '36px',
-                padding: '0 16px',
-                background: 'var(--brand)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '14px',
-                fontFamily: 'DM Sans, sans-serif',
-                fontWeight: 500,
-                textDecoration: 'none',
-                display: 'inline-flex',
-                alignItems: 'center',
-              }}
-            >
-              Get started
             </Link>
           </div>
         </div>
@@ -98,73 +86,64 @@ export default function LandingPage() {
       {/* Hero */}
       <section
         style={{
-          maxWidth: '780px',
-          margin: '0 auto',
-          padding: '80px 24px 64px',
-          textAlign: 'center',
+          maxWidth: "780px",
+          margin: "0 auto",
+          padding: "80px 24px 64px",
+          textAlign: "center",
         }}
       >
         <h1
           style={{
-            fontFamily: 'Syne, sans-serif',
-            fontSize: 'clamp(36px, 6vw, 56px)',
+            fontFamily: "Syne, sans-serif",
+            fontSize: "clamp(36px, 6vw, 56px)",
             fontWeight: 700,
-            color: 'var(--navy)',
+            color: "var(--navy)",
             lineHeight: 1.15,
-            marginBottom: '20px',
-            letterSpacing: '-1px',
+            marginBottom: "20px",
+            letterSpacing: "-1px",
           }}
         >
-          Presence intelligence<br />for modern teams
+          Presence intelligence
+          <br />
+          for modern teams
         </h1>
         <p
           style={{
-            fontSize: 'clamp(16px, 2.5vw, 20px)',
-            color: 'var(--text-secondary)',
-            maxWidth: '560px',
-            margin: '0 auto 36px',
+            fontSize: "clamp(16px, 2.5vw, 20px)",
+            color: "var(--text-secondary)",
+            maxWidth: "560px",
+            margin: "0 auto 36px",
             lineHeight: 1.6,
           }}
         >
-          Know who's in the office. Plan your week with purpose.
-          CheckMark makes hybrid work actually work — without surveillance.
+          Know who's in the office. Plan your week with purpose. CheckMark makes
+          hybrid work actually work — without surveillance.
         </p>
-        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            justifyContent: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <Link
             href="/login"
             style={{
-              height: '48px',
-              padding: '0 28px',
-              background: 'var(--brand)',
-              color: '#fff',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '16px',
-              fontFamily: 'DM Sans, sans-serif',
+              height: "48px",
+              padding: "0 28px",
+              background: "var(--brand)",
+              color: "#fff",
+              borderRadius: "var(--radius-md)",
+              fontSize: "16px",
+              fontFamily: "DM Sans, sans-serif",
               fontWeight: 600,
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
             }}
           >
-            Create your workspace
-          </Link>
-          <Link
-            href="/login"
-            style={{
-              height: '48px',
-              padding: '0 28px',
-              background: 'transparent',
-              color: 'var(--text-primary)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '16px',
-              fontFamily: 'DM Sans, sans-serif',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-            }}
-          >
-            Sign in
+            Get started
           </Link>
         </div>
       </section>
@@ -172,39 +151,39 @@ export default function LandingPage() {
       {/* Features */}
       <section
         style={{
-          maxWidth: '1100px',
-          margin: '0 auto',
-          padding: '0 24px 80px',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '16px',
+          maxWidth: "1100px",
+          margin: "0 auto",
+          padding: "0 24px 80px",
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+          gap: "16px",
         }}
       >
         {features.map((f) => (
           <div
             key={f.title}
             style={{
-              background: 'var(--surface-0)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-lg)',
-              padding: '24px',
+              background: "var(--surface-0)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-lg)",
+              padding: "24px",
             }}
           >
             <h3
               style={{
-                fontFamily: 'Syne, sans-serif',
-                fontSize: '16px',
+                fontFamily: "Syne, sans-serif",
+                fontSize: "16px",
                 fontWeight: 600,
-                color: 'var(--navy)',
-                marginBottom: '10px',
+                color: "var(--navy)",
+                marginBottom: "10px",
               }}
             >
               {f.title}
             </h3>
             <p
               style={{
-                fontSize: '14px',
-                color: 'var(--text-secondary)',
+                fontSize: "14px",
+                color: "var(--text-secondary)",
                 lineHeight: 1.6,
               }}
             >
@@ -217,15 +196,16 @@ export default function LandingPage() {
       {/* Footer */}
       <footer
         style={{
-          borderTop: '1px solid var(--border)',
-          padding: '24px',
-          textAlign: 'center',
+          borderTop: "1px solid var(--border)",
+          padding: "24px",
+          textAlign: "center",
         }}
       >
-        <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-          © {new Date().getFullYear()} CheckMark. Built for humans who work in offices sometimes.
+        <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
+          © {new Date().getFullYear()} CheckMark. Built for humans who work in
+          offices sometimes.
         </p>
       </footer>
     </div>
-  )
+  );
 }

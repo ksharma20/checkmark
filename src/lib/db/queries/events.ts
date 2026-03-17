@@ -17,6 +17,14 @@ export interface PresenceEvent {
   source: string
   api_token_id: string | null
   created_at: string
+  // Checkout-time signals (captured when user checks out)
+  checkout_gps_lat: number | null
+  checkout_gps_lng: number | null
+  checkout_gps_accuracy_m: number | null
+  checkout_wifi_ssid: string | null
+  checkout_ip_address: string | null
+  checkout_ip_geo_lat: number | null
+  checkout_ip_geo_lng: number | null
 }
 
 export async function createEvent(params: {
@@ -58,12 +66,41 @@ export async function createEvent(params: {
   return db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [id]) as Promise<PresenceEvent>
 }
 
-export async function checkoutEvent(eventId: string, userId: string): Promise<PresenceEvent | null> {
+export async function checkoutEvent(
+  eventId: string,
+  userId: string,
+  signals?: {
+    checkoutGpsLat?: number | null
+    checkoutGpsLng?: number | null
+    checkoutGpsAccuracyM?: number | null
+    checkoutWifiSsid?: string | null
+    checkoutIpAddress?: string | null
+    checkoutIpGeoLat?: number | null
+    checkoutIpGeoLng?: number | null
+  }
+): Promise<PresenceEvent | null> {
   await db.execute(
     `UPDATE presence_events
-     SET checkout_at = datetime('now')
+     SET checkout_at = datetime('now'),
+         checkout_gps_lat = ?,
+         checkout_gps_lng = ?,
+         checkout_gps_accuracy_m = ?,
+         checkout_wifi_ssid = ?,
+         checkout_ip_address = ?,
+         checkout_ip_geo_lat = ?,
+         checkout_ip_geo_lng = ?
      WHERE id = ? AND user_id = ? AND checkout_at IS NULL`,
-    [eventId, userId]
+    [
+      signals?.checkoutGpsLat ?? null,
+      signals?.checkoutGpsLng ?? null,
+      signals?.checkoutGpsAccuracyM ?? null,
+      signals?.checkoutWifiSsid ?? null,
+      signals?.checkoutIpAddress ?? null,
+      signals?.checkoutIpGeoLat ?? null,
+      signals?.checkoutIpGeoLng ?? null,
+      eventId,
+      userId,
+    ]
   )
   return db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [eventId])
 }

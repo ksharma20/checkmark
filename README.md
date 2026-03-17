@@ -510,6 +510,7 @@ All times stored as UTC in the DB. These helpers convert for display:
 | **Phase C** | ✅ Complete | Domain verification, consent flow (email + in-app), invite pages, PWA manifest, landing page |
 | **Phase D** | ✅ Complete | `/ws` workspace picker with creation form, `POST /api/workspace`, GPS signal config + timezone auto-detect, `POST /api/v1/checkin` Bearer auth, dual PWA manifests, signal config UI in settings |
 | **E2E Test** | ✅ All 10 steps pass | Registration (personal + org), existing login, workspace creation from personal account, GPS timezone auto-detect, domain verification, consent accept, PWA manifests, API token checkin |
+| **QA §1.1** | ✅ Complete | Check-in/check-out state machine enforced server + client. `POST /api/checkin` → 409 if open event exists. `POST /api/checkin/checkout` → 409 if not checked in; now captures GPS/WiFi/IP signals at checkout. `GET /api/checkin/status` added. `CheckinButtons` client: shows "I'm here" only when CHECKED_OUT, "I'm leaving" only when CHECKED_IN; switches state instantly on success + syncs with server via `router.refresh()`. DB: 7 checkout_* columns added to `presence_events`. |
 
 ---
 
