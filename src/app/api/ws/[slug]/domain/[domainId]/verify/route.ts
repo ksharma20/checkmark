@@ -27,7 +27,7 @@ export async function POST(request: NextRequest, { params }: Props) {
   const found = await checkDnsVerification(domain.domain, token)
 
   if (found) {
-    await markDomainVerified(domainId)
+    await markDomainVerified(domainId, ctx.workspace.id)
 
     // Auto-enrol existing users whose email matches the now-verified domain
     const unregistered = await getUsersMatchingDomainNotInWorkspace(ctx.workspace.id, domain.domain)

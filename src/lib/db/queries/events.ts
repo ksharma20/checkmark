@@ -163,8 +163,12 @@ export async function getUserEvents(params: {
   return { events, total }
 }
 
-export async function getEventById(eventId: string): Promise<PresenceEvent | null> {
-  return db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [eventId])
+/** Returns an event only if it belongs to the given user and is not soft-deleted. */
+export async function getEventByIdForUser(eventId: string, userId: string): Promise<PresenceEvent | null> {
+  return db.queryOne<PresenceEvent>(
+    'SELECT * FROM presence_events WHERE id = ? AND user_id = ? AND deleted_at IS NULL',
+    [eventId, userId]
+  )
 }
 
 export async function updateEventNote(eventId: string, userId: string, note: string): Promise<PresenceEvent | null> {

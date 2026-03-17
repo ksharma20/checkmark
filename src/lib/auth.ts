@@ -18,6 +18,7 @@ function getJwtSecret(): Uint8Array {
 export interface JwtPayload {
   sub: string   // userId
   email: string
+  jti: string   // unique token id — used for revocation
   iat: number
   exp: number
 }
@@ -26,6 +27,7 @@ export async function createJwt(userId: string, email: string): Promise<string> 
   return new SignJWT({ email })
     .setProtectedHeader({ alg: 'HS256' })
     .setSubject(userId)
+    .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(TOKEN_EXPIRY)
     .sign(getJwtSecret())

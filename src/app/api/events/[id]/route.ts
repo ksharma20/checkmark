@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getEventById, updateEventNote, deleteEvent } from '@/lib/db/queries/events'
+import { getEventByIdForUser, updateEventNote, deleteEvent } from '@/lib/db/queries/events'
 
 export async function PATCH(
   request: NextRequest,
@@ -22,8 +22,8 @@ export async function PATCH(
     return NextResponse.json({ error: 'note field required', code: 'MISSING_FIELD' }, { status: 400 })
   }
 
-  const event = await getEventById(id)
-  if (!event || event.user_id !== userId) {
+  const event = await getEventByIdForUser(id, userId)
+  if (!event) {
     return NextResponse.json({ error: 'Event not found', code: 'NOT_FOUND' }, { status: 404 })
   }
 

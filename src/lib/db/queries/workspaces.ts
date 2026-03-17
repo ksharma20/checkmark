@@ -118,10 +118,10 @@ export async function addWorkspaceDomain(workspaceId: string, domain: string): P
   return db.queryOne<WorkspaceDomain>('SELECT * FROM workspace_domains WHERE id = ?', [id]) as Promise<WorkspaceDomain>
 }
 
-export async function markDomainVerified(domainId: string): Promise<void> {
+export async function markDomainVerified(domainId: string, workspaceId: string): Promise<void> {
   await db.execute(
-    `UPDATE workspace_domains SET verified_at = datetime('now') WHERE id = ?`,
-    [domainId]
+    `UPDATE workspace_domains SET verified_at = datetime('now') WHERE id = ? AND workspace_id = ?`,
+    [domainId, workspaceId]
   )
 }
 

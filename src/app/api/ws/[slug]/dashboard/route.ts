@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getWorkspaceBySlug, getActiveMembersWithDetails, getWorkspaceMember } from '@/lib/db/queries/workspaces'
+import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
+import { requireWsAdmin } from '@/lib/ws-admin'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import type { PresenceEventWithMatch, MatchedBy } from '@/lib/signals'
 import type { MemberWithUser } from '@/lib/db/queries/workspaces'
 import { todayInTz, localMidnightToUtc } from '@/lib/timezone'
-import { getSessionFromRequest } from '@/lib/auth'
 
 export interface DashboardMember {
   member_id: string
@@ -39,22 +39,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const session = await getSessionFromRequest(request)
-  if (!session) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
   const { slug } = await params
-  const workspace = await getWorkspaceBySlug(slug)
-  if (!workspace) {
-    return NextResponse.json({ error: 'Workspace not found' }, { status: 404 })
-  }
-
-  // Must be an active member
-  const membership = await getWorkspaceMember(workspace.id, session.sub)
-  if (!membership || membership.status !== 'active') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
+  const ctx = await requireWsAdmin(request, slug)
+  if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+  const { workspace } = ctx
 
   // Parse query params
   const sp = request.nextUrl.searchParams

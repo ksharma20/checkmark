@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createWorkspace, getWorkspaceBySlug } from '@/lib/db/queries/workspaces'
 import { getUserByEmail } from '@/lib/db/queries/users'
+import { validateSlug } from '@/lib/slug'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -22,8 +23,10 @@ export async function POST(request: NextRequest) {
   if (!name) {
     return NextResponse.json({ error: 'Organisation name is required', code: 'MISSING_NAME' }, { status: 400 })
   }
-  if (!slug || !/^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]?$/.test(slug)) {
-    return NextResponse.json({ error: 'Invalid slug format', code: 'INVALID_SLUG' }, { status: 400 })
+
+  const slugCheck = validateSlug(slug)
+  if (!slugCheck.valid) {
+    return NextResponse.json({ error: slugCheck.error, code: 'INVALID_SLUG' }, { status: 400 })
   }
 
   const existing = await getWorkspaceBySlug(slug)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserById, updateUserPassword } from '@/lib/db/queries/users'
 import { verifyPassword, hashPassword } from '@/lib/auth'
+import { validatePassword } from '@/lib/password'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -18,8 +19,9 @@ export async function POST(request: NextRequest) {
   if (!body.currentPassword || !body.newPassword) {
     return NextResponse.json({ error: 'currentPassword and newPassword are required', code: 'MISSING_FIELDS' }, { status: 400 })
   }
-  if (body.newPassword.length < 8) {
-    return NextResponse.json({ error: 'New password must be at least 8 characters', code: 'WEAK_PASSWORD' }, { status: 400 })
+  const pwCheck = validatePassword(body.newPassword)
+  if (!pwCheck.valid) {
+    return NextResponse.json({ error: pwCheck.error, code: 'WEAK_PASSWORD' }, { status: 400 })
   }
 
   const user = await getUserById(userId)

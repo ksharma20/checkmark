@@ -131,4 +131,12 @@ CREATE TABLE IF NOT EXISTS user_stats (
   last_checkin_date TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+  jti        TEXT PRIMARY KEY,
+  expires_at TEXT NOT NULL,
+  revoked_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens(expires_at);
 `;
