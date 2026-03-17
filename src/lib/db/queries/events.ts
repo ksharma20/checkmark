@@ -25,6 +25,7 @@ export interface PresenceEvent {
   checkout_ip_address: string | null
   checkout_ip_geo_lat: number | null
   checkout_ip_geo_lng: number | null
+  location_label: string | null
   deleted_at: string | null
 }
 
@@ -194,6 +195,13 @@ export async function deleteEvent(eventId: string, userId: string): Promise<bool
     [eventId, userId]
   )
   return true
+}
+
+export async function updateEventLocationLabel(eventId: string, label: string): Promise<void> {
+  await db.execute(
+    'UPDATE presence_events SET location_label = ? WHERE id = ?',
+    [label, eventId]
+  )
 }
 
 export async function getEventsForUsers(params: {

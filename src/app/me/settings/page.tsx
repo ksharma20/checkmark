@@ -142,13 +142,17 @@ function StatusMsg({ msg }: { msg: { text: string; ok: boolean } | null }) {
 
 function ProfileSection() {
   const [fullName, setFullName] = useState('')
+  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
 
   useEffect(() => {
     fetch('/api/me')
       .then((r) => r.json())
-      .then((d) => setFullName(d.user?.fullName ?? ''))
+      .then((d) => {
+        setFullName(d.user?.fullName ?? '')
+        setEmail(d.user?.email ?? '')
+      })
       .catch(() => {})
   }, [])
 
@@ -169,10 +173,103 @@ function ProfileSection() {
 
   return (
     <SectionCard title="Profile">
+      {email && (
+        <div style={{ marginBottom: '12px' }}>
+          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'DM Sans, sans-serif', marginBottom: '5px' }}>
+            Email
+          </label>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-primary)', padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
+            {email}
+          </p>
+        </div>
+      )}
       <FieldInput label="Full name" value={fullName} onChange={setFullName} placeholder="Your name" />
       <Btn onClick={save} loading={loading}>
         Save
       </Btn>
+      <StatusMsg msg={status} />
+    </SectionCard>
+  )
+}
+
+// ─── Email change section ──────────────────────────────────────────────────────
+
+function EmailSection() {
+  const [step, setStep] = useState<'idle' | 'otp'>('idle')
+  const [newEmail, setNewEmail] = useState('')
+  const [code, setCode] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
+
+  async function requestOtp() {
+    setStatus(null)
+    setLoading(true)
+    try {
+      const res = await fetch('/api/me/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newEmail }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setStep('otp')
+        setStatus({ text: `Verification code sent to ${newEmail}`, ok: true })
+      } else {
+        setStatus({ text: data.error || 'Failed to send code', ok: false })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function confirmChange() {
+    setStatus(null)
+    setLoading(true)
+    try {
+      const res = await fetch('/api/me/email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newEmail, code }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setStatus({ text: 'Email updated. Please log in again.', ok: true })
+        setTimeout(() => { window.location.href = '/login' }, 1500)
+      } else {
+        setStatus({ text: data.error || 'Verification failed', ok: false })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <SectionCard title="Change email">
+      <FieldInput
+        label="New email address"
+        type="email"
+        value={newEmail}
+        onChange={(v) => { setNewEmail(v); setStep('idle'); setStatus(null) }}
+        placeholder="new@example.com"
+      />
+      {step === 'idle' && (
+        <Btn onClick={requestOtp} loading={loading}>
+          Send verification code
+        </Btn>
+      )}
+      {step === 'otp' && (
+        <>
+          <FieldInput label="Verification code" value={code} onChange={setCode} placeholder="6-digit code" />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Btn onClick={confirmChange} loading={loading}>
+              Confirm change
+            </Btn>
+            <Btn variant="outline" onClick={() => { setStep('idle'); setCode(''); setStatus(null) }}>
+              Resend
+            </Btn>
+          </div>
+        </>
+      )}
       <StatusMsg msg={status} />
     </SectionCard>
   )
@@ -421,7 +518,7 @@ function OrgSection() {
         Need to manage your team&apos;s attendance? Create a workspace to track who shows up, view real-time dashboards, and configure location signals.
       </p>
       <Link
-        href="/ws"
+        href="/ws/new"
         style={{
           display: 'inline-flex',
           alignItems: 'center',
@@ -439,6 +536,29 @@ function OrgSection() {
       >
         + Create a workspace
       </Link>
+    </SectionCard>
+  )
+}
+
+// ─── Logout section ───────────────────────────────────────────────────────────
+
+function LogoutSection() {
+  const [loading, setLoading] = useState(false)
+
+  async function logout() {
+    setLoading(true)
+    await fetch('/api/auth/logout', { method: 'POST' })
+    window.location.href = '/login'
+  }
+
+  return (
+    <SectionCard title="Session">
+      <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
+        Sign out of your CheckMark account on this device.
+      </p>
+      <Btn onClick={logout} loading={loading} variant="outline">
+        Sign out
+      </Btn>
     </SectionCard>
   )
 }
@@ -513,9 +633,11 @@ export default function SettingsPage() {
         Settings
       </h1>
       <ProfileSection />
+      <EmailSection />
       <PasswordSection />
       <TokensSection />
       <OrgSection />
+      <LogoutSection />
       <DangerSection />
     </div>
   )

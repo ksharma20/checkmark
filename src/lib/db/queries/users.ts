@@ -22,6 +22,7 @@ export interface OtpCode {
   purpose: string
   expires_at: string
   used: number
+  attempts: number
   created_at: string
 }
 
@@ -74,6 +75,19 @@ export async function updateUserPassword(userId: string, passwordHash: string): 
   )
 }
 
+export async function updateUserEmail(userId: string, newEmail: string): Promise<void> {
+  const email = newEmail.toLowerCase()
+  await db.execute(
+    `UPDATE users SET email = ?, updated_at = datetime('now') WHERE id = ?`,
+    [email, userId]
+  )
+  // Keep workspace_members.email in sync so invites + consent tokens still match
+  await db.execute(
+    `UPDATE workspace_members SET email = ? WHERE user_id = ?`,
+    [email, userId]
+  )
+}
+
 export async function updateUserTimezone(
   userId: string,
   timezone: string,
@@ -119,6 +133,16 @@ export async function createOtp(params: {
   )
 }
 
+export async function getLatestUnusedOtp(email: string, purpose: string): Promise<OtpCode | null> {
+  return db.queryOne<OtpCode>(
+    `SELECT * FROM otp_codes
+     WHERE email = ? AND purpose = ? AND used = 0
+       AND expires_at > datetime('now')
+     ORDER BY created_at DESC LIMIT 1`,
+    [email, purpose]
+  )
+}
+
 export async function getValidOtp(email: string, code: string, purpose: string): Promise<OtpCode | null> {
   return db.queryOne<OtpCode>(
     `SELECT * FROM otp_codes
@@ -127,6 +151,10 @@ export async function getValidOtp(email: string, code: string, purpose: string):
      ORDER BY created_at DESC LIMIT 1`,
     [email, code, purpose]
   )
+}
+
+export async function incrementOtpAttempts(otpId: string): Promise<void> {
+  await db.execute('UPDATE otp_codes SET attempts = attempts + 1 WHERE id = ?', [otpId])
 }
 
 export async function markOtpUsed(id: string): Promise<void> {

@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getAllActiveApiTokens, touchApiToken } from '@/lib/db/queries/users'
-import { createEvent } from '@/lib/db/queries/events'
+import { createEvent, updateEventLocationLabel } from '@/lib/db/queries/events'
 import { updateUserStats } from '@/lib/stats'
 import { extractIp, getIpGeo } from '@/lib/geo'
+import { reverseGeocodeLabel } from '@/lib/geo-label'
 
 /**
  * POST /api/v1/checkin
@@ -74,6 +75,12 @@ export async function POST(request: NextRequest) {
   })
 
   updateUserStats(matchedToken.user_id).catch(console.error)
+
+  if (event.gps_lat !== null && event.gps_lng !== null) {
+    reverseGeocodeLabel(event.gps_lat, event.gps_lng)
+      .then((label) => { if (label) return updateEventLocationLabel(event.id, label) })
+      .catch(() => {})
+  }
 
   return NextResponse.json({ event })
 }

@@ -439,6 +439,19 @@ export async function getAllMembersWithDetails(workspaceId: string): Promise<Mem
   )
 }
 
+/**
+ * Returns true if the domain has been verified by any workspace other than excludeWorkspaceId.
+ * Prevents the same domain being claimed by two organisations.
+ */
+export async function isDomainVerifiedElsewhere(domain: string, excludeWorkspaceId: string): Promise<boolean> {
+  const row = await db.queryOne<{ count: number }>(
+    `SELECT COUNT(*) as count FROM workspace_domains
+     WHERE domain = ? AND verified_at IS NOT NULL AND workspace_id != ?`,
+    [domain.toLowerCase(), excludeWorkspaceId]
+  )
+  return (row?.count ?? 0) > 0
+}
+
 export async function removeWorkspaceDomain(domainId: string, workspaceId: string): Promise<void> {
   await db.execute(
     'DELETE FROM workspace_domains WHERE id = ? AND workspace_id = ?',

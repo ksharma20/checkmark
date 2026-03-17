@@ -13,6 +13,7 @@ interface Workspace {
 
 interface Props {
   workspaces: Workspace[]
+  forceCreate?: boolean
 }
 
 const inputStyle: React.CSSProperties = {
@@ -173,9 +174,9 @@ function CreateWorkspaceForm({ onCreated }: { onCreated: (slug: string) => void 
   )
 }
 
-export default function WsClient({ workspaces }: Props) {
+export default function WsClient({ workspaces, forceCreate }: Props) {
   const router = useRouter()
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(forceCreate ?? false)
 
   function handleCreated(slug: string) {
     router.push(`/ws/${slug}`)

@@ -62,9 +62,11 @@ export default async function ConsentPage({ params, searchParams }: Props) {
     )
   }
 
-  // Decline — no login required
+  // Decline — no login required, but only if still pending
   if (action === 'decline') {
-    await declineConsent(member.id)
+    if (member.status === 'pending_consent') {
+      await declineConsent(member.id)
+    }
     return (
       <ResultCard
         title="Invitation declined"
@@ -74,10 +76,43 @@ export default async function ConsentPage({ params, searchParams }: Props) {
     )
   }
 
-  // Accept — requires login
+  // Accept — requires login and email must match the invited address
   if (action === 'accept') {
+    // Reject already-used tokens
+    if (member.status !== 'pending_consent') {
+      return (
+        <ResultCard
+          title="Link already used"
+          body="This invitation link has already been accepted or declined."
+          cta={<Link href="/me" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)' }}>Go to dashboard</Link>}
+        />
+      )
+    }
+
+    // Check token expiry
+    const expiresAt = member.consent_token_expires_at
+    if (expiresAt && new Date(expiresAt) < new Date()) {
+      return (
+        <ResultCard
+          title="Link expired"
+          body="This invitation link has expired. Ask your workspace admin to resend the invite."
+          cta={<Link href="/login" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)' }}>Go to sign in</Link>}
+        />
+      )
+    }
+
     const session = await getSessionFromCookies()
     if (session) {
+      // Email must match — prevent token-hijacking
+      if (session.email.toLowerCase() !== member.email.toLowerCase()) {
+        return (
+          <ResultCard
+            title="Wrong account"
+            body={`This invitation was sent to ${member.email}. Please sign in with that email address to accept.`}
+            cta={<Link href="/login" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)' }}>Sign in with the correct account</Link>}
+          />
+        )
+      }
       await acceptConsent(member.id, session.sub)
       redirect('/me')
     }

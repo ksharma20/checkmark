@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createEvent, getOpenEventToday } from '@/lib/db/queries/events'
+import { createEvent, getOpenEventToday, updateEventLocationLabel } from '@/lib/db/queries/events'
 import { getUserStats } from '@/lib/db/queries/stats'
 import { extractIp, getIpGeo } from '@/lib/geo'
 import { updateUserStats } from '@/lib/stats'
+import { reverseGeocodeLabel } from '@/lib/geo-label'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -51,6 +52,13 @@ export async function POST(request: NextRequest) {
   })
 
   updateUserStats(userId).catch(console.error)
+
+  // Fire-and-forget: resolve GPS to human label and store (avoids client-side 429s)
+  if (event.gps_lat !== null && event.gps_lng !== null) {
+    reverseGeocodeLabel(event.gps_lat, event.gps_lng)
+      .then((label) => { if (label) return updateEventLocationLabel(event.id, label) })
+      .catch(() => {})
+  }
 
   const stats = await getUserStats(userId)
   return NextResponse.json({ event, stats })

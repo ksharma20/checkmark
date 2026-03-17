@@ -754,6 +754,40 @@ function DomainsSection({ slug }: { slug: string }) {
   )
 }
 
+// ─── Logout section ───────────────────────────────────────────────────────────
+
+function LogoutSection() {
+  const [loading, setLoading] = useState(false)
+
+  async function logout() {
+    setLoading(true)
+    await fetch('/api/auth/logout', { method: 'POST' })
+    window.location.href = '/login'
+  }
+
+  return (
+    <SectionCard title="Session">
+      <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
+        Sign out of your CheckMark account on this device.
+      </p>
+      <button
+        type="button"
+        onClick={logout}
+        disabled={loading}
+        style={{
+          height: '44px', padding: '0 20px',
+          background: 'transparent', color: 'var(--text-secondary)',
+          border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+          fontSize: '14px', fontFamily: 'DM Sans, sans-serif', fontWeight: 500,
+          cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
+        }}
+      >
+        {loading ? 'Signing out…' : 'Sign out'}
+      </button>
+    </SectionCard>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -768,6 +802,7 @@ export default function SettingsPage() {
       <WorkspaceSection slug={slug} />
       <SignalsSection slug={slug} />
       <DomainsSection slug={slug} />
+      <LogoutSection />
     </div>
   )
 }
