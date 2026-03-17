@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PresenceEvent } from '@/lib/db/queries/events'
+import { fmtTime, fmtTimeOnDate } from '@/lib/client/format-time'
 
 interface CheckinButtonsProps {
   activeEvent: PresenceEvent | null
@@ -152,8 +153,41 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
 
   const isCheckedIn = state === 'checked_in'
 
+  // Today's date for the header — browser local timezone
+  const todayDisplay = new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  })
+
   return (
     <div>
+      {/* Date header */}
+      <p
+        style={{
+          fontSize: '13px',
+          color: 'var(--text-muted)',
+          fontFamily: 'DM Sans, sans-serif',
+          marginBottom: '4px',
+        }}
+      >
+        {todayDisplay}
+      </p>
+
+      {/* Status line — single source of truth, client-rendered */}
+      <p
+        style={{
+          fontSize: '15px',
+          fontFamily: 'DM Sans, sans-serif',
+          color: isCheckedIn ? 'var(--teal)' : 'var(--text-secondary)',
+          marginBottom: '16px',
+        }}
+      >
+        {isCheckedIn && activeEvent
+          ? `Checked in at ${fmtTimeOnDate(activeEvent.checkin_at)}`
+          : 'Not checked in yet'}
+      </p>
+
       {/* Toast */}
       {toast && (
         <div
@@ -169,31 +203,6 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
           }}
         >
           {toast.message}
-        </div>
-      )}
-
-      {/* Active check-in status — shown when checked in */}
-      {isCheckedIn && activeEvent && (
-        <div
-          style={{
-            padding: '10px 14px',
-            border: '1px solid var(--teal)',
-            borderRadius: 'var(--radius-md)',
-            color: 'var(--teal)',
-            fontSize: '14px',
-            fontFamily: 'DM Sans, sans-serif',
-            marginBottom: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-          }}
-        >
-          <span style={{ fontSize: '8px', color: 'var(--teal)' }}>●</span>
-          Active since{' '}
-          {new Date(activeEvent.checkin_at).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
         </div>
       )}
 

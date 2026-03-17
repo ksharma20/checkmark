@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
+import { fmtTime, durationLabel, isWithinMinutes } from '@/lib/client/format-time'
 
 const EVENT_TYPE_LABELS: Record<string, string> = {
   office_checkin: 'Office',
@@ -15,27 +16,21 @@ interface EventCardProps {
   onNoteUpdate?: (id: string, note: string) => void
 }
 
-function durationLabel(checkin: string, checkout: string | null): string | null {
-  if (!checkout) return null
-  const diff = new Date(checkout).getTime() - new Date(checkin).getTime()
-  const hrs = diff / (1000 * 60 * 60)
-  if (hrs < 1) return `${Math.round(hrs * 60)}m`
-  return `${hrs.toFixed(1)}h`
-}
-
-function isWithin5Min(createdAt: string): boolean {
-  return Date.now() - new Date(createdAt).getTime() < 5 * 60 * 1000
-}
-
 export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardProps) {
   const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(event.note ?? '')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [canDelete] = useState(() => isWithin5Min(event.created_at))
+  // 5-minute delete window — computed once on mount (client-side clock)
+  const [canDelete] = useState(() => isWithinMinutes(event.created_at, 5))
 
   const duration = durationLabel(event.checkin_at, event.checkout_at)
   const typeLabel = EVENT_TYPE_LABELS[event.event_type] ?? event.event_type
+
+  // "1:37 PM — 2:15 PM" or just "1:37 PM"
+  const timeRange = event.checkout_at
+    ? `${fmtTime(event.checkin_at)} — ${fmtTime(event.checkout_at)}`
+    : fmtTime(event.checkin_at)
 
   async function saveNote() {
     setSaving(true)
@@ -80,7 +75,7 @@ export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardPr
         marginBottom: '8px',
       }}
     >
-      {/* Top row: time + type badge + duration */}
+      {/* Top row: time range + type badge + duration */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
         <span
           style={{
@@ -90,9 +85,7 @@ export default function EventCard({ event, onDelete, onNoteUpdate }: EventCardPr
             fontWeight: 400,
           }}
         >
-          {new Date(event.checkin_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          {event.checkout_at &&
-            ` — ${new Date(event.checkout_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+          {timeRange}
         </span>
 
         {duration && (

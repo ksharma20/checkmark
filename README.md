@@ -258,10 +258,10 @@ All routes require a valid session cookie. The proxy redirects to `/login` if mi
 
 ### `/me` — Home
 
-Server-rendered. Shows:
-- Today's date + status line ("Checked in at 9:42 AM" or "Not checked in yet")
-- **"I'm here"** button (64px, full width) — always visible. Triggers GPS collection → check-in API call.
-- **"I'm leaving"** button — appears below when an active (unchecked-out) event exists.
+Server-rendered shell + client-rendered state. Shows:
+- Today's date (client local timezone) + status line — `"Checked in at 10:15 AM on 17 Mar 2026"` or `"Not checked in yet"` — client-rendered only, always in browser timezone.
+- **"I'm here"** button (64px, full width) — visible only when CHECKED_OUT. Triggers GPS collection → check-in API call.
+- **"I'm leaving"** button — visible only when CHECKED_IN. Triggers GPS collection → checkout API call.
 - Three stat chips: **days / hrs / places** this calendar month
 - Today's check-in list (server-rendered, refreshed via `router.refresh()` after mutations)
 - Workspace strip: each workspace the user is active in, with days count
@@ -510,7 +510,8 @@ All times stored as UTC in the DB. These helpers convert for display:
 | **Phase C** | ✅ Complete | Domain verification, consent flow (email + in-app), invite pages, PWA manifest, landing page |
 | **Phase D** | ✅ Complete | `/ws` workspace picker with creation form, `POST /api/workspace`, GPS signal config + timezone auto-detect, `POST /api/v1/checkin` Bearer auth, dual PWA manifests, signal config UI in settings |
 | **E2E Test** | ✅ All 10 steps pass | Registration (personal + org), existing login, workspace creation from personal account, GPS timezone auto-detect, domain verification, consent accept, PWA manifests, API token checkin |
-| **QA §1.1** | ✅ Complete | Check-in/check-out state machine enforced server + client. `POST /api/checkin` → 409 if open event exists. `POST /api/checkin/checkout` → 409 if not checked in; now captures GPS/WiFi/IP signals at checkout. `GET /api/checkin/status` added. `CheckinButtons` client: shows "I'm here" only when CHECKED_OUT, "I'm leaving" only when CHECKED_IN; switches state instantly on success + syncs with server via `router.refresh()`. DB: 7 checkout_* columns added to `presence_events`. |
+| **QA §1.2** | ✅ Complete | User timezone detection and confirmation. `PATCH /api/me/timezone` — validates IANA timezone string, updates `users.timezone + timezone_updated_at + timezone_confirmed`. `TimezoneReporter` — invisible client component, fires `Intl.DateTimeFormat().resolvedOptions().timeZone` to API on every `/me` mount (keeps DB in sync silently). `TimezoneBanner` — shown once when `timezone_confirmed = 0`; displays detected timezone, Confirm button (sets `confirm: true`) and Change button (inline text input for manual override); dismisses permanently on confirm. Both wired into `me/page.tsx` alongside the existing `CheckinButtons`. |
+| **QA §1.1** | ✅ Complete | Check-in/check-out state machine enforced server + client. `POST /api/checkin` → 409 if open event exists. `POST /api/checkin/checkout` → 409 if not checked in; now captures GPS/WiFi/IP signals at checkout. `GET /api/checkin/status` added. `CheckinButtons` client: shows "I'm here" only when CHECKED_OUT, "I'm leaving" only when CHECKED_IN; switches state instantly on success + syncs with server via `router.refresh()`. DB: 7 checkout_* columns added to `presence_events`. **Sub-bug fixes:** (1) SQLite datetime UTC parsing — `"2026-03-17 07:54:11"` (space, no Z) was misread as local time by browsers; created `src/lib/client/format-time.ts` with `parseUtc()` normaliser → all times now display in browser's local timezone. (2) Duplicate status display — removed server-rendered "Checked in at" from `me/page.tsx`; `CheckinButtons` is sole owner of the status line. (3) Days-count bug — `split('T')[0]` on SQLite format returned full string (no T → every event unique); changed to `slice(0, 10)`. (4) Consistent time format — `"10:15 AM on 17 Mar 2026"` enforced via `fmtTimeOnDate()` across `CheckinButtons` and `EventCard`. |
 
 ---
 

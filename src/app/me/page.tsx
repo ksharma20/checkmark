@@ -2,8 +2,11 @@ import { getServerUser } from '@/lib/auth'
 import { getOpenEventToday, getUserEvents } from '@/lib/db/queries/events'
 import { getUserStats } from '@/lib/db/queries/stats'
 import { getUserWorkspaces, getWorkspacesByIds } from '@/lib/db/queries/workspaces'
+import { getUserById } from '@/lib/db/queries/users'
 import CheckinButtons from '@/components/user/CheckinButtons'
 import EventCard from '@/components/user/EventCard'
+import TimezoneReporter from '@/components/user/TimezoneReporter'
+import TimezoneBanner from '@/components/user/TimezoneBanner'
 
 export default async function MePage() {
   const user = await getServerUser()
@@ -14,22 +17,28 @@ export default async function MePage() {
   const monthStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
   const nextMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
 
-  const [activeEvent, todayResult, monthResult, stats, memberships] = await Promise.all([
+  const [activeEvent, todayResult, monthResult, stats, memberships, fullUser] = await Promise.all([
     getOpenEventToday(user.userId),
     getUserEvents({ userId: user.userId, start: `${todayStr}T00:00:00.000Z`, end: `${todayStr}T23:59:59.999Z` }),
     getUserEvents({ userId: user.userId, start: `${monthStr}T00:00:00.000Z`, end: nextMonthDate.toISOString(), limit: 500 }),
     getUserStats(user.userId),
     getUserWorkspaces(user.userId),
+    getUserById(user.userId),
   ])
 
   const todayEvents = todayResult.events
   const monthEvents = monthResult.events
 
-  // Compute from this month's events
-  const distinctDaysThisMonth = new Set(monthEvents.map((e) => e.checkin_at.split('T')[0])).size
+  // Normalize SQLite datetime "2026-03-17 07:54:11" to proper UTC Date
+  function parseUtcServer(s: string): Date {
+    return new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z')
+  }
+
+  // slice(0,10) always returns "YYYY-MM-DD" regardless of space vs T separator
+  const distinctDaysThisMonth = new Set(monthEvents.map((e) => e.checkin_at.slice(0, 10))).size
   const hoursThisMonth = monthEvents.reduce((sum, e) => {
     if (e.checkout_at) {
-      return sum + (new Date(e.checkout_at).getTime() - new Date(e.checkin_at).getTime()) / 3_600_000
+      return sum + (parseUtcServer(e.checkout_at).getTime() - parseUtcServer(e.checkin_at).getTime()) / 3_600_000
     }
     return sum
   }, 0)
@@ -40,12 +49,6 @@ export default async function MePage() {
   const workspaces = await getWorkspacesByIds(workspaceIds)
   const wsMap = new Map(workspaces.map((w) => [w.id, w]))
 
-  const todayDisplay = now.toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  })
-
   return (
     <div
       style={{
@@ -54,35 +57,16 @@ export default async function MePage() {
         padding: '20px 16px',
       }}
     >
-      {/* Date */}
-      <p
-        style={{
-          fontSize: '13px',
-          color: 'var(--text-muted)',
-          fontFamily: 'DM Sans, sans-serif',
-          marginBottom: '4px',
-        }}
-      >
-        {todayDisplay}
-      </p>
+      {/* Silent timezone reporter — updates DB on every visit */}
+      <TimezoneReporter />
 
-      {/* Status line */}
-      <p
-        style={{
-          fontSize: '15px',
-          fontFamily: 'DM Sans, sans-serif',
-          color: activeEvent ? 'var(--teal)' : 'var(--text-secondary)',
-          marginBottom: '16px',
-        }}
-      >
-        {activeEvent
-          ? `Checked in at ${new Date(activeEvent.checkin_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-          : todayEvents.length > 0
-          ? `Last checked out at ${new Date(todayEvents[0].checkout_at ?? todayEvents[0].checkin_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-          : 'Not checked in yet'}
-      </p>
+      {/* Timezone confirmation banner — shown once until user confirms */}
+      <TimezoneBanner
+        storedTimezone={fullUser?.timezone ?? null}
+        confirmed={fullUser?.timezone_confirmed === 1}
+      />
 
-      {/* Check-in / checkout buttons */}
+      {/* Check-in / checkout buttons (includes status line + active indicator) */}
       <CheckinButtons activeEvent={activeEvent} />
 
       {/* This month stat chips */}

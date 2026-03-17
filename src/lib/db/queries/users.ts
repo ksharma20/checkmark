@@ -7,6 +7,9 @@ export interface User {
   password_hash: string
   full_name: string | null
   avatar_url: string | null
+  timezone: string | null
+  timezone_updated_at: string | null
+  timezone_confirmed: number  // 0 = unconfirmed, 1 = confirmed
   created_at: string
   updated_at: string
 }
@@ -54,6 +57,20 @@ export async function updateUserPassword(userId: string, passwordHash: string): 
   await db.execute(
     `UPDATE users SET password_hash = ?, updated_at = datetime('now') WHERE id = ?`,
     [passwordHash, userId]
+  )
+}
+
+export async function updateUserTimezone(
+  userId: string,
+  timezone: string,
+  confirm = false
+): Promise<void> {
+  await db.execute(
+    `UPDATE users
+     SET timezone = ?, timezone_updated_at = datetime('now'),
+         timezone_confirmed = ?, updated_at = datetime('now')
+     WHERE id = ?`,
+    [timezone, confirm ? 1 : 0, userId]
   )
 }
 
