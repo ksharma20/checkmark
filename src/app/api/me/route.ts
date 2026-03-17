@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserById, updateUserName, deleteUser } from '@/lib/db/queries/users'
+import { getUserById, updateUserName, deactivateUser } from '@/lib/db/queries/users'
+import { clearSessionCookie } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -38,7 +39,8 @@ export async function DELETE(request: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
-  // Cascade deletes all events, stats, memberships via FK constraints
-  await deleteUser(userId)
+  // Soft delete — data is preserved; user can reactivate by logging back in
+  await deactivateUser(userId)
+  await clearSessionCookie()
   return NextResponse.json({ success: true })
 }

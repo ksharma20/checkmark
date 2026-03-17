@@ -16,7 +16,8 @@ function getMonthBounds() {
 function groupByDate(events: PresenceEvent[]): Map<string, PresenceEvent[]> {
   const groups = new Map<string, PresenceEvent[]>()
   for (const event of events) {
-    const date = event.checkin_at.split('T')[0]
+    // slice(0,10) handles both ISO "2026-03-17T..." and SQLite "2026-03-17 ..." formats
+    const date = event.checkin_at.slice(0, 10)
     if (!groups.has(date)) groups.set(date, [])
     groups.get(date)!.push(event)
   }

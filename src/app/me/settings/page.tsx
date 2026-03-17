@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -403,25 +404,60 @@ function TokensSection() {
   )
 }
 
+// ─── Organisation features section ────────────────────────────────────────────
+
+function OrgSection() {
+  return (
+    <SectionCard title="Organisation features">
+      <p
+        style={{
+          fontSize: '13px',
+          fontFamily: 'DM Sans, sans-serif',
+          color: 'var(--text-secondary)',
+          marginBottom: '16px',
+          lineHeight: 1.5,
+        }}
+      >
+        Need to manage your team&apos;s attendance? Create a workspace to track who shows up, view real-time dashboards, and configure location signals.
+      </p>
+      <Link
+        href="/ws"
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          height: '44px',
+          padding: '0 20px',
+          background: 'var(--brand)',
+          color: '#fff',
+          border: 'none',
+          borderRadius: 'var(--radius-md)',
+          fontSize: '14px',
+          fontFamily: 'DM Sans, sans-serif',
+          fontWeight: 500,
+          textDecoration: 'none',
+        }}
+      >
+        + Create a workspace
+      </Link>
+    </SectionCard>
+  )
+}
+
 // ─── Danger zone ──────────────────────────────────────────────────────────────
 
 function DangerSection() {
   const [loading, setLoading] = useState(false)
 
-  async function deleteAccount() {
+  async function deactivateAccount() {
     const confirmed = confirm(
-      'Delete your account? All check-ins, stats, and workspace memberships will be permanently removed. This cannot be undone.'
+      'Deactivate your account? Your account and all data will be hidden from workspaces. You can reactivate anytime by logging back in with your password.'
     )
     if (!confirmed) return
-
-    const doubleConfirm = confirm('Are you absolutely sure? Type OK in the next prompt to confirm.')
-    if (!doubleConfirm) return
 
     setLoading(true)
     try {
       const res = await fetch('/api/me', { method: 'DELETE' })
       if (res.ok) {
-        await fetch('/api/auth/logout', { method: 'POST' })
         window.location.href = '/login'
       }
     } finally {
@@ -436,13 +472,25 @@ function DangerSection() {
           fontSize: '13px',
           fontFamily: 'DM Sans, sans-serif',
           color: 'var(--text-secondary)',
-          marginBottom: '14px',
+          marginBottom: '6px',
+          lineHeight: 1.5,
         }}
       >
-        Permanently delete your account and all associated data. This action cannot be reversed.
+        Deactivate your account. Your check-ins and data are preserved — your account simply becomes invisible to all workspaces.
       </p>
-      <Btn onClick={deleteAccount} loading={loading} danger>
-        Delete account
+      <p
+        style={{
+          fontSize: '13px',
+          fontFamily: 'DM Sans, sans-serif',
+          color: 'var(--text-muted)',
+          marginBottom: '14px',
+          lineHeight: 1.5,
+        }}
+      >
+        You can reactivate anytime by logging back in with your email and password.
+      </p>
+      <Btn onClick={deactivateAccount} loading={loading} danger>
+        Deactivate account
       </Btn>
     </SectionCard>
   )
@@ -467,6 +515,7 @@ export default function SettingsPage() {
       <ProfileSection />
       <PasswordSection />
       <TokensSection />
+      <OrgSection />
       <DangerSection />
     </div>
   )

@@ -25,6 +25,7 @@ export interface PresenceEvent {
   checkout_ip_address: string | null
   checkout_ip_geo_lat: number | null
   checkout_ip_geo_lng: number | null
+  deleted_at: string | null
 }
 
 export async function createEvent(params: {
@@ -108,7 +109,7 @@ export async function checkoutEvent(
 export async function getOpenEventToday(userId: string): Promise<PresenceEvent | null> {
   return db.queryOne<PresenceEvent>(
     `SELECT * FROM presence_events
-     WHERE user_id = ? AND checkout_at IS NULL
+     WHERE user_id = ? AND checkout_at IS NULL AND deleted_at IS NULL
        AND date(checkin_at) = date('now')
      ORDER BY checkin_at DESC LIMIT 1`,
     [userId]
@@ -118,7 +119,7 @@ export async function getOpenEventToday(userId: string): Promise<PresenceEvent |
 export async function getMostRecentOpenEvent(userId: string): Promise<PresenceEvent | null> {
   return db.queryOne<PresenceEvent>(
     `SELECT * FROM presence_events
-     WHERE user_id = ? AND checkout_at IS NULL
+     WHERE user_id = ? AND checkout_at IS NULL AND deleted_at IS NULL
      ORDER BY checkin_at DESC LIMIT 1`,
     [userId]
   )
@@ -131,7 +132,7 @@ export async function getUserEvents(params: {
   limit?: number
   offset?: number
 }): Promise<{ events: PresenceEvent[]; total: number }> {
-  const conditions: string[] = ['user_id = ?']
+  const conditions: string[] = ['user_id = ?', 'deleted_at IS NULL']
   const args: unknown[] = [params.userId]
 
   if (params.start) {
@@ -174,17 +175,24 @@ export async function updateEventNote(eventId: string, userId: string, note: str
 }
 
 export async function deleteEvent(eventId: string, userId: string): Promise<boolean> {
-  // Only deletable within 5 minutes of creation
+  // Only soft-deletable within 5 minutes of creation
   const event = await db.queryOne<PresenceEvent>(
-    `SELECT * FROM presence_events WHERE id = ? AND user_id = ?`,
+    `SELECT * FROM presence_events WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
     [eventId, userId]
   )
   if (!event) return false
 
-  const ageMs = Date.now() - new Date(event.created_at).getTime()
+  // Normalize SQLite datetime before computing age
+  const createdAt = event.created_at.includes('T')
+    ? event.created_at
+    : event.created_at.replace(' ', 'T') + 'Z'
+  const ageMs = Date.now() - new Date(createdAt).getTime()
   if (ageMs > 5 * 60 * 1000) return false
 
-  await db.execute('DELETE FROM presence_events WHERE id = ? AND user_id = ?', [eventId, userId])
+  await db.execute(
+    `UPDATE presence_events SET deleted_at = datetime('now') WHERE id = ? AND user_id = ?`,
+    [eventId, userId]
+  )
   return true
 }
 
@@ -199,6 +207,7 @@ export async function getEventsForUsers(params: {
     `SELECT * FROM presence_events
      WHERE user_id IN (${placeholders})
        AND checkin_at >= ? AND checkin_at <= ?
+       AND deleted_at IS NULL
      ORDER BY checkin_at DESC`,
     [...params.userIds, params.start, params.end]
   )

@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = 'email' | 'password' | 'otp' | 'accountType' | 'personal' | 'org'
+type Step = 'email' | 'password' | 'otp' | 'accountType' | 'personal' | 'org' | 'deactivated'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -153,9 +153,11 @@ function FieldGroup({ label, children }: { label: string; children: React.ReactN
 function EmailStep({
   onExisting,
   onNew,
+  onDeactivated,
 }: {
   onExisting: (email: string) => void
   onNew: (email: string) => void
+  onDeactivated: (email: string) => void
 }) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -176,7 +178,9 @@ function EmailStep({
         body: JSON.stringify({ email: e }),
       })
       const data = await res.json()
-      if (data.exists) {
+      if (data.exists && data.deactivated) {
+        onDeactivated(e)
+      } else if (data.exists) {
         onExisting(e)
       } else {
         const otpRes = await fetch('/api/auth/otp/send', {
@@ -316,6 +320,84 @@ function PasswordStep({
       </FieldGroup>
       <PrimaryBtn onClick={signIn} loading={loading}>
         Sign in
+      </PrimaryBtn>
+      <ErrorMsg text={error} />
+    </div>
+  )
+}
+
+// ─── Deactivated step ─────────────────────────────────────────────────────────
+
+function DeactivatedStep({
+  email,
+  onBack,
+  onSuccess,
+}: {
+  email: string
+  onBack: () => void
+  onSuccess: (redirect: string) => void
+}) {
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function reactivate() {
+    if (!password) { setError('Please enter your password'); return }
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/me/reactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        onSuccess(data.redirect ?? '/me')
+      } else {
+        setError(data.error || 'Reactivation failed')
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <BackLink onClick={onBack} />
+      <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--navy)', marginBottom: '4px' }}>
+        Account deactivated
+      </h1>
+      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
+        {email}
+      </p>
+      <div style={{
+        background: 'color-mix(in srgb, var(--amber) 10%, transparent)',
+        border: '1px solid var(--amber)',
+        borderRadius: 'var(--radius-md)',
+        padding: '12px 14px',
+        marginBottom: '20px',
+        fontSize: '13px',
+        fontFamily: 'DM Sans, sans-serif',
+        color: 'var(--text-secondary)',
+        lineHeight: 1.5,
+      }}>
+        This account was deactivated. Your data is intact — enter your password to reactivate and sign in.
+      </div>
+      <FieldGroup label="Password">
+        <Input
+          type="password"
+          value={password}
+          onChange={setPassword}
+          placeholder="Your password"
+          autoFocus
+          onKeyDown={(e) => e.key === 'Enter' && reactivate()}
+        />
+      </FieldGroup>
+      <PrimaryBtn onClick={reactivate} loading={loading}>
+        Reactivate account
       </PrimaryBtn>
       <ErrorMsg text={error} />
     </div>
@@ -993,6 +1075,7 @@ function LoginFlow() {
           <EmailStep
             onExisting={(e) => { setEmail(e); setStep('password') }}
             onNew={(e) => { setEmail(e); setStep('otp') }}
+            onDeactivated={(e) => { setEmail(e); setStep('deactivated') }}
           />
         )}
         {step === 'password' && (
@@ -1026,6 +1109,13 @@ function LoginFlow() {
           <OrgSetupStep
             email={email}
             onBack={() => setStep('accountType')}
+            onSuccess={handleSuccess}
+          />
+        )}
+        {step === 'deactivated' && (
+          <DeactivatedStep
+            email={email}
+            onBack={() => setStep('email')}
             onSuccess={handleSuccess}
           />
         )}

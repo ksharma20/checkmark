@@ -1,12 +1,12 @@
-import { find } from 'geo-tz'
-
 /**
- * Returns the IANA timezone string for given GPS coordinates.
- * e.g. timezoneFromCoords(28.6139, 77.2090) → 'Asia/Kolkata'
+ * Normalize SQLite datetime "2026-03-17 07:54:11" (space, no Z) to a proper
+ * UTC Date. Without this, new Date("2026-03-17 07:54:11") is implementation-
+ * defined — Node.js may treat it as local time, producing a timezone offset bug.
  */
-export function timezoneFromCoords(lat: number, lng: number): string {
-  const zones = find(lat, lng)
-  return zones[0] || 'UTC'
+function parseDbUtc(s: string): Date {
+  if (!s) return new Date(NaN)
+  if (s.includes('T')) return new Date(s.endsWith('Z') ? s : s + 'Z')
+  return new Date(s.replace(' ', 'T') + 'Z')
 }
 
 // All dates stored as UTC ISO 8601 strings in the DB.
@@ -20,7 +20,7 @@ export function formatInTz(
   tz: string,
   format: 'time' | 'date' | 'datetime'
 ): string {
-  const date = new Date(utcString)
+  const date = parseDbUtc(utcString)
 
   const opts: Intl.DateTimeFormatOptions = { timeZone: tz }
 
@@ -133,6 +133,6 @@ export function todayInTz(tz: string): string {
  */
 export function durationHours(checkinAt: string, checkoutAt: string | null): number | null {
   if (!checkoutAt) return null
-  const diff = new Date(checkoutAt).getTime() - new Date(checkinAt).getTime()
+  const diff = parseDbUtc(checkoutAt).getTime() - parseDbUtc(checkinAt).getTime()
   return diff / (1000 * 60 * 60)
 }

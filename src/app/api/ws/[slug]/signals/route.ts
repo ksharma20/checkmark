@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import { getSignalConfigs, addSignalConfig, updateWorkspace } from '@/lib/db/queries/workspaces'
-import { timezoneFromCoords } from '@/lib/timezone'
+import { timezoneFromCoords } from '@/lib/timezone-server'
 import { getIpGeo, extractIp } from '@/lib/geo'
 import bcrypt from 'bcryptjs'
 

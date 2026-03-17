@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserByEmail } from '@/lib/db/queries/users'
+import { getUserByEmailIncludeDeleted } from '@/lib/db/queries/users'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
 import { verifyPassword, createJwt, setSessionCookie } from '@/lib/auth'
 
@@ -26,14 +26,15 @@ export async function POST(request: NextRequest) {
     return apiError('Email is required', 'MISSING_EMAIL', 400)
   }
 
-  // Step 1: Check if user exists
+  // Step 1: Check if user exists (frontend uses check-email, but kept for safety)
   if (!body.password) {
-    const user = await getUserByEmail(email)
-    return NextResponse.json({ exists: !!user })
+    const user = await getUserByEmailIncludeDeleted(email)
+    if (!user) return NextResponse.json({ exists: false })
+    return NextResponse.json({ exists: true, deactivated: user.deleted_at !== null })
   }
 
   // Step 2: Verify password
-  const user = await getUserByEmail(email)
+  const user = await getUserByEmailIncludeDeleted(email)
   if (!user) {
     return apiError('Invalid credentials', 'INVALID_CREDENTIALS', 401)
   }
@@ -41,6 +42,14 @@ export async function POST(request: NextRequest) {
   const valid = await verifyPassword(body.password, user.password_hash)
   if (!valid) {
     return apiError('Invalid credentials', 'INVALID_CREDENTIALS', 401)
+  }
+
+  // Deactivated account — password is correct but account is soft-deleted
+  if (user.deleted_at !== null) {
+    return NextResponse.json(
+      { error: 'Account deactivated', code: 'ACCOUNT_DEACTIVATED', email },
+      { status: 403 }
+    )
   }
 
   const token = await createJwt(user.id, user.email)
