@@ -30,6 +30,12 @@ export default async function WsSlugLayout({ children, params }: Props) {
         background: 'var(--surface-1)',
       }}
     >
+      {/* PWA meta tags for /ws */}
+      <link rel="manifest" href="/manifest-ws.json" />
+      <meta name="theme-color" content="#1B4DFF" />
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      <meta name="apple-mobile-web-app-title" content="CheckMark WS" />
       {/* Top header */}
       <header
         style={{

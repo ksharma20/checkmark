@@ -434,3 +434,76 @@ export async function linkUserToMemberRecord(email: string, userId: string): Pro
     [userId, email.toLowerCase()]
   )
 }
+
+// ─── Signal config ─────────────────────────────────────────────────────────────
+
+export interface WorkspaceSignalConfig {
+  id: string
+  workspace_id: string
+  signal_type: string
+  location_name: string | null
+  wifi_ssid_hash: string | null
+  wifi_ssid_display: string | null
+  gps_lat: number | null
+  gps_lng: number | null
+  gps_radius_m: number | null
+  ip_geo_lat: number | null
+  ip_geo_lng: number | null
+  ip_proximity_m: number | null
+  is_active: number
+  created_at: string
+}
+
+export async function getSignalConfigs(workspaceId: string): Promise<WorkspaceSignalConfig[]> {
+  return db.query<WorkspaceSignalConfig>(
+    'SELECT * FROM workspace_signal_config WHERE workspace_id = ? AND is_active = 1 ORDER BY created_at ASC',
+    [workspaceId]
+  )
+}
+
+export async function addSignalConfig(params: {
+  workspaceId: string
+  signalType: string
+  locationName?: string
+  wifiSsidHash?: string
+  wifiSsidDisplay?: string
+  gpsLat?: number
+  gpsLng?: number
+  gpsRadiusM?: number
+  ipGeoLat?: number
+  ipGeoLng?: number
+  ipProximityM?: number
+}): Promise<WorkspaceSignalConfig> {
+  const id = crypto.randomUUID().replace(/-/g, '')
+  await db.execute(
+    `INSERT INTO workspace_signal_config
+       (id, workspace_id, signal_type, location_name, wifi_ssid_hash, wifi_ssid_display,
+        gps_lat, gps_lng, gps_radius_m, ip_geo_lat, ip_geo_lng, ip_proximity_m)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      params.workspaceId,
+      params.signalType,
+      params.locationName ?? null,
+      params.wifiSsidHash ?? null,
+      params.wifiSsidDisplay ?? null,
+      params.gpsLat ?? null,
+      params.gpsLng ?? null,
+      params.gpsRadiusM ?? 300,
+      params.ipGeoLat ?? null,
+      params.ipGeoLng ?? null,
+      params.ipProximityM ?? 500,
+    ]
+  )
+  return db.queryOne<WorkspaceSignalConfig>(
+    'SELECT * FROM workspace_signal_config WHERE id = ?',
+    [id]
+  ) as Promise<WorkspaceSignalConfig>
+}
+
+export async function deleteSignalConfig(signalId: string, workspaceId: string): Promise<void> {
+  await db.execute(
+    'DELETE FROM workspace_signal_config WHERE id = ? AND workspace_id = ?',
+    [signalId, workspaceId]
+  )
+}

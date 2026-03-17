@@ -508,6 +508,8 @@ All times stored as UTC in the DB. These helpers convert for display:
 | **Phase A** | ✅ Complete | Rewritten login: 6-state flow, account type selection, OTP cookie security, org registration with live slug check |
 | **Phase B** | ✅ Complete | Org PWA — `/ws` picker, `/ws/:slug` today dashboard, people tab, settings tab |
 | **Phase C** | ✅ Complete | Domain verification, consent flow (email + in-app), invite pages, PWA manifest, landing page |
+| **Phase D** | ✅ Complete | `/ws` workspace picker with creation form, `POST /api/workspace`, GPS signal config + timezone auto-detect, `POST /api/v1/checkin` Bearer auth, dual PWA manifests, signal config UI in settings |
+| **E2E Test** | ✅ All 10 steps pass | Registration (personal + org), existing login, workspace creation from personal account, GPS timezone auto-detect, domain verification, consent accept, PWA manifests, API token checkin |
 
 ---
 

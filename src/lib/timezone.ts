@@ -1,3 +1,14 @@
+import { find } from 'geo-tz'
+
+/**
+ * Returns the IANA timezone string for given GPS coordinates.
+ * e.g. timezoneFromCoords(28.6139, 77.2090) → 'Asia/Kolkata'
+ */
+export function timezoneFromCoords(lat: number, lng: number): string {
+  const zones = find(lat, lng)
+  return zones[0] || 'UTC'
+}
+
 // All dates stored as UTC ISO 8601 strings in the DB.
 // These helpers convert between UTC and workspace/user timezones for display.
 

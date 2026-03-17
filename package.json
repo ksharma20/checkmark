@@ -12,6 +12,7 @@
     "@vercel/postgres": "^0.10.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
+    "geo-tz": "^8.1.6",
     "jose": "^6.2.1",
     "next": "16.1.6",
     "react": "19.2.3",

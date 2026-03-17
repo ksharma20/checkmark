@@ -145,3 +145,16 @@ export async function getApiTokenByHash(tokenHash: string): Promise<UserApiToken
     [tokenHash]
   )
 }
+
+export async function getAllActiveApiTokens(): Promise<UserApiToken[]> {
+  return db.query<UserApiToken>(
+    `SELECT * FROM user_api_tokens WHERE revoked_at IS NULL`
+  )
+}
+
+export async function touchApiToken(tokenId: string): Promise<void> {
+  await db.execute(
+    `UPDATE user_api_tokens SET last_used_at = datetime('now') WHERE id = ?`,
+    [tokenId]
+  )
+}

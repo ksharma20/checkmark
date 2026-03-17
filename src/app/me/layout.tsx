@@ -19,6 +19,12 @@ export default async function MeLayout({ children }: { children: React.ReactNode
         background: 'var(--surface-1)',
       }}
     >
+      {/* PWA meta tags for /me */}
+      <link rel="manifest" href="/manifest-me.json" />
+      <meta name="theme-color" content="#1B4DFF" />
+      <meta name="apple-mobile-web-app-capable" content="yes" />
+      <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+      <meta name="apple-mobile-web-app-title" content="CheckMark" />
       {/* Header */}
       <header
         style={{
