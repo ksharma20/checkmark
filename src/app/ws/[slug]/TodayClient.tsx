@@ -359,12 +359,30 @@ export default function TodayClient({ slug, tz }: Props) {
       {/* ── Loading skeleton ─────────────────────────────────────────────────── */}
       {loading && (
         <div>
-          {[1, 2, 3].map((i) => (
-            <div key={i} style={{
-              height: '58px', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)',
-              marginBottom: '6px', animation: 'pulse 1.5s ease-in-out infinite',
-            }} />
-          ))}
+          {[1, 2, 3, 4].map((i) => {
+            const sk: React.CSSProperties = {
+              background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
+              backgroundSize: '600px 100%',
+              animation: 'shimmer 1.4s ease-in-out infinite',
+              borderRadius: '6px',
+            }
+            return (
+              <div key={i} style={{
+                display: 'grid', gridTemplateColumns: '1fr auto auto auto',
+                alignItems: 'center', gap: '16px', padding: '12px 16px',
+                background: 'var(--surface-0)', border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)', marginBottom: '6px',
+              }}>
+                <div>
+                  <div style={{ ...sk, height: '13px', width: '120px', marginBottom: '6px' }} />
+                  <div style={{ ...sk, height: '11px', width: '160px' }} />
+                </div>
+                <div style={{ ...sk, height: '12px', width: '80px' }} />
+                <div style={{ ...sk, height: '20px', width: '40px', borderRadius: '4px' }} />
+                <div style={{ ...sk, height: '12px', width: '40px' }} />
+              </div>
+            )
+          })}
         </div>
       )}
 

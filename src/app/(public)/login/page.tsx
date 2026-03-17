@@ -29,22 +29,27 @@ function Input({
   type = 'text',
   value,
   onChange,
+  onBlur,
   placeholder,
   autoFocus,
   onKeyDown,
+  hasError,
 }: {
   type?: string
   value: string
   onChange: (v: string) => void
+  onBlur?: () => void
   placeholder?: string
   autoFocus?: boolean
   onKeyDown?: (e: React.KeyboardEvent) => void
+  hasError?: boolean
 }) {
   return (
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       placeholder={placeholder}
       autoFocus={autoFocus}
       onKeyDown={onKeyDown}
@@ -52,7 +57,7 @@ function Input({
         width: '100%',
         height: '48px',
         padding: '0 14px',
-        border: '1px solid var(--border)',
+        border: `1px solid ${hasError ? 'var(--danger)' : 'var(--border)'}`,
         borderRadius: 'var(--radius-md)',
         fontSize: '15px',
         fontFamily: 'DM Sans, sans-serif',
@@ -60,6 +65,7 @@ function Input({
         color: 'var(--text-primary)',
         outline: 'none',
         boxSizing: 'border-box',
+        transition: 'border-color 0.15s',
       }}
     />
   )
@@ -162,10 +168,14 @@ function EmailStep({
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [emailTouched, setEmailTouched] = useState(false)
+
+  const emailInvalid = emailTouched && email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
 
   async function proceed() {
     const e = email.toLowerCase().trim()
-    if (!e || !e.includes('@')) {
+    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      setEmailTouched(true)
       setError('Please enter a valid email address')
       return
     }
@@ -229,11 +239,18 @@ function EmailStep({
         <Input
           type="email"
           value={email}
-          onChange={setEmail}
+          onChange={(v) => { setEmail(v); if (error) setError(null) }}
+          onBlur={() => setEmailTouched(true)}
           placeholder="you@company.com"
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && proceed()}
+          hasError={emailInvalid}
         />
+        {emailInvalid && (
+          <p style={{ fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--danger)', marginTop: '4px' }}>
+            Please enter a valid email address.
+          </p>
+        )}
       </FieldGroup>
       <PrimaryBtn onClick={proceed} loading={loading}>
         Continue

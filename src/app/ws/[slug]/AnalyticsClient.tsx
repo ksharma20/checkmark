@@ -3,6 +3,35 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { AnalyticsMember, AnalyticsResponse } from '@/app/api/ws/[slug]/analytics/route'
 
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const skeletonStyle: React.CSSProperties = {
+  background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
+  backgroundSize: '600px 100%',
+  animation: 'shimmer 1.4s ease-in-out infinite',
+  borderRadius: '6px',
+}
+
+function SkeletonRow() {
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '16px',
+      padding: '14px 16px', borderBottom: '1px solid var(--border)',
+    }}>
+      <div style={{ ...skeletonStyle, width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }} />
+      <div style={{ flex: '0 0 140px' }}>
+        <div style={{ ...skeletonStyle, height: '12px', width: '100px', marginBottom: '6px' }} />
+        <div style={{ ...skeletonStyle, height: '10px', width: '130px' }} />
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ ...skeletonStyle, height: '6px', borderRadius: '3px', marginBottom: '4px' }} />
+        <div style={{ ...skeletonStyle, height: '6px', borderRadius: '3px', width: '60%' }} />
+      </div>
+      <div style={{ ...skeletonStyle, width: '44px', height: '14px', marginLeft: 'auto' }} />
+    </div>
+  )
+}
+
 interface Props {
   slug: string
 }
@@ -76,6 +105,7 @@ function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; 
       alignItems: 'center',
       padding: '14px 16px',
       borderBottom: '1px solid var(--border)',
+      minWidth: signalsConfigured ? '720px' : '520px',
     }}>
       {/* Name */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
@@ -170,6 +200,7 @@ function TableHeader({ signalsConfigured }: { signalsConfigured: boolean }) {
       gap: '16px',
       padding: '10px 16px',
       borderBottom: '1px solid var(--border)',
+      minWidth: signalsConfigured ? '720px' : '520px',
     }}>
       <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Member</p>
       {signalsConfigured && <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Office</p>}
@@ -291,17 +322,20 @@ export default function AnalyticsClient({ slug }: Props) {
 
       {/* Member table */}
       {loading ? (
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '40px', textAlign: 'center' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)' }}>Loading analytics…</p>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+          {[1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
         </div>
       ) : !data || data.members.length === 0 ? (
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '40px', textAlign: 'center' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)' }}>
-            No check-in data for this period.
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '48px 24px', textAlign: 'center' }}>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+            No presence data for this period.
+          </p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>
+            Members will appear here as they check in.
           </p>
         </div>
       ) : (
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', overflowX: 'auto' }}>
           {!data.signals_configured && (
             <div style={{
               padding: '10px 16px',

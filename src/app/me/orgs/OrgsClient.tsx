@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import type { WorkspaceMember, Workspace } from '@/lib/db/queries/workspaces'
 
 interface Props {
@@ -222,19 +223,25 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
         </section>
       ) : (
         pendingList.length === 0 && (
-          <div
-            style={{
-              textAlign: 'center',
-              padding: '48px 0',
-              color: 'var(--text-muted)',
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: '14px',
-            }}
-          >
-            <p>You&apos;re not in any workspaces yet.</p>
-            <p style={{ fontSize: '13px', marginTop: '4px' }}>
-              An org admin will send you an invite, or you&apos;ll be auto-enrolled if your email domain matches.
+          <div style={{ textAlign: 'center', padding: '48px 20px' }}>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+              You&apos;re not part of any workspace yet.
             </p>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.6 }}>
+              Your employer needs to add you, or you&apos;ll be auto-enrolled if your email domain matches.
+            </p>
+            <Link
+              href="/ws"
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '13px',
+                color: 'var(--brand)',
+                textDecoration: 'none',
+                fontWeight: 500,
+              }}
+            >
+              Or create your own workspace →
+            </Link>
           </div>
         )
       )}

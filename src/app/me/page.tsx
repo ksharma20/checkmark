@@ -216,20 +216,23 @@ export default async function MePage() {
         </section>
       )}
 
-      {/* Empty state */}
+      {/* Empty state — no activity yet */}
       {todayEvents.length === 0 && memberships.length === 0 && (
         <div
           style={{
             marginTop: '32px',
+            padding: '32px 20px',
             textAlign: 'center',
-            color: 'var(--text-muted)',
-            fontFamily: 'DM Sans, sans-serif',
-            fontSize: '14px',
+            background: 'var(--surface-0)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-lg)',
           }}
         >
-          <p>Your first check-in is waiting.</p>
-          <p style={{ fontSize: '13px', marginTop: '4px' }}>
-            Tap &ldquo;I&apos;m here&rdquo; whenever you arrive at work.
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+            Tap &ldquo;I&apos;m here&rdquo; when you arrive somewhere.
+          </p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>
+            Your check-in history will build up here over time.
           </p>
         </div>
       )}

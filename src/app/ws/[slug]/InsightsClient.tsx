@@ -14,6 +14,48 @@ const INTERVALS: { key: InsightInterval; label: string }[] = [
   { key: 'year',    label: 'Year' },
 ]
 
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const skBase: React.CSSProperties = {
+  background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
+  backgroundSize: '600px 100%',
+  animation: 'shimmer 1.4s ease-in-out infinite',
+  borderRadius: '6px',
+}
+
+function InsightsSkeleton() {
+  return (
+    <div>
+      {/* Stat card skeletons */}
+      <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        {[120, 100, 110, 100, 90].map((w, i) => (
+          <div key={i} style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '16px 18px', flex: '1 1 120px' }}>
+            <div style={{ ...skBase, height: '10px', width: '60px', marginBottom: '10px' }} />
+            <div style={{ ...skBase, height: '24px', width: `${w - 30}px`, marginBottom: '6px' }} />
+            <div style={{ ...skBase, height: '9px', width: `${w}px` }} />
+          </div>
+        ))}
+      </div>
+      {/* Chart skeleton */}
+      {[1, 2].map((i) => (
+        <div key={i} style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px', marginBottom: '24px' }}>
+          <div style={{ ...skBase, height: '10px', width: '100px', marginBottom: '16px' }} />
+          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '140px' }}>
+            {Array.from({ length: 20 }, (_, j) => (
+              <div key={j} style={{
+                ...skBase,
+                flex: 1,
+                height: `${30 + Math.abs(Math.sin(j * 1.3) * 100)}px`,
+                borderRadius: '4px 4px 0 0',
+              }} />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ─── SVG Bar Chart ─────────────────────────────────────────────────────────────
 
 interface BarChartProps {
@@ -207,12 +249,11 @@ export default function InsightsClient({ slug }: Props) {
       </div>
 
       {loading ? (
-        <div style={{ padding: '60px', textAlign: 'center' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)' }}>Loading insights…</p>
-        </div>
+        <InsightsSkeleton />
       ) : !data || data.buckets.length === 0 ? (
-        <div style={{ padding: '60px', textAlign: 'center', background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)' }}>No data for this period.</p>
+        <div style={{ padding: '60px 24px', textAlign: 'center', background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>No check-in data for this period.</p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>Charts will appear as your team checks in.</p>
         </div>
       ) : (
         <>

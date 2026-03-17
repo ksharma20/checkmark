@@ -34,7 +34,7 @@ export default async function PeoplePage({ params }: Props) {
       >
         People
       </h1>
-      <PeopleClient slug={slug} currentUserId={session.sub} />
+      <PeopleClient slug={slug} />
     </div>
   )
 }

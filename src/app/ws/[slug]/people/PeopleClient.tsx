@@ -13,7 +13,6 @@ interface Member {
 
 interface Props {
   slug: string
-  currentUserId: string
 }
 
 const inputStyle: React.CSSProperties = {
@@ -252,7 +251,7 @@ function TransferOwnershipModal({ slug, target, onDone, onCancel }: TransferModa
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function PeopleClient({ slug, currentUserId }: Props) {
+export default function PeopleClient({ slug }: Props) {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [email, setEmail] = useState('')
@@ -307,16 +306,42 @@ export default function PeopleClient({ slug, currentUserId }: Props) {
   }
 
   if (loading) {
+    const skBase: React.CSSProperties = {
+      background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
+      backgroundSize: '600px 100%',
+      animation: 'shimmer 1.4s ease-in-out infinite',
+      borderRadius: '6px',
+    }
     return (
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)', padding: '40px 0', textAlign: 'center' }}>
-        Loading…
-      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {/* Invite form skeleton */}
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+          <div style={{ ...skBase, height: '14px', width: '120px', marginBottom: '14px' }} />
+          <div style={{ ...skBase, height: '13px', width: '280px', marginBottom: '14px' }} />
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ ...skBase, flex: 1, height: '40px', borderRadius: 'var(--radius-md)' }} />
+            <div style={{ ...skBase, width: '100px', height: '40px', borderRadius: 'var(--radius-md)' }} />
+          </div>
+        </div>
+        {/* Member list skeleton */}
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <div style={{ ...skBase, height: '14px', width: '90px' }} />
+          </div>
+          {[1, 2, 3].map((i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ ...skBase, width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0 }} />
+              <div style={{ flex: 1 }}>
+                <div style={{ ...skBase, height: '13px', width: '140px', marginBottom: '6px' }} />
+                <div style={{ ...skBase, height: '11px', width: '180px' }} />
+              </div>
+              <div style={{ ...skBase, height: '20px', width: '48px', borderRadius: '4px' }} />
+            </div>
+          ))}
+        </div>
+      </div>
     )
   }
-
-  const isAdmin = members.find(
-    (m) => m.role === "admin" && m.member_id === currentUserId,
-  );
 
   return (
     <div>
@@ -434,17 +459,14 @@ export default function PeopleClient({ slug, currentUserId }: Props) {
         </div>
 
         {members.length === 0 ? (
-          <p
-            style={{
-              padding: "32px 20px",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "14px",
-              color: "var(--text-muted)",
-              textAlign: "center",
-            }}
-          >
-            No members yet.
-          </p>
+          <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+              No members yet.
+            </p>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>
+              Use the invite form above to add your team.
+            </p>
+          </div>
         ) : (
           members.map((m, i) => (
             <div

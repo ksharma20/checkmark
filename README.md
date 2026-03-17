@@ -41,13 +41,17 @@ src/
 │   │   ├── layout.tsx          # Passthrough
 │   │   ├── page.tsx            # /ws — workspace picker (multi-workspace admins)
 │   │   └── [slug]/
-│   │       ├── layout.tsx      # Header + nav tabs (Today | People | Settings)
-│   │       ├── page.tsx        # /ws/:slug — Today dashboard
+│   │       ├── layout.tsx      # Header + nav tabs (Dashboard | People | Insights | Settings)
+│   │       ├── page.tsx        # /ws/:slug — Dashboard (Today + Analytics)
+│   │       ├── TodayClient.tsx       # Real-time attendance table + filters
+│   │       ├── AnalyticsClient.tsx   # Date-range analytics table
+│   │       ├── InsightsClient.tsx    # Interval charts (Today/Week/Month/…/Year)
+│   │       ├── insights/page.tsx     # /ws/:slug/insights server wrapper
 │   │       ├── people/
 │   │       │   ├── page.tsx    # /ws/:slug/people — server wrapper (auth check)
-│   │       │   └── PeopleClient.tsx  # Member list + invite form (client)
+│   │       │   └── PeopleClient.tsx  # Member list + invite + transfer ownership (client)
 │   │       └── settings/
-│   │           └── page.tsx    # /ws/:slug/settings — workspace details + domain verification
+│   │           └── page.tsx    # /ws/:slug/settings — workspace details + domain + restore/archive
 │   └── api/
 │       ├── auth/
 │       │   ├── check-email/route.ts    # POST — email existence check
@@ -57,11 +61,17 @@ src/
 │       │   ├── register/route.ts       # POST — create account (personal or org)
 │       │   └── logout/route.ts         # POST — clear session
 │       ├── workspace/
+│       │   ├── route.ts                # GET admin workspaces · POST create (max 1)
 │       │   └── check-slug/route.ts     # POST — slug availability check
 │       ├── ws/
 │       │   └── [slug]/
-│       │       ├── route.ts                          # PATCH — update workspace name/timezone
+│       │       ├── route.ts                          # GET workspace · PATCH name/timezone
 │       │       ├── archive/route.ts                   # POST — archive workspace (admin, soft)
+│       │       ├── restore/route.ts                   # POST — restore archived workspace
+│       │       ├── analytics/route.ts                 # GET — date-range analytics per member
+│       │       ├── dashboard/route.ts                 # GET — today's real-time attendance
+│       │       ├── insights/route.ts                  # GET — time-bucketed check-in data
+│       │       ├── transfer-ownership/route.ts        # POST — OTP-gated admin transfer
 │       │       ├── domain/route.ts                   # GET domains · POST add domain
 │       │       ├── domain/[domainId]/route.ts         # DELETE domain
 │       │       ├── domain/[domainId]/verify/route.ts  # POST — DNS TXT verification
@@ -533,6 +543,7 @@ The middleware verifies the JWT signature (Edge-compatible via `jose`). Token re
 | **QA §2.1** | ✅ Complete | Personal-to-org upgrade path. (1) **"Organisation features" section in `/me/settings`** — new `OrgSection` component with descriptive copy and a "Create a workspace" link to `/ws`. Sits between Tokens and Danger Zone sections. (2) **`/ws` already open to all authenticated users** — proxy only checks JWT (no admin role required); `ws/page.tsx` already renders 0-workspace empty state with workspace creation form via `WsClient`. No proxy or routing changes needed. (3) **Dashboard time fix (re-applied)** — `timezone.ts` was reverted by linter; restored `parseDbUtc()` normalizer so `formatInTz` and `durationHours` correctly parse SQLite `"YYYY-MM-DD HH:MM:SS"` strings as UTC instead of local time. (4) **`geo-tz` bundle split (re-applied)** — `timezone-server.ts` recreated; `signals/route.ts` re-pointed to it. `timezone.ts` is now client-safe again. |
 | **QA §1.3** | ✅ Complete | Three §1.3 items + three user-reported bugs fixed. (1) **Workspace settings load bug** — `WorkspaceSection` had empty `useEffect`; added `GET /api/ws/[slug]` returning `{name, display_timezone}`, section now fetches on mount and pre-populates both fields. (2) **GPS → readable location** — `EventCard` now uses `useReverseGeo` hook that calls Nominatim reverse-geocoding API (`/reverse?format=json`) on mount; displays suburb + city (e.g. "Connaught Place, New Delhi") as the map link text, falls back to raw coordinates if API fails. (3) **TimezoneBanner removed** — user correctly noted it was unnecessary; `TimezoneReporter` already syncs browser TZ to DB silently on every `/me` visit; no user prompt needed. (4) **Domain auto-sync on verify** — after `markDomainVerified()`, route now calls `getUsersMatchingDomainNotInWorkspace()` and batch-inserts matching verified users as active members. (5) **Plan limit banner** — workspace Today dashboard shows amber "approaching" or red "at limit" banner when member count is within 2 of or at the plan's `maxUsers` ceiling. (6) **Dashboard date boundary** — already correct via `todayInTz(tz)` + `localMidnightToUtc()`; confirmed no fix needed. |
 | **QA §1.2** | ✅ Complete | User timezone detection and confirmation. `PATCH /api/me/timezone` — validates IANA timezone string, updates `users.timezone + timezone_updated_at + timezone_confirmed`. `TimezoneReporter` — invisible client component, fires `Intl.DateTimeFormat().resolvedOptions().timeZone` to API on every `/me` mount (keeps DB in sync silently). `TimezoneBanner` — shown once when `timezone_confirmed = 0`; displays detected timezone, Confirm button (sets `confirm: true`) and Change button (inline text input for manual override); dismisses permanently on confirm. Both wired into `me/page.tsx` alongside the existing `CheckinButtons`. |
+| **QA §6** | ✅ Complete | UI polish — loading skeletons, empty states, error boundary, form validation, mobile overflow. (1) **Skeleton screens** — `@keyframes shimmer` + `@keyframes pulse` added to `globals.css`. `TodayClient` skeleton upgraded from 3 grey boxes to accurate 4-row shimmer skeletons matching the PersonRow grid layout. `AnalyticsClient` loading state replaced from text to 4 SkeletonRow components with shimmer gradient. `InsightsClient` loading state replaced with `InsightsSkeleton` showing stat-card and chart bar skeletons. `PeopleClient` "Loading…" text replaced with full skeleton (invite form + 3 member rows). (2) **Empty states** — `/me` home: descriptive framed card "Tap 'I'm here' when you arrive somewhere." `/ws/:slug/analytics`: "No presence data for this period. Members will appear here as they check in." `/ws/:slug/insights`: "No check-in data for this period. Charts will appear as your team checks in." `/ws/:slug/people` member list: two-line empty state with guidance copy. `/me/orgs` no workspaces: added "Or create your own workspace →" link to `/ws`. (3) **Global error boundary** — `src/app/error.tsx` created: centred full-page component with error digest display and "Try again" reset button. (4) **Form validation** — `Input` component in login page gains `onBlur` + `hasError` props; border turns danger-red on error. `EmailStep` adds `emailTouched` state and regex-based `emailInvalid` derived flag; inline error shown on blur before submit is attempted; on change, error is cleared immediately. (5) **Mobile overflow** — `AnalyticsClient` table container gets `overflowX: 'auto'`; `TableHeader` and `MemberRow` get `minWidth: 720px/520px` to enforce horizontal scroll on narrow screens rather than collapsing the grid. `InsightsClient` chart containers already had `overflowX: 'auto'`. (6) **PeopleClient cleanup** — unused `isAdmin` variable and `currentUserId` prop removed (lint zero). |
 | **QA §1.1** | ✅ Complete | Check-in/check-out state machine enforced server + client. `POST /api/checkin` → 409 if open event exists. `POST /api/checkin/checkout` → 409 if not checked in; now captures GPS/WiFi/IP signals at checkout. `GET /api/checkin/status` added. `CheckinButtons` client: shows "I'm here" only when CHECKED_OUT, "I'm leaving" only when CHECKED_IN; switches state instantly on success + syncs with server via `router.refresh()`. DB: 7 checkout_* columns added to `presence_events`. **Sub-bug fixes:** (1) SQLite datetime UTC parsing — `"2026-03-17 07:54:11"` (space, no Z) was misread as local time by browsers; created `src/lib/client/format-time.ts` with `parseUtc()` normaliser → all times now display in browser's local timezone. (2) Duplicate status display — removed server-rendered "Checked in at" from `me/page.tsx`; `CheckinButtons` is sole owner of the status line. (3) Days-count bug — `split('T')[0]` on SQLite format returned full string (no T → every event unique); changed to `slice(0, 10)`. (4) Consistent time format — `"10:15 AM on 17 Mar 2026"` enforced via `fmtTimeOnDate()` across `CheckinButtons` and `EventCard`. |
 
 ---
