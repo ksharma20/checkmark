@@ -7,6 +7,7 @@ import {
   getAdminWorkspacesForUser,
   createWorkspace,
   getWorkspaceBySlug,
+  linkUserToMemberRecord,
 } from '@/lib/db/queries/workspaces'
 import { hashPassword, createJwt, setSessionCookie, verifyOtpCookie, clearOtpCookie } from '@/lib/auth'
 
@@ -87,6 +88,9 @@ export async function POST(request: NextRequest) {
 
   const passwordHash = await hashPassword(password)
   const user = await createUser({ email, passwordHash, fullName })
+
+  // Link any pending invited memberships for this email to the new user account
+  await linkUserToMemberRecord(email, user.id)
 
   // Auto-enrol based on verified domain
   const matchingWorkspaceIds = await getVerifiedDomainsForEmail(email)

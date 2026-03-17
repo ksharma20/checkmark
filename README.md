@@ -42,7 +42,12 @@ src/
 │   │   ├── page.tsx            # /ws — workspace picker (multi-workspace admins)
 │   │   └── [slug]/
 │   │       ├── layout.tsx      # Header + nav tabs (Today | People | Settings)
-│   │       └── page.tsx        # /ws/:slug — Today dashboard
+│   │       ├── page.tsx        # /ws/:slug — Today dashboard
+│   │       ├── people/
+│   │       │   ├── page.tsx    # /ws/:slug/people — server wrapper (auth check)
+│   │       │   └── PeopleClient.tsx  # Member list + invite form (client)
+│   │       └── settings/
+│   │           └── page.tsx    # /ws/:slug/settings — workspace details + domain verification
 │   └── api/
 │       ├── auth/
 │       │   ├── check-email/route.ts    # POST — email existence check
@@ -53,6 +58,14 @@ src/
 │       │   └── logout/route.ts         # POST — clear session
 │       ├── workspace/
 │       │   └── check-slug/route.ts     # POST — slug availability check
+│       ├── ws/
+│       │   └── [slug]/
+│       │       ├── route.ts                          # PATCH — update workspace name/timezone
+│       │       ├── domain/route.ts                   # GET domains · POST add domain
+│       │       ├── domain/[domainId]/route.ts         # DELETE domain
+│       │       ├── domain/[domainId]/verify/route.ts  # POST — DNS TXT verification
+│       │       ├── members/route.ts                   # GET all members · POST invite
+│       │       └── members/[memberId]/route.ts        # DELETE member
 │       ├── checkin/
 │       │   ├── route.ts                # POST — create presence event
 │       │   └── checkout/route.ts       # POST — check out of most recent open event
@@ -67,6 +80,7 @@ src/
 │       └── tokens/
 │           ├── route.ts                # GET list · POST create (returns plain token once)
 │           └── [id]/route.ts           # DELETE — revoke
+├── app/manifest.ts             # PWA manifest
 ├── lib/
 │   ├── db/
 │   │   ├── index.ts       # DB abstraction (SQLite ↔ Postgres)
@@ -286,6 +300,61 @@ All routes require a valid session cookie AND admin membership of the workspace.
 
 Shown to admins of 2+ workspaces. Admins of a single workspace are redirected directly to `/ws/:slug` at login. If the user has no admin roles, redirects to `/me`.
 
+### `/ws/:slug/people` — People tab
+
+Server + client split. Features:
+- **Member list** — all statuses (active, invite sent, declined), avatar initials, role badge
+- **Status badges:** Active (teal), Invite sent (amber), Declined (red)
+- **Invite form** — send consent email to any address; shows error if already an active member
+- **Remove member** — disabled for admin roles
+
+### `/ws/:slug/settings` — Settings tab
+
+Full client component (uses `useParams` + `useCallback`). Two sections:
+- **Workspace details** — edit name + timezone (PATCH `/api/ws/:slug`)
+- **Email domain verification** — add domains, view DNS TXT records with copy buttons, check DNS verification status
+
+---
+
+## Domain Verification
+
+Admins add a domain (e.g. `acme.com`) in the Settings tab. CheckMark generates a DNS TXT record:
+
+```
+Name:  _checkmark-verify.acme.com
+Value: checkmark-verify=<token>
+```
+
+The token is deterministic: `HMAC-SHA256("domain-verify:{workspaceId}:{domain}", JWT_SECRET)` (first 32 hex chars). No extra DB column needed — recomputed on each verify request.
+
+Once DNS propagates, clicking "Check verification" calls `POST /api/ws/:slug/domain/:id/verify`, which resolves the TXT record and marks the domain verified.
+
+**Auto-enrolment:** When a verified domain matches a user's email on `/join/:slug`, they are automatically added as an active member without needing an explicit invite.
+
+---
+
+## Consent Flow
+
+Two paths to membership consent:
+
+### Email link (non-users / non-logged-in)
+
+1. Admin invites `colleague@company.com` from People tab
+2. Consent email sent with links: `Accept` / `Decline`
+3. **Decline** — resolves token, marks member declined, no login required
+4. **Accept (logged in)** — resolves token, calls `acceptConsent`, redirects to `/me`
+5. **Accept (not logged in)** — resolves workspace slug, redirects to `/login?invite={slug}`
+
+After login, `/join/:slug` detects `pending_consent` status and shows Accept/Decline buttons.
+
+### In-app (logged-in users)
+
+If a user visits `/join/:slug` directly:
+- **Active** → redirected to `/me`
+- **Pending consent** → shows Accept/Decline buttons (calls `POST /api/me/consent`)
+- **Domain match** → auto-enrolled without explicit consent needed
+- **No path** → "Invite required" message
+
 ### `/ws/:slug` — Today dashboard
 
 Server-rendered. Shows who is present right now, who visited today, and who hasn't checked in yet — all in the workspace's configured timezone.
@@ -312,6 +381,32 @@ Server-rendered. Shows who is present right now, who visited today, and who hasn
 | IP | Amber | Matched by IP geolocation |
 | Override | Purple | Admin override applied |
 | — | Muted | Config-light mode (no signals configured) |
+
+---
+
+## PWA
+
+CheckMark is installable as a Progressive Web App on both mobile and desktop.
+
+- **Manifest:** `src/app/manifest.ts` (served at `/manifest.webmanifest`)
+- **Start URL:** `/me` (user PWA)
+- **Display mode:** `standalone` (no browser chrome)
+- **Theme colour:** `#1a1a2e` (navy)
+- **Icons:** `/icon-192.png` and `/icon-512.png` — add to `public/` before deploying
+
+The `<meta name="apple-mobile-web-app-capable">` tag is set via `appleWebApp` in the root layout metadata, enabling full-screen mode on iOS when added to the home screen.
+
+---
+
+## Landing Page
+
+`/` — static, publicly accessible. Features:
+- Sticky nav: CheckMark wordmark + Sign in / Get started links
+- Hero: headline, subheadline, two CTAs (both route to `/login`)
+- Feature grid (4 cards): who's in today, privacy by design, verified domains, multiple signals
+- Footer
+
+No JavaScript required — fully server-rendered React.
 
 ---
 
@@ -349,6 +444,13 @@ The core dashboard function. Given a workspace and date range:
 3. If **no signal configs**: returns all events (config-light mode)
 4. If **signal configs exist**: filters events by proximity/WiFi match
 5. Returns each event with a `matched_by` field: `wifi | gps | ip | none | override`
+
+### `lib/domain-verify.ts`
+- `domainVerifyToken(workspaceId, domain)` — deterministic HMAC-SHA256 token (first 32 hex chars)
+- `checkDnsVerification(domain, token)` — resolves `_checkmark-verify.{domain}` TXT records, returns `boolean`
+
+### `lib/ws-admin.ts`
+- `requireWsAdmin(request, slug)` — reads `x-user-id` header, validates workspace + admin+active membership. Returns `{ workspace, userId }` or `null`.
 
 ### `lib/stats.ts` — `updateUserStats()`
 Called after every check-in. Computes:
@@ -404,8 +506,8 @@ All times stored as UTC in the DB. These helpers convert for display:
 | **Phase 2** | ✅ Complete | Auth API routes, `/login` page |
 | **Phase 3** | ✅ Complete | User PWA — check-in, timeline, orgs, settings pages + all APIs |
 | **Phase A** | ✅ Complete | Rewritten login: 6-state flow, account type selection, OTP cookie security, org registration with live slug check |
-| **Phase B** | 🔄 In progress | Org PWA — `/ws` picker + `/ws/:slug` today dashboard complete; People and Settings tabs pending |
-| Phase 5 | Pending | Landing page, PWA manifests, domain verification, invite flow |
+| **Phase B** | ✅ Complete | Org PWA — `/ws` picker, `/ws/:slug` today dashboard, people tab, settings tab |
+| **Phase C** | ✅ Complete | Domain verification, consent flow (email + in-app), invite pages, PWA manifest, landing page |
 
 ---
 
@@ -521,6 +623,42 @@ All routes return JSON. Errors always return:
 
 // Response
 { "available": true }
+```
+
+### Workspace Admin
+
+All routes require session cookie + admin membership of the workspace.
+
+| Method | Route | Description |
+|---|---|---|
+| PATCH | `/api/ws/:slug` | Update workspace name and/or timezone |
+| GET | `/api/ws/:slug/domain` | List domains (with verify token if unverified) |
+| POST | `/api/ws/:slug/domain` | Add a domain |
+| DELETE | `/api/ws/:slug/domain/:id` | Remove a domain |
+| POST | `/api/ws/:slug/domain/:id/verify` | Trigger DNS TXT verification |
+| GET | `/api/ws/:slug/members` | List all members (all statuses) |
+| POST | `/api/ws/:slug/members` | Invite member (sends consent email) |
+| DELETE | `/api/ws/:slug/members/:id` | Remove member (blocked for admins) |
+
+#### `POST /api/ws/:slug/members`
+```json
+// Request
+{ "email": "colleague@company.com" }
+
+// Response
+{ "success": true }
+
+// Error (already active) — 409
+{ "error": "This person is already an active member", "code": "ALREADY_MEMBER" }
+```
+
+#### `POST /api/ws/:slug/domain/:id/verify`
+```json
+// Response (verified)
+{ "verified": true, "message": "Domain verified" }
+
+// Response (not yet)
+{ "verified": false, "message": "TXT record not found yet. DNS propagation can take up to 48 hours." }
 ```
 
 ---

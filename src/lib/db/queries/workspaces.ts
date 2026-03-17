@@ -347,3 +347,90 @@ export async function getOverrideEventIds(workspaceId: string): Promise<Set<stri
   )
   return new Set(rows.map((r) => r.presence_event_id))
 }
+
+// ─── New query functions (Part C) ─────────────────────────────────────────────
+
+export async function getMemberByConsentToken(token: string): Promise<WorkspaceMember | null> {
+  return db.queryOne<WorkspaceMember>(
+    `SELECT * FROM workspace_members WHERE consent_token = ?`,
+    [token]
+  )
+}
+
+export async function upsertInvitedMember(params: {
+  workspaceId: string
+  email: string
+  consentToken: string
+  consentTokenExpiresAt: string
+}): Promise<WorkspaceMember> {
+  const existing = await db.queryOne<WorkspaceMember>(
+    `SELECT * FROM workspace_members WHERE workspace_id = ? AND email = ?`,
+    [params.workspaceId, params.email.toLowerCase()]
+  )
+
+  if (existing && existing.status !== 'active') {
+    await db.execute(
+      `UPDATE workspace_members
+       SET consent_token = ?, consent_token_expires_at = ?
+       WHERE id = ?`,
+      [params.consentToken, params.consentTokenExpiresAt, existing.id]
+    )
+    return db.queryOne<WorkspaceMember>(
+      'SELECT * FROM workspace_members WHERE id = ?',
+      [existing.id]
+    ) as Promise<WorkspaceMember>
+  }
+
+  if (!existing) {
+    const id = crypto.randomUUID().replace(/-/g, '')
+    await db.execute(
+      `INSERT INTO workspace_members
+         (id, workspace_id, user_id, email, role, status, consent_token, consent_token_expires_at)
+       VALUES (?, ?, NULL, ?, 'member', 'pending_consent', ?, ?)`,
+      [id, params.workspaceId, params.email.toLowerCase(), params.consentToken, params.consentTokenExpiresAt]
+    )
+    return db.queryOne<WorkspaceMember>(
+      'SELECT * FROM workspace_members WHERE id = ?',
+      [id]
+    ) as Promise<WorkspaceMember>
+  }
+
+  return existing
+}
+
+export interface MemberWithUserFull {
+  member_id: string
+  workspace_id: string
+  user_id: string | null
+  email: string
+  role: string
+  status: string
+  full_name: string | null
+  added_at: string
+}
+
+export async function getAllMembersWithDetails(workspaceId: string): Promise<MemberWithUserFull[]> {
+  return db.query<MemberWithUserFull>(
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, wm.status, wm.added_at, u.full_name
+     FROM workspace_members wm
+     LEFT JOIN users u ON u.id = wm.user_id
+     WHERE wm.workspace_id = ?
+     ORDER BY wm.added_at DESC`,
+    [workspaceId]
+  )
+}
+
+export async function removeWorkspaceDomain(domainId: string, workspaceId: string): Promise<void> {
+  await db.execute(
+    'DELETE FROM workspace_domains WHERE id = ? AND workspace_id = ?',
+    [domainId, workspaceId]
+  )
+}
+
+export async function linkUserToMemberRecord(email: string, userId: string): Promise<void> {
+  await db.execute(
+    `UPDATE workspace_members SET user_id = ?
+     WHERE email = ? AND status = 'pending_consent' AND user_id IS NULL`,
+    [userId, email.toLowerCase()]
+  )
+}
