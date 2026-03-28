@@ -1,124 +1,112 @@
-// DB abstraction layer — SQLite in dev, Vercel Postgres in production
-// All queries use this interface so switching backends is one config change
+// DB abstraction layer — better-sqlite3 (local dev) | Turso/libSQL (production)
+// All query files use this interface; switching backends requires no query changes.
 
-import { SCHEMA_SQL } from './schema'
-import { DB_FILE } from '@/lib/constants'
+import { DB_FILE } from "@/lib/constants";
 
-export type QueryResult<T> = T[]
+export type QueryResult<T> = T[];
 
 export interface DB {
-  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<QueryResult<T>>
-  queryOne<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<T | null>
-  execute(sql: string, params?: unknown[]): Promise<{ changes: number; lastInsertRowid?: unknown }>
-  transaction<T>(fn: (db: DB) => Promise<T>): Promise<T>
+  query<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ): Promise<QueryResult<T>>;
+  queryOne<T = Record<string, unknown>>(
+    sql: string,
+    params?: unknown[],
+  ): Promise<T | null>;
+  execute(
+    sql: string,
+    params?: unknown[],
+  ): Promise<{ changes: number; lastInsertRowid?: unknown }>;
+  transaction<T>(fn: (db: DB) => Promise<T>): Promise<T>;
 }
 
-// ─── SQLite (development) ────────────────────────────────────────────────────
+// ─── SQLite via better-sqlite3 (local dev) ───────────────────────────────────
 
 function createSQLiteDB(): DB {
-  // Dynamic import to avoid bundling in production
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Database = require('better-sqlite3')
-  const path = require('path') as typeof import('path')
-  const dbPath = path.join(process.cwd(), DB_FILE)
-  const sqlite = new Database(dbPath) as import('better-sqlite3').Database
+  const Database = require("better-sqlite3");
+  const path = require("path") as typeof import("path");
+  const dbPath = path.join(process.cwd(), DB_FILE);
+  const sqlite = new Database(dbPath) as import("better-sqlite3").Database;
 
-  sqlite.pragma('journal_mode = WAL')
-  sqlite.pragma('foreign_keys = ON')
+  sqlite.pragma("journal_mode = WAL");
+  sqlite.pragma("foreign_keys = ON");
 
   return {
     async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
-      const stmt = sqlite.prepare(sql)
-      return stmt.all(...params) as T[]
+      return sqlite.prepare(sql).all(...params) as T[];
     },
     async queryOne<T>(sql: string, params: unknown[] = []): Promise<T | null> {
-      const stmt = sqlite.prepare(sql)
-      return (stmt.get(...params) as T) ?? null
+      return (sqlite.prepare(sql).get(...params) as T) ?? null;
     },
     async execute(sql: string, params: unknown[] = []) {
-      const stmt = sqlite.prepare(sql)
-      const result = stmt.run(...params)
-      return { changes: result.changes, lastInsertRowid: result.lastInsertRowid }
+      const result = sqlite.prepare(sql).run(...params);
+      return {
+        changes: result.changes,
+        lastInsertRowid: result.lastInsertRowid,
+      };
     },
     async transaction<T>(fn: (db: DB) => Promise<T>): Promise<T> {
-      // better-sqlite3 transactions are synchronous — wrap in a sync transaction
-      let result: T
-      const tx = sqlite.transaction(() => {
-        // We can't await inside a sync transaction, so we run synchronously
-        // This works because better-sqlite3 is synchronous under the hood
-        result = undefined as unknown as T
-      })
-      tx()
-      // For now, run fn outside transaction — proper async transactions require a queue
-      result = await fn(this)
-      return result
+      return fn(this);
     },
-  }
+  };
 }
 
-// ─── Vercel Postgres (production) ───────────────────────────────────────────
+// ─── Turso / libSQL (production) ─────────────────────────────────────────────
 
-function createPostgresDB(): DB {
+function createTursoDB(): DB {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { sql } = require('@vercel/postgres')
+  const { createClient } = require("@libsql/client");
+  const client = createClient({
+    url: process.env.TURSO_DATABASE_URL!,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  });
 
-  return {
-    async query<T>(sqlStr: string, params: unknown[] = []): Promise<T[]> {
-      const result = await sql.query(sqlStr, params)
-      return result.rows as T[]
+  const makeDB = (executor: typeof client): DB => ({
+    async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
+      const result = await executor.execute({ sql, args: params as never[] });
+      return result.rows as unknown as T[];
     },
-    async queryOne<T>(sqlStr: string, params: unknown[] = []): Promise<T | null> {
-      const result = await sql.query(sqlStr, params)
-      return (result.rows[0] as T) ?? null
+    async queryOne<T>(sql: string, params: unknown[] = []): Promise<T | null> {
+      const result = await executor.execute({ sql, args: params as never[] });
+      return (result.rows[0] as unknown as T) ?? null;
     },
-    async execute(sqlStr: string, params: unknown[] = []) {
-      const result = await sql.query(sqlStr, params)
-      return { changes: result.rowCount ?? 0 }
+    async execute(sql: string, params: unknown[] = []) {
+      const result = await executor.execute({ sql, args: params as never[] });
+      return {
+        changes: result.rowsAffected,
+        lastInsertRowid: result.lastInsertRowid,
+      };
     },
     async transaction<T>(fn: (db: DB) => Promise<T>): Promise<T> {
-      await sql`BEGIN`
+      const tx = await client.transaction("write");
       try {
-        const result = await fn(this)
-        await sql`COMMIT`
-        return result
+        const result = await fn(makeDB(tx));
+        await tx.commit();
+        return result;
       } catch (err) {
-        await sql`ROLLBACK`
-        throw err
+        await tx.rollback();
+        throw err;
       }
     },
-  }
+  });
+
+  return makeDB(client);
 }
 
-// ─── Singleton ───────────────────────────────────────────────────────────────
+// ─── Singleton ────────────────────────────────────────────────────────────────
 
-let _db: DB | null = null
+let _db: DB | null = null;
 
 export function getDB(): DB {
-  if (_db) return _db
-
-  const dbUrl = process.env.DATABASE_URL ?? ''
-  if (dbUrl.startsWith('postgres')) {
-    _db = createPostgresDB()
-  } else {
-    _db = createSQLiteDB()
-  }
-
-  return _db
+  if (_db) return _db;
+  _db = process.env.TURSO_DATABASE_URL ? createTursoDB() : createSQLiteDB();
+  return _db;
 }
 
 export const db = new Proxy({} as DB, {
   get(_target, prop) {
-    return getDB()[prop as keyof DB]
+    return getDB()[prop as keyof DB];
   },
-})
-
-// Run migrations — called from scripts/migrate.js and on first import in dev
-export async function runMigrations(): Promise<void> {
-  const statements = SCHEMA_SQL.split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0)
-
-  for (const statement of statements) {
-    await db.execute(statement)
-  }
-}
+});

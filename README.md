@@ -140,8 +140,8 @@ Edit `.env.local` (already exists with template values):
 
 ```bash
 # Leave empty → uses SQLite at ./checkmark.db (recommended for local dev)
-DATABASE_URL=
-
+TURSO_DATABASE_URL=xxxxxx
+TURSO_AUTH_TOKEN=xxxxxx
 # Generate a secret: openssl rand -base64 32
 JWT_SECRET=your-random-32-char-secret
 
@@ -820,7 +820,7 @@ Design rules:
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | No (dev) | Postgres URL for production. Empty → uses SQLite. |
+| `TURSO_DATABASE_URL` | No (dev) | Turso URL for production. Empty → uses SQLite. |
 | `JWT_SECRET` | **Yes** | Random 32+ char string for JWT signing |
 | `RESEND_API_KEY` | Recommended | From resend.com. OTPs log to console if missing. |
 | `NEXT_PUBLIC_APP_URL` | Yes | Full app URL (`http://localhost:3000` in dev) |

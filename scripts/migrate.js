@@ -1,44 +1,29 @@
 #!/usr/bin/env node
 // Consolidated database migration — single script, fully idempotent.
-// Usage: node scripts/migrate.js
 //
-// Fresh install: creates every table with all columns, then ALTER TABLE
-//   statements are silently skipped (duplicate column).
-// Existing DB:   CREATE TABLE IF NOT EXISTS is skipped, ALTER TABLE adds
-//   any columns that didn't exist yet.
-// DB rename:     if checkmark.db is absent but checkmark.db is present,
-//   the old file is copied automatically before migrating.
+// Local SQLite:  node scripts/migrate.js
+// Turso (prod):  TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... node scripts/migrate.js
+//
+// Behaviour:
+//   Fresh DB  — creates every table + all columns; ALTER TABLE statements silently skip.
+//   Existing  — CREATE TABLE IF NOT EXISTS skips; ALTER TABLE adds missing columns.
+//   DB rename — if checkmark.db absent but checkmark.db present, copies it automatically.
 
 const path = require('path')
 const fs   = require('fs')
 
-// Load env from .env.local (needed only for Postgres; SQLite path is local)
+// Load .env.local so TURSO_* vars are available when running locally
 try {
   fs.readFileSync(path.join(__dirname, '../.env.local'), 'utf8')
     .split('\n')
     .forEach((line) => {
       const [key, ...rest] = line.split('=')
-      if (key && rest.length) process.env[key.trim()] = rest.join('=').trim()
+      if (key && rest.length) process.env[key.trim()] = rest.join('=').trim().replace(/^["']|["']$/g, '')
     })
-} catch { /* .env.local absent — fine for local SQLite */ }
+} catch { /* .env.local absent — fine */ }
 
-const Database = require('better-sqlite3')
-const dbPath   = path.join(__dirname, '../checkmark.db')
-const oldPath  = path.join(__dirname, '../checkmark.db')
+// ─── Schema ───────────────────────────────────────────────────────────────────
 
-// One-time rename: copy existing data to new filename
-if (!fs.existsSync(dbPath) && fs.existsSync(oldPath)) {
-  fs.copyFileSync(oldPath, dbPath)
-  console.log('✓ Copied checkmark.db → checkmark.db')
-}
-
-const db = new Database(dbPath)
-db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
-
-// ─── Base schema — CREATE TABLE IF NOT EXISTS ─────────────────────────────────
-// Includes all columns that existed at initial creation.
-// Columns added after the fact are listed in ADDITIVE_MIGRATIONS below.
 const BASE_SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -180,9 +165,6 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
 CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens(expires_at);
 `
 
-// ─── Additive column migrations — idempotent ─────────────────────────────────
-// On a fresh DB these are skipped (columns already present from CREATE TABLE).
-// On an existing DB they add columns that were missing.
 const ADDITIVE_MIGRATIONS = [
   // users
   `ALTER TABLE users ADD COLUMN deleted_at TEXT`,
@@ -214,41 +196,75 @@ const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE workspaces ADD COLUMN archived_at TEXT`,
 ]
 
-// ─── Run base schema ──────────────────────────────────────────────────────────
-const baseStatements = BASE_SCHEMA
-  .split(';')
-  .map(s => s.trim())
-  .filter(s => s.length > 0)
+// ─── SQLite runner (local dev) ────────────────────────────────────────────────
 
-let ran = 0
-for (const stmt of baseStatements) {
-  try {
-    db.prepare(stmt).run()
-    ran++
-  } catch (err) {
-    console.error(`Failed on:\n${stmt}\n`)
-    console.error(err)
-    process.exit(1)
+function runSQLite() {
+  const Database = require('better-sqlite3')
+  const dbPath   = path.join(__dirname, '../checkmark.db')
+  const oldPath  = path.join(__dirname, '../checkmark.db')
+
+  if (!fs.existsSync(dbPath) && fs.existsSync(oldPath)) {
+    fs.copyFileSync(oldPath, dbPath)
+    console.log('✓ Copied checkmark.db → checkmark.db')
   }
-}
 
-// ─── Run additive migrations ──────────────────────────────────────────────────
-let skipped = 0
-for (const stmt of ADDITIVE_MIGRATIONS) {
-  try {
-    db.prepare(stmt).run()
-    ran++
-  } catch (err) {
-    const msg = err.message ?? ''
-    if (msg.includes('duplicate column') || msg.includes('already exists')) {
-      skipped++
-    } else {
-      console.error(`Failed on:\n${stmt}\n`)
-      console.error(err)
-      process.exit(1)
+  const db = new Database(dbPath)
+  db.pragma('journal_mode = WAL')
+  db.pragma('foreign_keys = ON')
+
+  const baseStatements = BASE_SCHEMA.split(';').map(s => s.trim()).filter(Boolean)
+
+  let ran = 0, skipped = 0
+  for (const stmt of baseStatements) {
+    try { db.prepare(stmt).run(); ran++ }
+    catch (err) { console.error(`Failed:\n${stmt}\n`, err); process.exit(1) }
+  }
+  for (const stmt of ADDITIVE_MIGRATIONS) {
+    try { db.prepare(stmt).run(); ran++ }
+    catch (err) {
+      const msg = err.message ?? ''
+      if (msg.includes('duplicate column') || msg.includes('already exists')) { skipped++ }
+      else { console.error(`Failed:\n${stmt}\n`, err); process.exit(1) }
     }
   }
+
+  db.close()
+  console.log(`✓ SQLite migration complete — ${ran} executed, ${skipped} skipped — ${dbPath}`)
 }
 
-db.close()
-console.log(`✓ Migration complete — ${ran} executed, ${skipped} skipped — ${dbPath}`)
+// ─── Turso runner (production) ────────────────────────────────────────────────
+
+async function runTurso() {
+  const { createClient } = require('@libsql/client')
+  const client = createClient({
+    url: process.env.TURSO_DATABASE_URL,
+    authToken: process.env.TURSO_AUTH_TOKEN,
+  })
+
+  const baseStatements = BASE_SCHEMA.split(';').map(s => s.trim()).filter(Boolean)
+
+  let ran = 0, skipped = 0
+  for (const stmt of baseStatements) {
+    try { await client.execute(stmt); ran++ }
+    catch (err) { console.error(`Failed:\n${stmt}\n`, err); process.exit(1) }
+  }
+  for (const stmt of ADDITIVE_MIGRATIONS) {
+    try { await client.execute(stmt); ran++ }
+    catch (err) {
+      const msg = err.message ?? ''
+      if (msg.includes('duplicate column') || msg.includes('already exists')) { skipped++ }
+      else { console.error(`Failed:\n${stmt}\n`, err); process.exit(1) }
+    }
+  }
+
+  await client.close()
+  console.log(`✓ Turso migration complete — ${ran} executed, ${skipped} skipped — ${process.env.TURSO_DATABASE_URL}`)
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+
+if (process.env.TURSO_DATABASE_URL) {
+  runTurso().catch(err => { console.error(err); process.exit(1) })
+} else {
+  runSQLite()
+}
