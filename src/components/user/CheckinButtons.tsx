@@ -4,21 +4,18 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PresenceEvent } from '@/lib/db/queries/events'
 import { fmtTimeOnDate } from '@/lib/client/format-time'
+import { en } from '@/locales/en'
+import {
+  STALE_NOTIF_KEY,
+  STALE_NOTIF_EVENT_KEY,
+  NOTIF_TAG_STALE,
+  NOTIF_TAG_AUTO_CHECKOUT,
+} from '@/lib/constants'
 
 // Notification schedule (hours from check-in): 8, 12, 16, 18, 20, 22 — then auto-checkout at 24h
 const NOTIFICATION_SCHEDULE_H = [8, 12, 16, 18, 20, 22]
 const AUTO_CHECKOUT_H = 24
-const STALE_NOTIF_KEY = 'cm_stale_notif_count'
-const STALE_NOTIF_EVENT_KEY = 'cm_stale_notif_event'
-
-const NOTIFICATION_MESSAGES: Record<number, { title: string; body: string }> = {
-  8:  { title: 'CheckMark — time to wrap up?', body: "It's been 8 hours. Work-life balance matters — feel free to head out!" },
-  12: { title: 'CheckMark — still going?', body: "12 hours in! Dedication noted, but rest is important too. Time to head home." },
-  16: { title: 'CheckMark — seriously though', body: "16 hours checked in. Even the most committed need sleep. Please check out!" },
-  18: { title: 'CheckMark — we are worried', body: "18 hours! Your productivity has left the building. Be kind to yourself — go home." },
-  20: { title: 'CheckMark — this is getting serious', body: "20 hours and counting. We genuinely recommend a bed over your desk right now." },
-  22: { title: 'CheckMark — final warning', body: "22 hours! Auto-checkout happens in 2 hours. This is your last chance to do it yourself." },
-}
+const NOTIFICATION_MESSAGES = en.notifications.stale
 
 interface CheckinButtonsProps {
   activeEvent: PresenceEvent | null
@@ -97,13 +94,13 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
     if (typeof window === 'undefined' || !('Notification' in window)) return
     if (Notification.permission !== 'granted') return
     const msg = NOTIFICATION_MESSAGES[hour] ?? {
-      title: 'CheckMark — still checked in?',
-      body: `You've been checked in for ${hour} hours. Did you forget to check out?`,
+      title: en.notifications.staleFallback.title,
+      body: en.notifications.staleFallback.body(hour),
     }
     new Notification(msg.title, {
       body: msg.body,
       icon: '/favicon.ico',
-      tag: 'cm-stale-checkin',
+      tag: NOTIF_TAG_STALE,
     })
   }
 
@@ -122,10 +119,10 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
           localStorage.removeItem(STALE_NOTIF_EVENT_KEY)
         } catch { /* ignore */ }
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification('CheckMark — auto checked out', {
-            body: 'You were automatically checked out after 24 hours.',
+          new Notification(en.notifications.autoCheckout.title, {
+            body: en.notifications.autoCheckout.body,
             icon: '/favicon.ico',
-            tag: 'cm-auto-checkout',
+            tag: NOTIF_TAG_AUTO_CHECKOUT,
           })
         }
         router.refresh()

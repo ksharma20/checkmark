@@ -1,10 +1,11 @@
 import type { MetadataRoute } from 'next'
+import { en } from '@/locales/en'
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'CheckMark',
-    short_name: 'CheckMark',
-    description: 'Presence Intelligence Platform — know where your team is, own where you\'ve been.',
+    name: en.brand.name,
+    short_name: en.brand.shortName,
+    description: en.brand.description,
     start_url: '/me',
     display: 'standalone',
     background_color: '#f5f4f2',

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { en } from '@/locales/en'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -223,7 +224,7 @@ function EmailStep({
           marginBottom: '8px',
         }}
       >
-        Welcome to CheckMark
+        Welcome to {en.brand.name}
       </h1>
       <p
         style={{
@@ -578,7 +579,7 @@ function AccountTypeStep({
           marginBottom: '8px',
         }}
       >
-        How will you use CheckMark?
+        How will you use {en.brand.name}?
       </h1>
       <p
         style={{

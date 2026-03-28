@@ -2,6 +2,7 @@
 // All queries use this interface so switching backends is one config change
 
 import { SCHEMA_SQL } from './schema'
+import { DB_FILE } from '@/lib/constants'
 
 export type QueryResult<T> = T[]
 
@@ -19,7 +20,7 @@ function createSQLiteDB(): DB {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
   const path = require('path') as typeof import('path')
-  const dbPath = path.join(process.cwd(), 'checkmark.db')
+  const dbPath = path.join(process.cwd(), DB_FILE)
   const sqlite = new Database(dbPath) as import('better-sqlite3').Database
 
   sqlite.pragma('journal_mode = WAL')

@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getMemberByConsentToken, acceptConsent, declineConsent, getWorkspaceById } from '@/lib/db/queries/workspaces'
 import { getSessionFromCookies } from '@/lib/auth'
+import { en } from '@/locales/en'
 
 interface Props {
   params: Promise<{ token: string }>
@@ -32,7 +33,7 @@ function ResultCard({ title, body, cta }: { title: string; body: string; cta?: R
         }}
       >
         <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--brand)', marginBottom: '24px' }}>
-          CheckMark
+          {en.consent.brandLogo}
         </p>
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '20px', fontWeight: 700, color: 'var(--navy)', marginBottom: '8px' }}>
           {title}
@@ -70,7 +71,7 @@ export default async function ConsentPage({ params, searchParams }: Props) {
     return (
       <ResultCard
         title="Invitation declined"
-        body="You won't appear in that workspace's presence dashboard. You can always sign in to CheckMark to manage your own presence."
+        body={en.consent.declineBody}
         cta={<Link href="/login" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)' }}>Go to sign in</Link>}
       />
     )

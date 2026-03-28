@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { en } from '@/locales/en'
 
 interface Workspace {
   id: string
@@ -198,7 +199,7 @@ export default function WsClient({ workspaces, archivedWorkspaces }: Props) {
     >
       <div style={{ width: '100%', maxWidth: '480px' }}>
         <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--brand)', marginBottom: '32px' }}>
-          CheckMark
+          {en.workspace.brandLogo}
         </p>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>

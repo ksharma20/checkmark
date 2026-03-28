@@ -1,14 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { en } from "@/locales/en";
 
 export const metadata: Metadata = {
-  title: "CheckMark — Presence Intelligence",
-  description: "Know where your team is. Own where you've been.",
+  title: `${en.brand.name} — ${en.brand.tagline}`,
+  description: en.brand.taglineLong,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "CheckMark",
+    title: en.brand.shortName,
   },
 };
 

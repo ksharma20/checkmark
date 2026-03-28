@@ -3,13 +3,15 @@
  * Called once at check-in time and stored in presence_events.location_label.
  * Never called from client components — avoids 429s from repeated browser-side requests.
  */
+import { GEO_USER_AGENT } from '@/lib/constants'
+
 export async function reverseGeocodeLabel(lat: number, lng: number): Promise<string | null> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
       {
         headers: {
-          'User-Agent': 'CheckMark/1.0 (presence-platform)',
+          'User-Agent': GEO_USER_AGENT,
           'Accept-Language': 'en',
         },
         cache: 'no-store',

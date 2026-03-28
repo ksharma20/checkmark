@@ -3,7 +3,7 @@
 const WEAK_PASSWORDS = new Set([
   'password', 'password1', 'password123', '12345678', '123456789', '1234567890',
   'qwerty123', 'iloveyou', 'admin123', 'welcome1', 'letmein1', 'monkey123',
-  'checkmark', 'checkmark1', 'abc12345', 'pass1234', 'test1234',
+  'checkmark', 'checkmark123', 'abc12345', 'pass1234', 'test1234',
 ])
 
 export function validatePassword(password: string): { valid: true } | { valid: false; error: string } {

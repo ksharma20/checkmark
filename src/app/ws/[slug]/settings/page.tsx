@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { DNS_VERIFY_SUBDOMAIN, DNS_VERIFY_VALUE_PREFIX } from '@/lib/constants'
 
 // ─── Timezone options ─────────────────────────────────────────────────────────
 
@@ -709,8 +710,8 @@ function DomainsSection({ slug }: { slug: string }) {
                 Add this DNS TXT record, then click &ldquo;Check verification&rdquo;:
               </p>
               {[
-                { label: 'Name', value: `_checkmark-verify.${d.domain}` },
-                { label: 'Value', value: `checkmark-verify=${d.verifyToken}` },
+                { label: 'Name', value: `${DNS_VERIFY_SUBDOMAIN}.${d.domain}` },
+                { label: 'Value', value: `${DNS_VERIFY_VALUE_PREFIX}=${d.verifyToken}` },
               ].map(({ label, value }) => (
                 <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
                   <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', width: '40px', flexShrink: 0 }}>{label}</span>

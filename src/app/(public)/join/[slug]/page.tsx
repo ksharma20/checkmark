@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSessionFromCookies } from '@/lib/auth'
+import { en } from '@/locales/en'
 import {
   getWorkspaceBySlug,
   getMembershipsByEmail,
@@ -45,7 +46,7 @@ function InfoCard({ children }: { children: React.ReactNode }) {
             marginBottom: '24px',
           }}
         >
-          CheckMark
+          {en.join.brandLogo}
         </p>
         {children}
       </div>

@@ -2,8 +2,9 @@ import { SignJWT, jwtVerify } from 'jose'
 import bcrypt from 'bcryptjs'
 import { cookies, headers } from 'next/headers'
 import { NextRequest } from 'next/server'
+import { COOKIE_SESSION, COOKIE_OTP } from '@/lib/constants'
 
-const COOKIE_NAME = 'cm_session'
+const COOKIE_NAME = COOKIE_SESSION
 const TOKEN_EXPIRY = '30d'
 const BCRYPT_ROUNDS = 12
 
@@ -114,7 +115,7 @@ export function otpExpiresAt(): string {
 
 // ─── OTP verification cookie ─────────────────────────────────────────────────
 
-const OTP_COOKIE_NAME = 'cm_otp_ok'
+const OTP_COOKIE_NAME = COOKIE_OTP
 
 export async function setOtpVerifiedCookie(email: string): Promise<void> {
   const token = await new SignJWT({ email, purpose: 'otp_verified' })

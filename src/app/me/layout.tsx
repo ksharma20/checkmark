@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getServerUser } from '@/lib/auth'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
 import BottomNav from '@/components/user/BottomNav'
+import { en } from '@/locales/en'
 
 export default async function MeLayout({ children }: { children: React.ReactNode }) {
   const user = await getServerUser()
@@ -24,7 +25,7 @@ export default async function MeLayout({ children }: { children: React.ReactNode
       <meta name="theme-color" content="#1B4DFF" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      <meta name="apple-mobile-web-app-title" content="CheckMark" />
+      <meta name="apple-mobile-web-app-title" content={en.brand.shortName} />
       {/* Header */}
       <header
         style={{
@@ -48,7 +49,7 @@ export default async function MeLayout({ children }: { children: React.ReactNode
             flex: 1,
           }}
         >
-          CheckMark
+          {en.brand.name}
         </span>
 
         {adminWorkspaces.length > 0 && (

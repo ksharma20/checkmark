@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getServerUser } from '@/lib/auth'
 import { getWorkspaceBySlug, getWorkspaceMember } from '@/lib/db/queries/workspaces'
+import { en } from '@/locales/en'
 
 interface Props {
   children: React.ReactNode
@@ -35,7 +36,7 @@ export default async function WsSlugLayout({ children, params }: Props) {
       <meta name="theme-color" content="#1B4DFF" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-      <meta name="apple-mobile-web-app-title" content="CheckMark WS" />
+      <meta name="apple-mobile-web-app-title" content={`${en.brand.shortName} WS`} />
       {/* Top header */}
       <header
         style={{
@@ -64,7 +65,7 @@ export default async function WsSlugLayout({ children, params }: Props) {
               marginRight: '8px',
             }}
           >
-            CheckMark
+            {en.brand.name}
           </span>
           <span style={{ color: 'var(--border)', marginRight: '8px', fontSize: '14px' }}>/</span>
           <span

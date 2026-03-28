@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { en } from '@/locales/en'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -570,7 +571,7 @@ function LogoutSection() {
   return (
     <SectionCard title="Session">
       <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', marginBottom: '14px', lineHeight: 1.5 }}>
-        Sign out of your CheckMark account on this device.
+        {en.auth.sessionLogoutText}
       </p>
       <Btn onClick={logout} loading={loading} variant="outline">
         Sign out

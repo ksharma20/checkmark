@@ -1,23 +1,5 @@
 import Link from 'next/link'
-
-const features = [
-  {
-    title: 'Know who\'s in today',
-    body: 'Your Today dashboard shows which team members are in the office right now, who visited earlier, and who stayed remote — updated by the second.',
-  },
-  {
-    title: 'Privacy by design',
-    body: 'Employees choose to participate. Every data point belongs to the person who created it. Consent can be withdrawn at any time with one click.',
-  },
-  {
-    title: 'Verified domains, zero friction',
-    body: 'Add your company domain and anyone who signs up with a matching email is auto-enrolled — no invite required.',
-  },
-  {
-    title: 'Multiple signals',
-    body: 'Wi-Fi network detection, GPS check-in, IP geofencing, and manual override. Whichever fits your team\'s setup.',
-  },
-]
+import { en } from '@/locales/en'
 
 export default function LandingPage() {
   return (
@@ -58,7 +40,7 @@ export default function LandingPage() {
               letterSpacing: "-0.3px",
             }}
           >
-            CheckMark
+            {en.brand.name}
           </span>
           <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
             <Link
@@ -101,11 +83,10 @@ export default function LandingPage() {
             lineHeight: 1.15,
             marginBottom: "20px",
             letterSpacing: "-1px",
+            whiteSpace: "pre-line",
           }}
         >
-          Presence intelligence
-          <br />
-          for modern teams
+          {en.landing.heroHeadline}
         </h1>
         <p
           style={{
@@ -116,8 +97,7 @@ export default function LandingPage() {
             lineHeight: 1.6,
           }}
         >
-          Know who's in the office. Plan your week with purpose. CheckMark makes
-          hybrid work actually work — without surveillance.
+          {en.landing.heroSubtitle}
         </p>
         <div
           style={{
@@ -159,7 +139,7 @@ export default function LandingPage() {
           gap: "16px",
         }}
       >
-        {features.map((f) => (
+        {en.landing.features.map((f) => (
           <div
             key={f.title}
             style={{
@@ -202,8 +182,7 @@ export default function LandingPage() {
         }}
       >
         <p style={{ fontSize: "13px", color: "var(--text-muted)" }}>
-          © {new Date().getFullYear()} CheckMark. Built for humans who work in
-          offices sometimes.
+          © {new Date().getFullYear()} {en.brand.name}. {en.landing.footerText}
         </p>
       </footer>
     </div>
