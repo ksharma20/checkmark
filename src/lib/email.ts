@@ -9,7 +9,11 @@ function getResend(): Resend | null {
   return resend
 }
 
-const FROM = `${en.brand.name} <${en.brand.email}>`
+// Allow RESEND_FROM_EMAIL env override — needed when using Resend's shared
+// domain (onboarding@resend.dev) before a custom domain is verified.
+const FROM = process.env.RESEND_FROM_EMAIL
+  ? `${en.brand.name} <${process.env.RESEND_FROM_EMAIL}>`
+  : `${en.brand.name} <${en.brand.email}>`
 
 export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const client = getResend()

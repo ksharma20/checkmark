@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { en } from "@/locales/en";
+import SwRegister from "@/components/SwRegister";
 
 export const metadata: Metadata = {
   title: `${en.brand.name} — ${en.brand.tagline}`,
@@ -24,7 +25,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <SwRegister />
+        {children}
+      </body>
     </html>
   );
 }

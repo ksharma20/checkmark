@@ -106,6 +106,11 @@ export function wifiSsidDisplay(ssid: string): string {
 // ─── OTP ─────────────────────────────────────────────────────────────────────
 
 export function generateOtp(): string {
+  if (process.env.NODE_ENV === 'development') {
+    // First 6 digits of current Unix epoch seconds — predictable from the clock.
+    // Stays constant for ~10,000 seconds (~2.7 hrs). Tell testers: floor(Date.now()/1000).toString().slice(0,6)
+    return String(Math.floor(Date.now() / 1000)).slice(0, 6)
+  }
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
 

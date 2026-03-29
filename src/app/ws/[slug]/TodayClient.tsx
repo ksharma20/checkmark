@@ -59,36 +59,57 @@ function PersonRow({ member, tz }: { member: DashboardMember; tz: string }) {
   const checkinTime = ev ? formatInTz(ev.checkin_at, tz, 'time') : null
   const checkoutTime = ev?.checkout_at ? formatInTz(ev.checkout_at, tz, 'time') : null
   const dur = ev ? durationHours(ev.checkin_at, ev.checkout_at) : null
+  const displayName = member.full_name ?? member.email
 
   return (
     <div style={{
-      display: 'grid', gridTemplateColumns: '1fr auto auto auto',
-      alignItems: 'center', gap: '16px', padding: '12px 16px',
+      padding: '11px 14px',
       background: 'var(--surface-0)', border: '1px solid var(--border)',
       borderRadius: 'var(--radius-md)', marginBottom: '6px',
     }}>
-      <div>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '14px', color: 'var(--text-primary)' }}>
-          {member.full_name ?? member.email}
+      {/* Row 1: name + signal + duration */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
+        <span style={{
+          fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '14px',
+          color: 'var(--text-primary)', flex: 1,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+        }}>
+          {displayName}
           {member.event_count > 1 && (
-            <span style={{ marginLeft: '6px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400 }}>
+            <span style={{ marginLeft: '5px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400 }}>
               ×{member.event_count}
             </span>
           )}
-        </p>
+        </span>
+        {ev && <SignalBadge matchedBy={ev.matched_by} />}
+        <span style={{
+          fontFamily: 'JetBrains Mono, monospace', fontSize: '12px',
+          color: dur !== null ? 'var(--text-secondary)' : 'var(--text-muted)',
+          flexShrink: 0,
+        }}>
+          {dur !== null ? fmtDuration(dur) : isActive ? '…' : '—'}
+        </span>
+      </div>
+
+      {/* Row 2: email (optional) + time range */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
         {member.full_name && (
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)' }}>
+          <span style={{
+            fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+          }}>
             {member.email}
-          </p>
+          </span>
+        )}
+        {checkinTime && (
+          <span style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: '12px',
+            color: 'var(--text-secondary)', whiteSpace: 'nowrap', marginLeft: 'auto',
+          }}>
+            {checkinTime}{checkoutTime ? ` → ${checkoutTime}` : isActive ? ' →' : ''}
+          </span>
         )}
       </div>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
-        {checkinTime}{checkoutTime ? ` → ${checkoutTime}` : isActive ? ' →' : ''}
-      </span>
-      {ev ? <SignalBadge matchedBy={ev.matched_by} /> : <span />}
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: dur !== null ? 'var(--text-secondary)' : 'var(--text-muted)', width: '52px', textAlign: 'right' }}>
-        {dur !== null ? fmtDuration(dur) : isActive ? '…' : '—'}
-      </span>
     </div>
   )
 }
@@ -96,15 +117,21 @@ function PersonRow({ member, tz }: { member: DashboardMember; tz: string }) {
 function NotInRow({ member }: { member: DashboardMember }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', padding: '10px 16px',
+      display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px',
       background: 'var(--surface-0)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)', marginBottom: '6px', opacity: 0.7,
+      borderRadius: 'var(--radius-md)', marginBottom: '6px', opacity: 0.65,
     }}>
-      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)', flex: 1 }}>
+      <span style={{
+        fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)',
+        flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      }}>
         {member.full_name ?? member.email}
       </span>
       {member.full_name && (
-        <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)' }}>
+        <span style={{
+          fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '50%',
+        }}>
           {member.email}
         </span>
       )}

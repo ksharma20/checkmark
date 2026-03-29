@@ -275,6 +275,27 @@ export async function getAdminWorkspacesForUser(userId: string): Promise<Workspa
   )
 }
 
+/**
+ * Returns active (non-archived) workspaces where the given user is the ONLY
+ * active admin. Used to block account deactivation.
+ *
+ * Archived workspaces are excluded — a deactivated account is fine as the
+ * owner of an archived workspace since it can't affect any running team.
+ */
+export async function getSoleAdminWorkspaces(userId: string): Promise<Workspace[]> {
+  return db.query<Workspace>(
+    `SELECT w.* FROM workspaces w
+     JOIN workspace_members wm ON wm.workspace_id = w.id
+     WHERE wm.user_id = ? AND wm.role = 'admin' AND wm.status = 'active'
+       AND w.archived_at IS NULL
+       AND (
+         SELECT COUNT(*) FROM workspace_members wm2
+         WHERE wm2.workspace_id = w.id AND wm2.role = 'admin' AND wm2.status = 'active'
+       ) = 1`,
+    [userId]
+  )
+}
+
 export async function getArchivedAdminWorkspacesForUser(userId: string): Promise<Workspace[]> {
   return db.query<Workspace>(
     `SELECT w.* FROM workspaces w
@@ -372,6 +393,22 @@ export async function getWorkspaceOverrides(workspaceId: string): Promise<AdminO
     'SELECT * FROM admin_overrides WHERE workspace_id = ? ORDER BY created_at DESC',
     [workspaceId]
   )
+}
+
+export async function deleteAdminOverride(
+  workspaceId: string,
+  presenceEventId: string
+): Promise<boolean> {
+  const existing = await db.queryOne<AdminOverride>(
+    'SELECT * FROM admin_overrides WHERE workspace_id = ? AND presence_event_id = ?',
+    [workspaceId, presenceEventId]
+  )
+  if (!existing) return false
+  await db.execute(
+    'DELETE FROM admin_overrides WHERE workspace_id = ? AND presence_event_id = ?',
+    [workspaceId, presenceEventId]
+  )
+  return true
 }
 
 export interface MemberWithUser {

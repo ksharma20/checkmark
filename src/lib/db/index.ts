@@ -63,14 +63,18 @@ function createTursoDB(): DB {
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
 
+  // libSQL Row objects have a special prototype — spread into plain objects
+  // so they can safely cross the Server → Client Component boundary.
+  const toPlain = <T>(row: unknown): T => ({ ...(row as object) }) as T
+
   const makeDB = (executor: typeof client): DB => ({
     async query<T>(sql: string, params: unknown[] = []): Promise<T[]> {
       const result = await executor.execute({ sql, args: params as never[] });
-      return result.rows as unknown as T[];
+      return result.rows.map(toPlain<T>);
     },
     async queryOne<T>(sql: string, params: unknown[] = []): Promise<T | null> {
       const result = await executor.execute({ sql, args: params as never[] });
-      return (result.rows[0] as unknown as T) ?? null;
+      return result.rows[0] ? toPlain<T>(result.rows[0]) : null;
     },
     async execute(sql: string, params: unknown[] = []) {
       const result = await executor.execute({ sql, args: params as never[] });

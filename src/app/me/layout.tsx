@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { getServerUser } from '@/lib/auth'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
 import BottomNav from '@/components/user/BottomNav'
+import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import { en } from '@/locales/en'
 
 export default async function MeLayout({ children }: { children: React.ReactNode }) {
@@ -78,6 +79,7 @@ export default async function MeLayout({ children }: { children: React.ReactNode
       <main style={{ flex: 1, paddingBottom: '72px' }}>{children}</main>
 
       <BottomNav />
+      <PwaInstallPrompt />
     </div>
   )
 }

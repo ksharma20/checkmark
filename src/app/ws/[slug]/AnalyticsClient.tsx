@@ -92,6 +92,79 @@ function DayBar({ value, max, color }: { value: number; max: number; color: stri
   )
 }
 
+const labelStyle: React.CSSProperties = {
+  fontFamily: 'DM Sans, sans-serif',
+  fontSize: '11px',
+  fontWeight: 600,
+  color: 'var(--text-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.07em',
+}
+
+function MemberCard({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; workingDays: number; signalsConfigured: boolean }) {
+  const initials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
+  return (
+    <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+      {/* Row 1: avatar + name/email + hours */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
+        <div style={{
+          width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
+          background: 'color-mix(in srgb, var(--brand) 15%, transparent)',
+          color: 'var(--brand)', fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 700,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {initials}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {m.name}
+          </div>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {m.email}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
+            {m.total_hours}h
+          </div>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
+            {m.avg_daily_hours}h avg
+          </div>
+        </div>
+      </div>
+      {/* Row 2: bars */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        {signalsConfigured ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Office</span>
+              <DayBar value={m.office_days} max={workingDays} color="var(--teal)" />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Remote</span>
+              <DayBar value={m.wfh_days} max={workingDays} color="var(--amber)" />
+            </div>
+          </>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Present</span>
+            <DayBar value={m.office_days + m.wfh_days} max={workingDays} color="var(--brand)" />
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Absent</span>
+          <DayBar value={m.absent_days} max={workingDays} color="var(--danger)" />
+        </div>
+      </div>
+      {m.multi_location_days > 0 && (
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--amber)', marginTop: '6px' }}>
+          {m.multi_location_days} multi-location days
+        </p>
+      )}
+    </div>
+  )
+}
+
 function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; workingDays: number; signalsConfigured: boolean }) {
   const initials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
@@ -107,7 +180,6 @@ function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; 
       borderBottom: '1px solid var(--border)',
       minWidth: signalsConfigured ? '720px' : '520px',
     }}>
-      {/* Name */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
         <div style={{
           width: '32px', height: '32px', borderRadius: '50%',
@@ -127,59 +199,42 @@ function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; 
         </div>
       </div>
 
-      {/* Office days */}
       {signalsConfigured && (
         <div>
           <DayBar value={m.office_days} max={workingDays} color="var(--teal)" />
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            office
-          </p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>office</p>
         </div>
       )}
 
-      {/* WFH / remote days */}
       {signalsConfigured ? (
         <div>
           <DayBar value={m.wfh_days} max={workingDays} color="var(--amber)" />
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            remote
-          </p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>remote</p>
         </div>
       ) : (
         <div>
           <DayBar value={m.office_days + m.wfh_days} max={workingDays} color="var(--brand)" />
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-            present
-          </p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>present</p>
         </div>
       )}
 
-      {/* Absent days */}
       <div>
         <DayBar value={m.absent_days} max={workingDays} color="var(--danger)" />
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-          absent
-        </p>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>absent</p>
       </div>
 
-      {/* Total hours */}
       <div style={{ textAlign: 'right' }}>
         <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
           {m.total_hours}h
         </p>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
-          total
-        </p>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>total</p>
       </div>
 
-      {/* Avg daily hours */}
       <div style={{ textAlign: 'right' }}>
         <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
           {m.avg_daily_hours}h
         </p>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
-          avg/day
-        </p>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>avg/day</p>
         {m.multi_location_days > 0 && (
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--amber)', marginTop: '2px' }}>
             {m.multi_location_days} multi-loc
@@ -202,12 +257,12 @@ function TableHeader({ signalsConfigured }: { signalsConfigured: boolean }) {
       borderBottom: '1px solid var(--border)',
       minWidth: signalsConfigured ? '720px' : '520px',
     }}>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Member</p>
-      {signalsConfigured && <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Office</p>}
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{signalsConfigured ? 'Remote' : 'Present'}</p>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Absent</p>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: 'right' }}>Total hrs</p>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: 'right' }}>Avg/day</p>
+      <p style={labelStyle}>Member</p>
+      {signalsConfigured && <p style={labelStyle}>Office</p>}
+      <p style={labelStyle}>{signalsConfigured ? 'Remote' : 'Present'}</p>
+      <p style={labelStyle}>Absent</p>
+      <p style={{ ...labelStyle, textAlign: 'right' }}>Total hrs</p>
+      <p style={{ ...labelStyle, textAlign: 'right' }}>Avg/day</p>
     </div>
   )
 }
@@ -218,6 +273,14 @@ export default function AnalyticsClient({ slug }: Props) {
   const [endDate, setEndDate] = useState(defaultRange.end)
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isNarrow, setIsNarrow] = useState(false)
+
+  useEffect(() => {
+    function check() { setIsNarrow(window.innerWidth < 640) }
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   const fetchAnalytics = useCallback(async (start: string, end: string) => {
     setLoading(true)
@@ -335,7 +398,7 @@ export default function AnalyticsClient({ slug }: Props) {
           </p>
         </div>
       ) : (
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', overflowX: 'auto' }}>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', overflowX: isNarrow ? 'visible' : 'auto' }}>
           {!data.signals_configured && (
             <div style={{
               padding: '10px 16px',
@@ -346,15 +409,28 @@ export default function AnalyticsClient({ slug }: Props) {
               No location signals configured — all check-ins are shown. Configure GPS/WiFi signals in Settings to distinguish office vs remote days.
             </div>
           )}
-          <TableHeader signalsConfigured={data.signals_configured} />
-          {data.members.map((m) => (
-            <MemberRow
-              key={m.user_id}
-              m={m}
-              workingDays={data.working_days}
-              signalsConfigured={data.signals_configured}
-            />
-          ))}
+          {isNarrow ? (
+            data.members.map((m) => (
+              <MemberCard
+                key={m.user_id}
+                m={m}
+                workingDays={data.working_days}
+                signalsConfigured={data.signals_configured}
+              />
+            ))
+          ) : (
+            <>
+              <TableHeader signalsConfigured={data.signals_configured} />
+              {data.members.map((m) => (
+                <MemberRow
+                  key={m.user_id}
+                  m={m}
+                  workingDays={data.working_days}
+                  signalsConfigured={data.signals_configured}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 

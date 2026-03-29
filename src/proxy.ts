@@ -57,6 +57,7 @@ function isPublicApiRoute(pathname: string): boolean {
     '/api/auth/logout',
     '/api/auth/check-email',
     '/api/workspace/check-slug',
+    '/api/me/reactivate',
   ]
   return PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route))
 }

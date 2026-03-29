@@ -12,8 +12,8 @@ import {
   NOTIF_TAG_AUTO_CHECKOUT,
 } from '@/lib/constants'
 
-// Notification schedule (hours from check-in): 8, 12, 16, 18, 20, 22 — then auto-checkout at 24h
-const NOTIFICATION_SCHEDULE_H = [8, 12, 16, 18, 20, 22]
+// Notification schedule (hours from check-in): 4, 8, 12, 16, 18, 20, 22 — then auto-checkout at 24h
+const NOTIFICATION_SCHEDULE_H = [4, 8, 12, 16, 18, 20, 22]
 const AUTO_CHECKOUT_H = 24
 const NOTIFICATION_MESSAGES = en.notifications.stale
 
@@ -62,14 +62,18 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
     // Schedule the 6 notifications
     NOTIFICATION_SCHEDULE_H.slice(sentSoFar).forEach((hour, i) => {
       const fireAt = checkinMs + hour * 60 * 60 * 1000
-      const delay = fireAt - Date.now()
-      if (delay <= 0) return
-      const notifIndex = sentSoFar + i + 1
+      const delay = fireAt - Date.now();
+      if (delay <= 0) return;
+      const notifIndex = sentSoFar + i + 1;
       const timer = setTimeout(() => {
-        try { localStorage.setItem(STALE_NOTIF_KEY, String(notifIndex)) } catch { /* ignore */ }
-        fireStaleNotification(hour)
-      }, delay)
-      notifTimers.current.push(timer)
+        try {
+          localStorage.setItem(STALE_NOTIF_KEY, String(notifIndex));
+        } catch {
+          /* ignore */
+        }
+        fireStaleNotification(hour);
+      }, delay);
+      notifTimers.current.push(timer);
     })
 
     // Schedule auto-checkout at 24h
@@ -90,18 +94,22 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeEvent?.id])
 
-  function fireStaleNotification(hour: number) {
+  async function fireStaleNotification(hour: number) {
     if (typeof window === 'undefined' || !('Notification' in window)) return
     if (Notification.permission !== 'granted') return
     const msg = NOTIFICATION_MESSAGES[hour] ?? {
       title: en.notifications.staleFallback.title,
       body: en.notifications.staleFallback.body(hour),
     }
-    new Notification(msg.title, {
-      body: msg.body,
-      icon: '/favicon.ico',
-      tag: NOTIF_TAG_STALE,
-    })
+    const opts: NotificationOptions = { body: msg.body, icon: '/favicon.ico', tag: NOTIF_TAG_STALE }
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready
+        await reg.showNotification(msg.title, opts)
+        return
+      } catch { /* fall through to page notification */ }
+    }
+    new Notification(msg.title, opts)
   }
 
   async function triggerAutoCheckout() {
@@ -119,11 +127,14 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
           localStorage.removeItem(STALE_NOTIF_EVENT_KEY)
         } catch { /* ignore */ }
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-          new Notification(en.notifications.autoCheckout.title, {
-            body: en.notifications.autoCheckout.body,
-            icon: '/favicon.ico',
-            tag: NOTIF_TAG_AUTO_CHECKOUT,
-          })
+          const opts: NotificationOptions = { body: en.notifications.autoCheckout.body, icon: '/favicon.ico', tag: NOTIF_TAG_AUTO_CHECKOUT }
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.ready.then((reg) => reg.showNotification(en.notifications.autoCheckout.title, opts)).catch(() => {
+              new Notification(en.notifications.autoCheckout.title, opts)
+            })
+          } else {
+            new Notification(en.notifications.autoCheckout.title, opts)
+          }
         }
         router.refresh()
       }

@@ -79,8 +79,9 @@ export const en = {
   },
 
   notifications: {
-    // Stale check-in reminders — fired at 8h, 12h, 16h, 18h, 20h, 22h after check-in
+    // Stale check-in reminders — fired at 4h, 8h, 12h, 16h, 18h, 20h, 22h after check-in
     stale: {
+      4:  { title: `${brand} — half day?`,                 body: "You've been in for 4 hours. If you're doing a half day, now's a good time to check out and head home!" },
       8:  { title: `${brand} — time to wrap up?`,          body: "It's been 8 hours. Work-life balance matters — feel free to head out!" },
       12: { title: `${brand} — still going?`,              body: '12 hours in! Dedication noted, but rest is important too. Time to head home.' },
       16: { title: `${brand} — seriously though`,          body: '16 hours checked in. Even the most committed need sleep. Please check out!' },

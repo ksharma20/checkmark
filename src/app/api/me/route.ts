@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserById, updateUserName, deactivateUser } from '@/lib/db/queries/users'
+import { getSoleAdminWorkspaces } from '@/lib/db/queries/workspaces'
 import { clearSessionCookie } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
@@ -39,6 +40,20 @@ export async function DELETE(request: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
+
+  // Block if this user is the sole admin of any active workspace — deactivating
+  // would orphan it with no way to recover access.
+  const soleAdminOf = await getSoleAdminWorkspaces(userId)
+  if (soleAdminOf.length > 0) {
+    return NextResponse.json(
+      {
+        error: 'SOLE_ADMIN',
+        workspaces: soleAdminOf.map((w) => ({ slug: w.slug, name: w.name })),
+      },
+      { status: 409 }
+    )
+  }
+
   // Soft delete — data is preserved; user can reactivate by logging back in
   await deactivateUser(userId)
   await clearSessionCookie()

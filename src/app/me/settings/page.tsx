@@ -580,71 +580,304 @@ function LogoutSection() {
   )
 }
 
-// ─── Danger zone ──────────────────────────────────────────────────────────────
+// ─── Danger zone (collapsed accordion) ────────────────────────────────────────
 
-function DangerSection() {
-  const [loading, setLoading] = useState(false)
+function DeactivateCard() {
+  const [loading, setLoading] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [blockedBy, setBlockedBy] = useState<
+    { slug: string; name: string }[] | null
+  >(null);
 
   async function deactivateAccount() {
-    const confirmed = confirm(
-      'Deactivate your account? Your account and all data will be hidden from workspaces. You can reactivate anytime by logging back in with your password.'
-    )
-    if (!confirmed) return
-
-    setLoading(true)
+    setLoading(true);
+    setBlockedBy(null);
     try {
-      const res = await fetch('/api/me', { method: 'DELETE' })
+      const res = await fetch("/api/me", { method: "DELETE" });
       if (res.ok) {
-        window.location.href = '/login'
+        window.location.href = "/login";
+      } else if (res.status === 409) {
+        const data = await res.json();
+        setBlockedBy(data.workspaces ?? []);
+        setConfirming(false);
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 
   return (
-    <SectionCard title="Danger zone">
+    <div
+      style={{
+        border: "1px solid color-mix(in srgb, var(--danger) 25%, transparent)",
+        borderRadius: "var(--radius-md)",
+        padding: "14px 16px",
+        background: "color-mix(in srgb, var(--danger) 4%, transparent)",
+      }}
+    >
       <p
         style={{
-          fontSize: '13px',
-          fontFamily: 'DM Sans, sans-serif',
-          color: 'var(--text-secondary)',
-          marginBottom: '6px',
-          lineHeight: 1.5,
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: "13px",
+          fontWeight: 600,
+          color: "var(--text-primary)",
+          margin: "0 0 4px",
         }}
       >
-        Deactivate your account. Your check-ins and data are preserved — your account simply becomes invisible to all workspaces.
-      </p>
-      <p
-        style={{
-          fontSize: '13px',
-          fontFamily: 'DM Sans, sans-serif',
-          color: 'var(--text-muted)',
-          marginBottom: '14px',
-          lineHeight: 1.5,
-        }}
-      >
-        You can reactivate anytime by logging back in with your email and password.
-      </p>
-      <Btn onClick={deactivateAccount} loading={loading} danger>
         Deactivate account
-      </Btn>
-    </SectionCard>
-  )
+      </p>
+      <p
+        style={{
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: "12px",
+          color: "var(--text-secondary)",
+          lineHeight: 1.5,
+          margin: "0 0 12px",
+        }}
+      >
+        Your check-ins and data are preserved — your account becomes invisible
+        to all workspaces. You can reactivate anytime by logging back in.
+      </p>
+
+      {/* Sole-admin blocker */}
+      {blockedBy && blockedBy.length > 0 && (
+        <div
+          style={{
+            background: "color-mix(in srgb, var(--amber) 10%, transparent)",
+            border:
+              "1px solid color-mix(in srgb, var(--amber) 40%, transparent)",
+            borderRadius: "var(--radius-sm)",
+            padding: "10px 12px",
+            marginBottom: "12px",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              margin: "0 0 4px",
+            }}
+          >
+            You&apos;re the only admin of{" "}
+            {blockedBy.length === 1
+              ? "this workspace"
+              : `${blockedBy.length} workspaces`}
+            .
+          </p>
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              lineHeight: 1.5,
+              margin: "0 0 8px",
+            }}
+          >
+            For each active workspace below, either promote another member to
+            admin or archive it first. Archived workspaces don&apos;t block
+            deactivation.
+          </p>
+          <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+            {blockedBy.map((ws) => (
+              <div
+                key={ws.slug}
+                style={{ display: "flex", gap: "10px", alignItems: "center" }}
+              >
+                <a
+                  href={`/ws/${ws.slug}/people`}
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: "12px",
+                    color: "var(--brand)",
+                    textDecoration: "none",
+                  }}
+                >
+                  {ws.name} — promote admin
+                </a>
+                <span
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--text-muted)",
+                    fontFamily: "DM Sans, sans-serif",
+                  }}
+                >
+                  or
+                </span>
+                <a
+                  href={`/ws/${ws.slug}/settings`}
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: "12px",
+                    color: "var(--text-secondary)",
+                    textDecoration: "none",
+                  }}
+                >
+                  archive workspace
+                </a>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!confirming ? (
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          style={{
+            height: "34px",
+            padding: "0 14px",
+            border:
+              "1px solid color-mix(in srgb, var(--danger) 40%, transparent)",
+            borderRadius: "var(--radius-sm)",
+            background: "transparent",
+            color: "var(--danger)",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "13px",
+            cursor: "pointer",
+          }}
+        >
+          Deactivate account
+        </button>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "12px",
+              color: "var(--danger)",
+              margin: 0,
+            }}
+          >
+            Are you sure? This will sign you out immediately.
+          </p>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={deactivateAccount}
+              style={{
+                height: "34px",
+                padding: "0 14px",
+                background: "var(--danger)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "var(--radius-sm)",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "13px",
+                fontWeight: 600,
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.7 : 1,
+              }}
+            >
+              {loading ? "Deactivating…" : "Yes, deactivate"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              style={{
+                height: "34px",
+                padding: "0 14px",
+                background: "transparent",
+                color: "var(--text-secondary)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-sm)",
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "13px",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DangerSection() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div style={{ marginBottom: "16px" }}>
+      {/* Accordion trigger — intentionally quiet */}
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        style={{
+          width: "100%",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "10px 14px",
+          background: "transparent",
+          border: "1px solid var(--border)",
+          borderRadius: open
+            ? "var(--radius-md) var(--radius-md) 0 0"
+            : "var(--radius-md)",
+          cursor: "pointer",
+          textAlign: "left",
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "13px",
+          }}
+        >
+          Danger zone
+        </span>
+        <span
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "14px",
+            color: "var(--text-muted)",
+            transform: open ? "rotate(180deg)" : "none",
+            transition: "transform 0.2s",
+            display: "inline-block",
+            lineHeight: 1,
+          }}
+        >
+          ›
+        </span>
+      </button>
+
+      {/* Expanded content */}
+      {open && (
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderTop: "none",
+            borderRadius: "0 0 var(--radius-md) var(--radius-md)",
+            padding: "14px",
+            background: "var(--surface-0)",
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+          }}
+        >
+          <DeactivateCard />
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
   return (
-    <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
+    <div style={{ maxWidth: "480px", margin: "0 auto", padding: "20px 16px" }}>
       <h1
         style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
+          fontFamily: "Syne, sans-serif",
+          fontSize: "22px",
           fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '20px',
+          color: "var(--navy)",
+          marginBottom: "20px",
         }}
       >
         Settings
@@ -657,5 +890,6 @@ export default function SettingsPage() {
       <LogoutSection />
       <DangerSection />
     </div>
-  )
+  );
 }
+
