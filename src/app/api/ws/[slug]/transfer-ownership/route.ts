@@ -61,7 +61,7 @@ export async function POST(request: NextRequest, { params }: Props) {
 
   // ── Step 1: request OTP ────────────────────────────────────────────────────
   if (action === 'request') {
-    const recentCount = await countRecentOtps(adminUser.email, 60)
+    const recentCount = await countRecentOtps(adminUser.email, 15);
     if (recentCount >= 3) {
       return NextResponse.json({ error: 'Too many requests. Try again later.', code: 'RATE_LIMITED' }, { status: 429 })
     }
