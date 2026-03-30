@@ -821,6 +821,7 @@ Design rules:
 | Variable | Required | Description |
 |---|---|---|
 | `TURSO_DATABASE_URL` | No (dev) | Turso URL for production. Empty → uses SQLite. |
+| `TURSO_AUTH_TOKEN` | No (dev) | Turso Auth Token for production. Empty → dev env |
 | `JWT_SECRET` | **Yes** | Random 32+ char string for JWT signing |
 | `RESEND_API_KEY` | Recommended | From resend.com. OTPs log to console if missing. |
 | `NEXT_PUBLIC_APP_URL` | Yes | Full app URL (`http://localhost:3000` in dev) |

@@ -49,11 +49,11 @@ export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/',
+    secure: !!process.env.TURSO_AUTH_TOKEN,
+    sameSite: "strict",
+    path: "/",
     maxAge: 60 * 60 * 24 * 30, // 30 days
-  })
+  });
 }
 
 export async function clearSessionCookie(): Promise<void> {
@@ -106,10 +106,10 @@ export function wifiSsidDisplay(ssid: string): string {
 // ─── OTP ─────────────────────────────────────────────────────────────────────
 
 export function generateOtp(): string {
-  if (process.env.NODE_ENV === 'development') {
+  if (!process.env.RESEND_API_KEY) {
     // First 6 digits of current Unix epoch seconds — predictable from the clock.
     // Stays constant for ~10,000 seconds (~2.7 hrs). Tell testers: floor(Date.now()/1000).toString().slice(0,6)
-    return String(Math.floor(Date.now() / 1000)).slice(0, 6)
+    return String(Math.floor(Date.now() / 1000)).slice(0, 6);
   }
   return Math.floor(100000 + Math.random() * 900000).toString()
 }
@@ -131,11 +131,11 @@ export async function setOtpVerifiedCookie(email: string): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.set(OTP_COOKIE_NAME, token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-    path: '/',
+    secure: !!process.env.TURSO_AUTH_TOKEN,
+    sameSite: "lax",
+    path: "/",
     maxAge: 60 * 15,
-  })
+  });
 }
 
 export async function verifyOtpCookie(email: string): Promise<boolean> {
