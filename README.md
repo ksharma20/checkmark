@@ -3,6 +3,7 @@
 > **Know where your team is. Own where you've been.**
 
 CheckMark is a full-stack Next.js application with two PWA surfaces:
+
 - **User side** (`/me/*`) — mobile-first, individuals record their own presence
 - **Org side** (`/ws/:slug/*`) — desktop-first, companies query presence data
 
@@ -10,14 +11,14 @@ CheckMark is a full-stack Next.js application with two PWA surfaces:
 
 ## Tech Stack
 
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router, TypeScript) |
-| Database | `better-sqlite3` in dev → `@vercel/postgres` / Neon in production |
-| Auth | Custom — email + password, OTP via `jose` + `bcryptjs` |
-| Styling | Tailwind CSS v4 — utility only, no component libraries |
-| Email | Resend (OTP, consent emails) |
-| Deployment | Vercel |
+| Layer      | Choice                                                            |
+| ---------- | ----------------------------------------------------------------- |
+| Framework  | Next.js 16 (App Router, TypeScript)                               |
+| Database   | `better-sqlite3` in dev → `@vercel/postgres` / Neon in production |
+| Auth       | Custom — email + password, OTP via `jose` + `bcryptjs`            |
+| Styling    | Tailwind CSS v4 — utility only, no component libraries            |
+| Email      | Resend (OTP, consent emails)                                      |
+| Deployment | Vercel                                                            |
 
 ---
 
@@ -26,9 +27,15 @@ CheckMark is a full-stack Next.js application with two PWA surfaces:
 ```
 src/
 ├── app/
-│   ├── (public)/               # Landing, login — no auth required
+│   ├── (public)/               # Marketing + auth — no auth required
 │   │   ├── layout.tsx          # Passthrough layout for public routes
-│   │   └── login/page.tsx      # /login — 6-state auth flow
+│   │   ├── login/page.tsx      # /login — 6-state auth flow
+│   │   ├── for-teams/page.tsx  # /for-teams — org admin marketing page
+│   │   ├── for-you/page.tsx    # /for-you — individual user marketing page
+│   │   ├── pricing/page.tsx    # /pricing — plan cards + FAQ
+│   │   ├── open-source/page.tsx# /open-source — OSS info + self-host guide
+│   │   ├── privacy/page.tsx    # /privacy — full privacy policy
+│   │   └── terms/page.tsx      # /terms — full terms of service
 │   ├── me/                     # User PWA — requires session
 │   │   ├── layout.tsx          # Header + bottom nav
 │   │   ├── page.tsx            # /me — home (check-in, stats, orgs strip)
@@ -108,8 +115,13 @@ src/
 │   ├── timezone.ts        # UTC ↔ IANA timezone helpers
 │   ├── plans.ts           # Plan limits (free / starter / growth)
 │   ├── signals.ts         # Core dashboard query (signal matching)
-│   └── stats.ts           # User stats computation
+│   ├── stats.ts           # User stats computation
+│   ├── slug.ts            # validateSlug() — shared across check-slug, register, workspace
+│   └── password.ts        # validatePassword() — shared across register, me/password
 ├── components/
+│   ├── marketing/
+│   │   ├── MarketingNav.tsx    # Sticky nav: logo, centre links, Sign in / Get started
+│   │   └── MarketingFooter.tsx # Footer with all marketing page links
 │   └── user/
 │       ├── BottomNav.tsx       # Fixed bottom nav (client — uses usePathname)
 │       ├── CheckinButtons.tsx  # "I'm here" + "I'm leaving" (client — GPS + API)
@@ -162,6 +174,7 @@ node scripts/migrate.js
 ```
 
 Expected output:
+
 ```
 ✓ Migration complete — ran 13 statement(s) against /path/to/checkmark.db
 ```
@@ -180,19 +193,19 @@ App runs at `http://localhost:3000`.
 
 ### Schema (11 tables + 5 column additions)
 
-| Table | Purpose |
-|---|---|
-| `users` | User accounts — email, password hash, name |
-| `otp_codes` | 6-digit OTPs for signup and verification |
-| `user_api_tokens` | Personal API tokens for programmatic check-ins |
-| `presence_events` | Core table — every check-in/check-out, GPS, WiFi, IP |
-| `workspaces` | Organisations — slug, name, plan, org_type, timezone, `archived_at` |
-| `workspace_domains` | Email domains for auto-enrolment |
-| `workspace_members` | User ↔ workspace membership, role, consent status |
-| `workspace_signal_config` | GPS / WiFi / IP signal configs for presence matching |
-| `admin_overrides` | Additive admin overrides — audit log, never modifies events |
-| `user_stats` | Pre-computed streaks, totals — upserted after every check-in |
-| `revoked_tokens` | Invalidated JWT IDs (jti) — checked on every authenticated request |
+| Table                     | Purpose                                                             |
+| ------------------------- | ------------------------------------------------------------------- |
+| `users`                   | User accounts — email, password hash, name                          |
+| `otp_codes`               | 6-digit OTPs for signup and verification                            |
+| `user_api_tokens`         | Personal API tokens for programmatic check-ins                      |
+| `presence_events`         | Core table — every check-in/check-out, GPS, WiFi, IP                |
+| `workspaces`              | Organisations — slug, name, plan, org_type, timezone, `archived_at` |
+| `workspace_domains`       | Email domains for auto-enrolment                                    |
+| `workspace_members`       | User ↔ workspace membership, role, consent status                   |
+| `workspace_signal_config` | GPS / WiFi / IP signal configs for presence matching                |
+| `admin_overrides`         | Additive admin overrides — audit log, never modifies events         |
+| `user_stats`              | Pre-computed streaks, totals — upserted after every check-in        |
+| `revoked_tokens`          | Invalidated JWT IDs (jti) — checked on every authenticated request  |
 
 The migration runner is idempotent. `ALTER TABLE` column additions are wrapped in try/catch so re-running is always safe:
 
@@ -246,21 +259,21 @@ Email input
 
 ### Post-login routing
 
-| Condition | Redirects to |
-|---|---|
-| Admin of 1 workspace | `/ws/:slug` |
-| Admin of 2+ workspaces | `/ws` |
-| No admin role | `/me` |
+| Condition              | Redirects to |
+| ---------------------- | ------------ |
+| Admin of 1 workspace   | `/ws/:slug`  |
+| Admin of 2+ workspaces | `/ws`        |
+| No admin role          | `/me`        |
 
 ---
 
 ## Plans
 
-| Plan | Max users | History | Locations | CSV export |
-|---|---|---|---|---|
-| `free` | 10 | 3 months | 1 | No |
-| `starter` | Unlimited | 12 months | 1 | Yes |
-| `growth` | Unlimited | 7 years | 5 | Yes |
+| Plan      | Max users | History   | Locations | CSV export |
+| --------- | --------- | --------- | --------- | ---------- |
+| `free`    | 10        | 3 months  | 1         | No         |
+| `starter` | Unlimited | 12 months | 1         | Yes        |
+| `growth`  | Unlimited | 7 years   | 5         | Yes        |
 
 Plan limits are enforced server-side in `lib/plans.ts`.
 
@@ -273,6 +286,7 @@ All routes require a valid session cookie. The proxy redirects to `/login` if mi
 ### `/me` — Home
 
 Server-rendered shell + client-rendered state. Shows:
+
 - Today's date (client local timezone) + status line — `"Checked in at 10:15 AM on 17 Mar 2026"` or `"Not checked in yet"` — client-rendered only, always in browser timezone.
 - **"I'm here"** button (64px, full width) — visible only when CHECKED_OUT. Triggers GPS collection → check-in API call.
 - **"I'm leaving"** button — visible only when CHECKED_IN. Triggers GPS collection → checkout API call.
@@ -287,6 +301,7 @@ Server-rendered shell + client-rendered state. Shows:
 ### `/me/timeline`
 
 Client component. Fetches from `GET /api/events`. Features:
+
 - Date range pickers (default: current month, resets on page load)
 - Events grouped by date, newest first
 - Inline note editing on any event
@@ -295,12 +310,14 @@ Client component. Fetches from `GET /api/events`. Features:
 ### `/me/orgs`
 
 Server + client split. Shows:
+
 - **Pending consent invites** — Accept / Decline buttons
 - **Active workspace memberships** — with Leave button (blocked if sole admin)
 
 ### `/me/settings`
 
 Client component with four sections:
+
 - **Profile** — update display name
 - **Password** — change with current password verification
 - **API Tokens** — create named tokens (plain token shown once), revoke existing
@@ -315,6 +332,7 @@ All routes require a valid session cookie AND admin membership of the workspace.
 ### `/ws` — Workspace picker
 
 Always accessible to authenticated users (never auto-redirects). Shows:
+
 - **Active workspaces** — clickable cards
 - **Archived workspaces** — greyed out with "Archived" badge (still accessible)
 - **Big "+" create button** — always visible, opens the workspace creation form inline
@@ -322,6 +340,7 @@ Always accessible to authenticated users (never auto-redirects). Shows:
 ### `/ws/:slug/people` — People tab
 
 Server + client split. Features:
+
 - **Member list** — all statuses (active, invite sent, declined), avatar initials, role badge
 - **Status badges:** Active (teal), Invite sent (amber), Declined (red)
 - **Invite form** — send consent email to any address; shows error if already an active member
@@ -330,6 +349,7 @@ Server + client split. Features:
 ### `/ws/:slug/settings` — Settings tab
 
 Full client component (uses `useParams` + `useCallback`). Two sections:
+
 - **Workspace details** — edit name + timezone (PATCH `/api/ws/:slug`)
 - **Email domain verification** — add domains, view DNS TXT records with copy buttons, check DNS verification status
 
@@ -369,6 +389,7 @@ After login, `/join/:slug` detects `pending_consent` status and shows Accept/Dec
 ### In-app (logged-in users)
 
 If a user visits `/join/:slug` directly:
+
 - **Active** → redirected to `/me`
 - **Pending consent** → shows Accept/Decline buttons (calls `POST /api/me/consent`)
 - **Domain match** → auto-enrolled without explicit consent needed
@@ -379,6 +400,7 @@ If a user visits `/join/:slug` directly:
 Server-rendered. Shows who is present right now, who visited today, and who hasn't checked in yet — all in the workspace's configured timezone.
 
 **Data flow:**
+
 1. Resolves workspace from slug, verifies admin membership
 2. Computes today's UTC bounds using `todayInTz(tz)` + `localMidnightToUtc()`
 3. Calls `queryWorkspaceEvents()` — applies plan history gate + signal matching
@@ -386,6 +408,7 @@ Server-rendered. Shows who is present right now, who visited today, and who hasn
 5. Groups by: **In office now** (open event) | **Visited today** (all checked out) | **Not in** (no events)
 
 **Layout:**
+
 - Sticky header: `CheckMark / Workspace Name` + `Personal →` link
 - Nav tabs: `Today` | `People` | `Settings`
 - Stat chips: in office · visited · not in · total members
@@ -393,13 +416,13 @@ Server-rendered. Shows who is present right now, who visited today, and who hasn
 
 **Signal badges:**
 
-| Badge | Colour | Meaning |
-|---|---|---|
-| WiFi | Teal | Matched by WiFi SSID |
-| GPS | Brand blue | Matched by GPS proximity |
-| IP | Amber | Matched by IP geolocation |
-| Override | Purple | Admin override applied |
-| — | Muted | Config-light mode (no signals configured) |
+| Badge    | Colour     | Meaning                                   |
+| -------- | ---------- | ----------------------------------------- |
+| WiFi     | Teal       | Matched by WiFi SSID                      |
+| GPS      | Brand blue | Matched by GPS proximity                  |
+| IP       | Amber      | Matched by IP geolocation                 |
+| Override | Purple     | Admin override applied                    |
+| —        | Muted      | Config-light mode (no signals configured) |
 
 ---
 
@@ -417,15 +440,26 @@ The `<meta name="apple-mobile-web-app-capable">` tag is set via `appleWebApp` in
 
 ---
 
-## Landing Page
+## Marketing Site
 
 `/` — static, publicly accessible. Features:
+
 - Sticky nav: CheckMark wordmark + Sign in / Get started links
 - Hero: headline, subheadline, two CTAs (both route to `/login`)
 - Feature grid (4 cards): who's in today, privacy by design, verified domains, multiple signals
 - Footer
 
-No JavaScript required — fully server-rendered React.
+All pages are fully static Server Components — no JavaScript required. All share `MarketingNav` (sticky, glass-blur, centre links, Sign in / Get started) and `MarketingFooter`.
+
+| Page        | Route          | Contents                                                                                                                                                |
+| ----------- | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Landing     | `/`            | Hero (phone + dashboard mockup), For Orgs (hybrid / field), For Individuals, How it works (teams / you), pricing preview (3 cards), open source section |
+| For Teams   | `/for-teams`   | Hero, two team types (hybrid office / field force), triple-signal verification, 5-step setup walkthrough, CTA                                           |
+| For You     | `/for-you`     | Hero, 6 feature cards, "works with any employer" section, privacy plain-language section, CTA                                                           |
+| Pricing     | `/pricing`     | 3 plan cards with feature matrix (free ✓ / — per item), individuals callout, 6-item FAQ                                                                 |
+| Open Source | `/open-source` | What's open source (4 items), what we run as a service (5 items), 4-step self-host guide with code blocks, GitHub CTA                                   |
+| Privacy     | `/privacy`     | Full policy: data table, who can see data, retention (7 years), consent model, your rights (6 items), security, contact                                 |
+| Terms       | `/terms`       | Full terms: acceptable use, org admin responsibilities, no warranty on signal accuracy, limitation of liability, governing law                          |
 
 ---
 
@@ -433,18 +467,19 @@ No JavaScript required — fully server-rendered React.
 
 Single entry point for all authentication. A 6-state client state machine:
 
-| State | Description |
-|---|---|
-| `email` | Enter email — checks existence via `/api/auth/check-email` |
-| `password` | Existing user — enter password |
-| `otp` | New user — enter 6-digit code sent to email |
-| `accountType` | OTP verified — choose Personal or Organisation |
-| `personal` | Enter name + password |
-| `org` | Enter org name, URL handle (live `/ws/check-slug` check), optional domain, name + password |
+| State         | Description                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------ |
+| `email`       | Enter email — checks existence via `/api/auth/check-email`                                 |
+| `password`    | Existing user — enter password                                                             |
+| `otp`         | New user — enter 6-digit code sent to email                                                |
+| `accountType` | OTP verified — choose Personal or Organisation                                             |
+| `personal`    | Enter name + password                                                                      |
+| `org`         | Enter org name, URL handle (live `/ws/check-slug` check), optional domain, name + password |
 
 **OTP security:** After verify, a 15-minute signed `cm_otp_ok` httpOnly cookie is set server-side. The register route validates this cookie — the client never sends `otpVerified: true`.
 
 **Resend not configured?** OTPs are printed to the server console in dev:
+
 ```
 [DEV] OTP for user@example.com: 481923
 ```
@@ -454,10 +489,13 @@ Single entry point for all authentication. A 6-state client state machine:
 ## Key Library Modules
 
 ### `lib/db/index.ts`
+
 Single `db` object with `query`, `queryOne`, `execute`, `transaction`. Switches backend via `DATABASE_URL` env var. All app code uses this — never imports SQLite or Postgres directly.
 
 ### `lib/signals.ts` — `queryWorkspaceEvents()`
+
 The core dashboard function. Given a workspace and date range:
+
 1. Gets active member user IDs (honours plan user limit)
 2. Gets signal configs (GPS / WiFi / IP)
 3. If **no signal configs**: returns all events (config-light mode)
@@ -465,32 +503,40 @@ The core dashboard function. Given a workspace and date range:
 5. Returns each event with a `matched_by` field: `wifi | gps | ip | none | override`
 
 ### `lib/domain-verify.ts`
+
 - `domainVerifyToken(workspaceId, domain)` — deterministic HMAC-SHA256 token (first 32 hex chars)
 - `checkDnsVerification(domain, token)` — resolves `_checkmark-verify.{domain}` TXT records, returns `boolean`
 
 ### `lib/ws-admin.ts`
+
 - `requireWsAdmin(request, slug)` — reads `x-user-id` header, validates workspace + admin+active membership. Returns `{ workspace, userId }` or `null`.
 
 ### `lib/stats.ts` — `updateUserStats()`
+
 Called after every check-in. Computes:
+
 - Streak (consecutive days with ≥1 check-in)
 - Total check-ins and hours
 - This month's check-ins
 - Distinct GPS clusters this month (500m radius)
 
 ### `lib/geo.ts`
+
 - `getIpGeo(ip)` — calls ip-api.com (free, no key, 45 req/min limit). Returns `null` for localhost/private IPs in dev.
 - `haversineMetres(lat1, lng1, lat2, lng2)` — great-circle distance in metres
 - `extractIp(request)` — reads `x-forwarded-for` or `x-real-ip`
 
 ### `lib/timezone.ts`
+
 All times stored as UTC in the DB. These helpers convert for display:
+
 - `formatInTz(utcStr, tz, 'time'|'date'|'datetime')`
 - `monthBoundsUtc(year, month, tz)` — returns UTC start/end for a calendar month in a timezone
 - `todayInTz(tz)` — today's date string `YYYY-MM-DD` in a given timezone
 - `localMidnightToUtc(dateStr, tz)` — converts a local date to UTC ISO
 
 ### `lib/auth.ts`
+
 - `createJwt` / `verifyJwt` — session tokens
 - `setSessionCookie` / `clearSessionCookie` / `getSessionFromCookies`
 - `setOtpVerifiedCookie(email)` — 15-min signed JWT in `cm_otp_ok` cookie
@@ -503,15 +549,15 @@ All times stored as UTC in the DB. These helpers convert for display:
 
 `src/proxy.ts` runs on every matched request via Next.js 16 Edge middleware (Next.js 16 uses `proxy.ts` natively instead of `middleware.ts`):
 
-| Path | Requirement |
-|---|---|
-| `/me/*` | Valid JWT cookie → redirect to `/login` if missing |
-| `/ws/*` | Valid JWT cookie → redirect to `/login` if missing (admin role checked per-route) |
-| `/api/*` (non-public) | Valid JWT cookie → 401 if missing |
-| `/api/v1/*` | Bearer token (handled inside route handlers) |
-| `/api/auth/*` | Public — no auth required |
-| `/api/auth/check-email` | Public — no auth required |
-| `/api/workspace/check-slug` | Public — no auth required |
+| Path                        | Requirement                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------- |
+| `/me/*`                     | Valid JWT cookie → redirect to `/login` if missing                                |
+| `/ws/*`                     | Valid JWT cookie → redirect to `/login` if missing (admin role checked per-route) |
+| `/api/*` (non-public)       | Valid JWT cookie → 401 if missing                                                 |
+| `/api/v1/*`                 | Bearer token (handled inside route handlers)                                      |
+| `/api/auth/*`               | Public — no auth required                                                         |
+| `/api/auth/check-email`     | Public — no auth required                                                         |
+| `/api/workspace/check-slug` | Public — no auth required                                                         |
 
 The middleware verifies the JWT signature (Edge-compatible via `jose`). Token revocation (SQLite) is checked in `getSessionFromCookies()` which runs in Node.js server components and route handlers.
 
@@ -552,15 +598,15 @@ Shows all pending consent invites (Accept / Decline) and active workspace member
 
 **Settings — `/me/settings`**
 
-| Section | What it does |
-|---|---|
-| Profile | Update display name |
-| Email | 2-step change: enter new email → OTP sent to new address → verify code → email updated (synced in `workspace_members` too) |
-| Password | Verify current password, set new one (8-char minimum enforced server-side) |
-| API Tokens | Create named tokens for `POST /api/v1/checkin` Bearer auth. Token shown once in plaintext, stored as bcrypt hash. |
-| Organisation | Link to create a workspace |
-| Sign out | `POST /api/auth/logout` → jti revoked in DB → cookie cleared |
-| Danger zone | Soft-deactivates account (`deleted_at` stamped). Data preserved. Reactivate by logging back in. |
+| Section      | What it does                                                                                                               |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| Profile      | Update display name                                                                                                        |
+| Email        | 2-step change: enter new email → OTP sent to new address → verify code → email updated (synced in `workspace_members` too) |
+| Password     | Verify current password, set new one (8-char minimum enforced server-side)                                                 |
+| API Tokens   | Create named tokens for `POST /api/v1/checkin` Bearer auth. Token shown once in plaintext, stored as bcrypt hash.          |
+| Organisation | Link to create a workspace                                                                                                 |
+| Sign out     | `POST /api/auth/logout` → jti revoked in DB → cookie cleared                                                               |
+| Danger zone  | Soft-deactivates account (`deleted_at` stamped). Data preserved. Reactivate by logging back in.                            |
 
 ---
 
@@ -575,6 +621,7 @@ After login: 1 workspace → redirected directly to `/ws/:slug`. 2+ workspaces �
 The core admin view. Client fetches from `GET /api/ws/:slug/dashboard` (admin-only).
 
 What the dashboard query does:
+
 1. Resolves workspace from slug, validates you are an active admin
 2. Computes today's date in the workspace's configured timezone (e.g. 00:00–23:59 IST → equivalent UTC bounds)
 3. Calls `queryWorkspaceEvents(workspace.id, plan, { startDate, endDate })`:
@@ -601,59 +648,61 @@ All members: active, invited, declined. Invite by email → consent email sent. 
 
 ### What the DB records for each action
 
-| Action | Tables written |
-|---|---|
-| Register personal | `users`, `otp_codes` |
-| Register org | `users`, `workspaces`, `workspace_members`, `workspace_domains` |
-| Check in | `presence_events` (insert), `user_stats` (upsert), `presence_events.location_label` (async update) |
-| Check out | `presence_events` (stamp `checkout_at` + `checkout_reason` + checkout signals) |
-| Dashboard query | Read-only: `workspace_members`, `presence_events`, `workspace_signal_config`, `admin_overrides` |
-| Invite member | `workspace_members` (upsert with consent token + expiry) |
-| Accept invite | `workspace_members` (status → active, link `user_id`) |
-| Verify domain | `workspace_domains` (`verified_at`, scoped to `workspace_id`), `workspace_members` (auto-enroll matching users) |
-| Logout | `revoked_tokens` (insert jti + expiry), cookie deleted |
-| Deactivate account | `users.deleted_at` stamped; cookie cleared |
+| Action             | Tables written                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Register personal  | `users`, `otp_codes`                                                                                            |
+| Register org       | `users`, `workspaces`, `workspace_members`, `workspace_domains`                                                 |
+| Check in           | `presence_events` (insert), `user_stats` (upsert), `presence_events.location_label` (async update)              |
+| Check out          | `presence_events` (stamp `checkout_at` + `checkout_reason` + checkout signals)                                  |
+| Dashboard query    | Read-only: `workspace_members`, `presence_events`, `workspace_signal_config`, `admin_overrides`                 |
+| Invite member      | `workspace_members` (upsert with consent token + expiry)                                                        |
+| Accept invite      | `workspace_members` (status → active, link `user_id`)                                                           |
+| Verify domain      | `workspace_domains` (`verified_at`, scoped to `workspace_id`), `workspace_members` (auto-enroll matching users) |
+| Logout             | `revoked_tokens` (insert jti + expiry), cookie deleted                                                          |
+| Deactivate account | `users.deleted_at` stamped; cookie cleared                                                                      |
 
 ---
 
 ### Security properties at a glance
 
-| Concern | Mechanism |
-|---|---|
-| **Session auth** | JWT (HS256, 30-day expiry), unique `jti` per token, stored in `httpOnly; SameSite=Strict` cookie |
-| **Logout invalidation** | `jti` inserted into `revoked_tokens` on logout; `getSessionFromCookies()` checks revocation on every server-component/route-handler request |
-| **CSRF** | `SameSite=Strict` — cross-origin requests cannot attach the session cookie |
-| **Password storage** | bcrypt at cost 12. Minimum 8 chars enforced server-side on both registration and password change. Never stored in plaintext. |
-| **WiFi SSID storage** | bcrypt hash — raw SSID never persisted, cannot be reversed |
-| **OTP brute force** | 5-attempt lockout per code; max 3 sends per email per hour |
-| **Reserved slugs** | 20+ blocked names (api, admin, me, ws, etc.) at the `check-slug` API level |
-| **Consent token hijacking** | Three-layer validation: status must be `pending_consent`, token must not be expired, logged-in email must match invited email |
+| Concern                     | Mechanism                                                                                                                                                                                                                                                                                              |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Session auth**            | JWT (HS256, 30-day expiry), unique `jti` per token, stored in `httpOnly; SameSite=Strict` cookie                                                                                                                                                                                                       |
+| **Logout invalidation**     | `jti` inserted into `revoked_tokens` on logout; `getSessionFromCookies()` checks revocation on every server-component/route-handler request                                                                                                                                                            |
+| **CSRF**                    | `SameSite=Strict` — cross-origin requests cannot attach the session cookie                                                                                                                                                                                                                             |
+| **Password storage**        | bcrypt at cost 12. Minimum 8 chars enforced server-side on both registration and password change. Never stored in plaintext.                                                                                                                                                                           |
+| **WiFi SSID storage**       | bcrypt hash — raw SSID never persisted, cannot be reversed                                                                                                                                                                                                                                             |
+| **OTP brute force**         | 5-attempt lockout per code; max 3 sends per email per hour                                                                                                                                                                                                                                             |
+| **Reserved slugs**          | 20+ blocked names (api, admin, me, ws, etc.) at the `check-slug` API level                                                                                                                                                                                                                             |
+| **Consent token hijacking** | Three-layer validation: status must be `pending_consent`, token must not be expired, logged-in email must match invited email                                                                                                                                                                          |
 | **Cross-workspace leakage** | All mutations scoped by `workspace_id` at the DB level. `requireWsAdmin` resolves slug → `workspace.id`, validates admin role on that ID, passes `ctx.workspace.id` to every subsequent query. `markDomainVerified` and `deleteSignalConfig` both require matching `workspace_id` in the WHERE clause. |
-| **Event ownership** | `getEventByIdForUser(eventId, userId)` — DB query enforces `user_id = ?` directly; no caller can skip the ownership check. `GET /api/events` never accepts `userId` from query params — always from the validated JWT. |
-| **Domain uniqueness** | Domains already verified by another workspace are blocked (409 `DOMAIN_CLAIMED`) |
-| **Soft delete** | `users.deleted_at` — data preserved; all active-user queries filter `AND deleted_at IS NULL`. API tokens checked against active user status in `POST /api/v1/checkin`. |
+| **Event ownership**         | `getEventByIdForUser(eventId, userId)` — DB query enforces `user_id = ?` directly; no caller can skip the ownership check. `GET /api/events` never accepts `userId` from query params — always from the validated JWT.                                                                                 |
+| **Domain uniqueness**       | Domains already verified by another workspace are blocked (409 `DOMAIN_CLAIMED`)                                                                                                                                                                                                                       |
+| **Soft delete**             | `users.deleted_at` — data preserved; all active-user queries filter `AND deleted_at IS NULL`. API tokens checked against active user status in `POST /api/v1/checkin`.                                                                                                                                 |
 
 ---
 
 ## API Reference
 
 All routes return JSON. Errors always return:
+
 ```json
 { "error": "Human-readable message", "code": "MACHINE_READABLE_CODE" }
 ```
 
 ### Auth
 
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| POST | `/api/auth/check-email` | None | Check if email has an account |
-| POST | `/api/auth/login` | None | Email check or password verify |
-| POST | `/api/auth/otp/send` | None | Send 6-digit OTP to email |
-| POST | `/api/auth/otp/verify` | None | Verify OTP — sets `cm_otp_ok` cookie |
-| POST | `/api/auth/register` | OTP cookie | Create account (personal or org) |
-| POST | `/api/auth/logout` | Cookie | Clear session cookie |
+| Method | Route                   | Auth       | Description                          |
+| ------ | ----------------------- | ---------- | ------------------------------------ |
+| POST   | `/api/auth/check-email` | None       | Check if email has an account        |
+| POST   | `/api/auth/login`       | None       | Email check or password verify       |
+| POST   | `/api/auth/otp/send`    | None       | Send 6-digit OTP to email            |
+| POST   | `/api/auth/otp/verify`  | None       | Verify OTP — sets `cm_otp_ok` cookie |
+| POST   | `/api/auth/register`    | OTP cookie | Create account (personal or org)     |
+| POST   | `/api/auth/logout`      | Cookie     | Clear session cookie                 |
 
 #### `POST /api/auth/check-email`
+
 ```json
 // Request
 { "email": "user@example.com" }
@@ -665,6 +714,7 @@ All routes return JSON. Errors always return:
 #### `POST /api/auth/login`
 
 **Step 1 — check if email exists:**
+
 ```json
 // Request
 { "email": "user@example.com" }
@@ -674,6 +724,7 @@ All routes return JSON. Errors always return:
 ```
 
 **Step 2 — verify password:**
+
 ```json
 // Request
 { "email": "user@example.com", "password": "mypassword" }
@@ -686,6 +737,7 @@ All routes return JSON. Errors always return:
 ```
 
 #### `POST /api/auth/otp/send`
+
 ```json
 // Request
 { "email": "newuser@example.com" }
@@ -698,6 +750,7 @@ All routes return JSON. Errors always return:
 ```
 
 #### `POST /api/auth/otp/verify`
+
 ```json
 // Request
 { "email": "newuser@example.com", "code": "481923" }
@@ -710,6 +763,7 @@ All routes return JSON. Errors always return:
 ```
 
 #### `POST /api/auth/register`
+
 ```json
 // Personal account
 {
@@ -736,11 +790,12 @@ All routes return JSON. Errors always return:
 
 ### Workspace
 
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| POST | `/api/workspace/check-slug` | None | Check slug availability |
+| Method | Route                       | Auth | Description             |
+| ------ | --------------------------- | ---- | ----------------------- |
+| POST   | `/api/workspace/check-slug` | None | Check slug availability |
 
 #### `POST /api/workspace/check-slug`
+
 ```json
 // Request
 { "slug": "acme-corp" }
@@ -753,18 +808,19 @@ All routes return JSON. Errors always return:
 
 All routes require session cookie + admin membership of the workspace.
 
-| Method | Route | Description |
-|---|---|---|
-| PATCH | `/api/ws/:slug` | Update workspace name and/or timezone |
-| GET | `/api/ws/:slug/domain` | List domains (with verify token if unverified) |
-| POST | `/api/ws/:slug/domain` | Add a domain |
-| DELETE | `/api/ws/:slug/domain/:id` | Remove a domain |
-| POST | `/api/ws/:slug/domain/:id/verify` | Trigger DNS TXT verification |
-| GET | `/api/ws/:slug/members` | List all members (all statuses) |
-| POST | `/api/ws/:slug/members` | Invite member (sends consent email) |
-| DELETE | `/api/ws/:slug/members/:id` | Remove member (blocked for admins) |
+| Method | Route                             | Description                                    |
+| ------ | --------------------------------- | ---------------------------------------------- |
+| PATCH  | `/api/ws/:slug`                   | Update workspace name and/or timezone          |
+| GET    | `/api/ws/:slug/domain`            | List domains (with verify token if unverified) |
+| POST   | `/api/ws/:slug/domain`            | Add a domain                                   |
+| DELETE | `/api/ws/:slug/domain/:id`        | Remove a domain                                |
+| POST   | `/api/ws/:slug/domain/:id/verify` | Trigger DNS TXT verification                   |
+| GET    | `/api/ws/:slug/members`           | List all members (all statuses)                |
+| POST   | `/api/ws/:slug/members`           | Invite member (sends consent email)            |
+| DELETE | `/api/ws/:slug/members/:id`       | Remove member (blocked for admins)             |
 
 #### `POST /api/ws/:slug/members`
+
 ```json
 // Request
 { "email": "colleague@company.com" }
@@ -777,6 +833,7 @@ All routes require session cookie + admin membership of the workspace.
 ```
 
 #### `POST /api/ws/:slug/domain/:id/verify`
+
 ```json
 // Response (verified)
 { "verified": true, "message": "Domain verified" }
@@ -791,24 +848,26 @@ All routes require session cookie + admin membership of the workspace.
 
 CSS variables (defined in `src/app/globals.css`):
 
-| Variable | Value | Use |
-|---|---|---|
-| `--brand` | `#1B4DFF` | Primary buttons, links |
-| `--navy` | `#0D1B2A` | Headings, dark text |
-| `--teal` | `#00D4AA` | "Present" status badge |
-| `--amber` | `#F59E0B` | Warnings |
-| `--danger` | `#EF4444` | Errors, destructive actions |
-| `--surface-0` | `#FFFFFF` | Card backgrounds |
-| `--surface-1` | `#F8FAFC` | Page backgrounds |
-| `--surface-2` | `#F1F5F9` | Input backgrounds |
-| `--border` | `#E2E8F0` | All borders |
+| Variable      | Value     | Use                         |
+| ------------- | --------- | --------------------------- |
+| `--brand`     | `#1B4DFF` | Primary buttons, links      |
+| `--navy`      | `#0D1B2A` | Headings, dark text         |
+| `--teal`      | `#00D4AA` | "Present" status badge      |
+| `--amber`     | `#F59E0B` | Warnings                    |
+| `--danger`    | `#EF4444` | Errors, destructive actions |
+| `--surface-0` | `#FFFFFF` | Card backgrounds            |
+| `--surface-1` | `#F8FAFC` | Page backgrounds            |
+| `--surface-2` | `#F1F5F9` | Input backgrounds           |
+| `--border`    | `#E2E8F0` | All borders                 |
 
 Fonts loaded via Google Fonts:
+
 - **Headings:** Syne (400, 600, 700)
 - **Body:** DM Sans (400, 500)
 - **Code / timestamps:** JetBrains Mono (400)
 
 Design rules:
+
 - No drop shadows — use borders only
 - No gradients — flat solid fills
 - Minimum touch target: 44px height
@@ -818,12 +877,10 @@ Design rules:
 
 ## Environment Variables Reference
 
-| Variable | Required | Description |
-|---|---|---|
-| `TURSO_DATABASE_URL` | No (dev) | Turso URL for production. Empty → uses SQLite. |
-| `TURSO_AUTH_TOKEN` | No (dev) | Turso Auth Token for production. Empty → dev env |
-| `JWT_SECRET` | **Yes** | Random 32+ char string for JWT signing |
-| `RESEND_API_KEY` | Recommended | From resend.com. OTPs log to console if missing. |
-| `NEXT_PUBLIC_APP_URL` | Yes | Full app URL (`http://localhost:3000` in dev) |
-
-
+| Variable              | Required    | Description                                      |
+| --------------------- | ----------- | ------------------------------------------------ |
+| `TURSO_DATABASE_URL`  | No (dev)    | Turso URL for production. Empty → uses SQLite.   |
+| `TURSO_AUTH_TOKEN`    | No (dev)    | Turso Auth Token for production. Empty → dev env |
+| `JWT_SECRET`          | **Yes**     | Random 32+ char string for JWT signing           |
+| `RESEND_API_KEY`      | Recommended | From resend.com. OTPs log to console if missing. |
+| `NEXT_PUBLIC_APP_URL` | Yes         | Full app URL (`http://localhost:3000` in dev)    |
