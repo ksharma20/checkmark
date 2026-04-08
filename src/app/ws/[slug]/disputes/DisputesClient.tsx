@@ -297,7 +297,7 @@ function EventRow({
         </div>
         {ev.note && (
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
-            &ldquo;{ev.note}&rdquo;
+            {ev.note}
           </p>
         )}
       </div>

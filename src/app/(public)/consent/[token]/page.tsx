@@ -19,10 +19,36 @@ function ResultCard({ title, body, cta }: { title: string; body: string; cta?: R
         justifyContent: 'center',
         background: 'var(--surface-1)',
         padding: '24px 16px',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
+      {/* Radial glow */}
+      <div style={{
+        pointerEvents: 'none',
+        position: 'absolute',
+        left: '50%',
+        top: '-10%',
+        width: '700px',
+        height: '500px',
+        transform: 'translateX(-50%)',
+        background: 'radial-gradient(ellipse at center, rgba(27,77,255,0.09) 0%, transparent 70%)',
+        zIndex: 0,
+      }} />
+      {/* Grid pattern */}
+      <div style={{
+        pointerEvents: 'none',
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: 'linear-gradient(rgba(27,77,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(27,77,255,0.04) 1px, transparent 1px)',
+        backgroundSize: '60px 60px',
+        maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%)',
+        zIndex: 0,
+      }} />
       <div
         style={{
+          position: 'relative',
+          zIndex: 1,
           width: '100%',
           maxWidth: '420px',
           background: 'var(--surface-0)',
@@ -30,11 +56,10 @@ function ResultCard({ title, body, cta }: { title: string; body: string; cta?: R
           borderRadius: 'var(--radius-lg)',
           padding: '32px 28px',
           textAlign: 'center',
+          boxShadow: '0 0 40px rgba(27,77,255,0.08)',
         }}
       >
-        <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--brand)', marginBottom: '24px' }}>
-          {en.consent.brandLogo}
-        </p>
+        <img src="/logo.png" alt="CheckMark" style={{ height: '42px', width: 'auto', marginBottom: '24px' }} />
         <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '20px', fontWeight: 700, color: 'var(--navy)', marginBottom: '8px' }}>
           {title}
         </h1>

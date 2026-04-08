@@ -54,27 +54,42 @@ function fmtDate(d: string): string {
   return `${parseInt(day)} ${months[parseInt(m) - 1]} ${y}`
 }
 
-function StatChip({ label, value, sub }: { label: string; value: string | number; sub?: string }) {
+function StatChip({ label, value, sub, icon }: { label: string; value: string | number; sub?: string; icon: React.ReactNode }) {
   return (
     <div style={{
       background: 'var(--surface-0)',
       border: '1px solid var(--border)',
       borderRadius: 'var(--radius-md)',
-      padding: '14px 18px',
+      padding: '16px 18px',
       flex: '1 1 120px',
-      minWidth: '100px',
+      minWidth: '110px',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '10px',
     }}>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '4px' }}>
-        {label}
-      </p>
-      <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--navy)', lineHeight: 1 }}>
-        {value}
-      </p>
-      {sub && (
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
-          {sub}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+          {label}
         </p>
-      )}
+        <div style={{
+          width: '30px', height: '30px', borderRadius: '8px',
+          background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          color: 'var(--brand)',
+        }}>
+          {icon}
+        </div>
+      </div>
+      <div>
+        <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '24px', fontWeight: 700, color: 'var(--navy)', lineHeight: 1 }}>
+          {value}
+        </p>
+        {sub && (
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+            {sub}
+          </p>
+        )}
+      </div>
     </div>
   )
 }
@@ -129,7 +144,7 @@ function MemberCard({ m, workingDays, signalsConfigured }: { m: AnalyticsMember;
             {fmtHours(m.total_hours)}
           </div>
           <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
-            {fmtHours(m.avg_daily_hours)} avg
+            {m.avg_daily_hours}h avg
           </div>
         </div>
       </div>
@@ -174,12 +189,12 @@ function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; 
       display: 'grid',
       gridTemplateColumns: signalsConfigured
         ? '200px 1fr 1fr 1fr 90px 90px'
-        : '200px 1fr 1fr 90px',
+        : '200px 1fr 1fr 90px 90px',
       gap: '16px',
       alignItems: 'center',
       padding: '14px 16px',
       borderBottom: '1px solid var(--border)',
-      minWidth: signalsConfigured ? '720px' : '520px',
+      minWidth: signalsConfigured ? '720px' : '620px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
         <div style={{
@@ -252,11 +267,11 @@ function TableHeader({ signalsConfigured }: { signalsConfigured: boolean }) {
       display: 'grid',
       gridTemplateColumns: signalsConfigured
         ? '200px 1fr 1fr 1fr 90px 90px'
-        : '200px 1fr 1fr 90px',
+        : '200px 1fr 1fr 90px 90px',
       gap: '16px',
       padding: '10px 16px',
       borderBottom: '1px solid var(--border)',
-      minWidth: signalsConfigured ? '720px' : '520px',
+      minWidth: signalsConfigured ? '720px' : '620px',
     }}>
       <p style={labelStyle}>Member</p>
       {signalsConfigured && <p style={labelStyle}>Office</p>}
@@ -373,14 +388,35 @@ export default function AnalyticsClient({ slug }: Props) {
       {/* Summary chips */}
       {data && (
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <StatChip label="Members" value={data.members.length} sub="in workspace" />
+          <StatChip label="Members" value={data.members.length} sub="in workspace" icon={
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+          } />
           {data.signals_configured ? (
-            <StatChip label="Office days" value={totalOfficeDays} sub="total across team" />
+            <StatChip label="Office days" value={totalOfficeDays} sub="total across team" icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
+              </svg>
+            } />
           ) : (
-            <StatChip label="Check-ins" value={data.members.reduce((s, m) => s + m.office_days + m.wfh_days, 0)} sub="total across team" />
+            <StatChip label="Check-ins" value={data.members.reduce((s, m) => s + m.office_days + m.wfh_days, 0)} sub="total across team" icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            } />
           )}
-          <StatChip label="Hours tracked" value={fmtHours(totalHours)} sub="total logged" />
-          <StatChip label="Avg days" value={avgAttendance} sub="attended per person" />
+          <StatChip label="Hours tracked" value={fmtHours(totalHours)} sub="total logged" icon={
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+          } />
+          <StatChip label="Avg days" value={avgAttendance} sub="attended per person" icon={
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
+          } />
         </div>
       )}
 

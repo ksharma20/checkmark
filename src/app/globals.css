@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700&family=DM+Sans:wght@400;500&family=JetBrains+Mono:wght@400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Syne:wght@400;500;600;700;800&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -15,15 +15,26 @@
   --text-secondary:  #64748B;
   --text-muted:      #94A3B8;
   --border:          #E2E8F0;
+  --header-bg:       #0D1B2A;
   --radius-sm:       6px;
   --radius-md:       10px;
   --radius-lg:       16px;
+  --checkmark-brand: #1B4DFF;
+  --brand-dim:       #1640E0;
+  --brand-glow:      rgba(27,77,255,0.18);
+  --bg-dark:         #0D1B2A;
+  --bg-card:         #1A2635;
+  --bg-card2:        #1E2D3D;
+  --checkmark-text:     #F1F5F9;
+  --checkmark-muted:    #94A3B8;
+  --checkmark-border:   rgba(27,77,255,0.15);
 }
 
 @theme inline {
   --color-brand:          var(--brand);
   --color-brand-hover:    var(--brand-hover);
   --color-navy:           var(--navy);
+  --color-header-bg:      var(--header-bg);
   --color-teal:           var(--teal);
   --color-amber:          var(--amber);
   --color-danger:         var(--danger);
@@ -37,6 +48,23 @@
   --font-heading:         'Syne', sans-serif;
   --font-body:            'DM Sans', sans-serif;
   --font-mono:            'JetBrains Mono', monospace;
+  --font-dm-sans:         'DM Sans', sans-serif;
+  --font-syne:            'Syne', sans-serif;
+  --color-checkmark-brand:   var(--checkmark-brand);
+  --color-checkmark-brand-dim: var(--brand-dim);
+  --color-checkmark-brand-glow: var(--brand-glow);
+  --color-checkmark-bg-dark: var(--bg-dark);
+  --color-checkmark-bg-card: var(--bg-card);
+  --color-checkmark-bg-card2: var(--bg-card2);
+  --color-checkmark-text:    var(--checkmark-text);
+  --color-checkmark-text-muted: var(--checkmark-muted);
+  --color-checkmark-border:  var(--checkmark-border);
+  --animate-fade-up:      fadeUp 0.8s ease both;
+  --animate-fade-down:    fadeDown 0.7s ease both;
+  --animate-float:        float 8s ease-in-out infinite;
+  --animate-pulse-dot:    pulseDot 2s infinite;
+  --animate-marquee:      marquee 28s linear infinite;
+  --animate-ind-fade-in:  indFadeIn 0.35s ease both;
 }
 
 * {
@@ -82,6 +110,21 @@ code, pre, .mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
+/* ── Dark theme — authenticated app pages ─────────────────────────────── */
+.vz-dark {
+  --surface-0:      #1A2635;
+  --surface-1:      #0D1B2A;
+  --surface-2:      #132131;
+  --text-primary:   #F1F5F9;
+  --text-secondary: #94A3B8;
+  --text-muted:     #64748B;
+  --border:         rgba(27, 77, 255, 0.2);
+  --brand:          #1B4DFF;
+  --brand-hover:    #1640E0;
+  --navy:           #F1F5F9;
+  color-scheme: dark;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.45; }
@@ -92,6 +135,165 @@ code, pre, .mono {
   100% { background-position: 600px 0; }
 }
 
-@keyframes cm-spin {
-  to { transform: rotate(360deg); }
+.reveal {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(28px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeDown {
+  from { opacity: 0; transform: translateY(-16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-30px) scale(1.04); }
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+@keyframes lineReveal {
+  to { transform: scaleX(1); }
+}
+
+@keyframes pinDrop {
+  0% { transform: translateY(-120px) scaleY(0.7); opacity: 0; }
+  60% { transform: translateY(8px) scaleY(1.05); opacity: 1; }
+  80% { transform: translateY(-4px) scaleY(0.97); }
+  100% { transform: translateY(0) scaleY(1); opacity: 1; }
+}
+
+/* Looping drop — 2s cycle, pin lands at 40% (0.8s) */
+@keyframes pinDropLoop {
+  0%   { transform: translateY(-100px) scaleY(0.7); opacity: 0; }
+  25%  { transform: translateY(8px) scaleY(1.06); opacity: 1; }
+  33%  { transform: translateY(-3px) scaleY(0.98); opacity: 1; }
+  40%  { transform: translateY(0) scaleY(1); opacity: 1; }
+  73%  { transform: translateY(0) scaleY(1); opacity: 1; }
+  88%  { transform: translateY(-14px) scaleY(0.94); opacity: 0; }
+  100% { transform: translateY(-100px) scaleY(0.7); opacity: 0; }
+}
+
+/* Shadow synced to pinDropLoop */
+@keyframes shadowLoopSync {
+  0%   { transform: translateX(-50%) scaleX(0); opacity: 0; }
+  40%  { transform: translateX(-50%) scaleX(1); opacity: 1; }
+  73%  { transform: translateX(-50%) scaleX(1); opacity: 1; }
+  88%  { transform: translateX(-50%) scaleX(0); opacity: 0; }
+  100% { transform: translateX(-50%) scaleX(0); opacity: 0; }
+}
+
+@keyframes shadowScale {
+  0% { transform: translateX(-50%) scaleX(0); opacity: 0; }
+  100% { transform: translateX(-50%) scaleX(1); opacity: 1; }
+}
+
+@keyframes rippleOut {
+  0% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.5); }
+}
+
+@keyframes badgePop {
+  to { opacity: 1; transform: scale(1) translateX(0); }
+}
+
+/* Badge synced to pinDropLoop — same 2s cycle, starts 0.8s after pin (when it lands) */
+@keyframes badgeLoopSync {
+  0%   { opacity: 0; transform: scale(0.6) translateX(-6px); }
+  10%  { opacity: 1; transform: scale(1) translateX(0); }
+  68%  { opacity: 1; transform: scale(1) translateX(0); }
+  82%  { opacity: 0; transform: scale(0.85) translateX(-3px); }
+  100% { opacity: 0; transform: scale(0.6) translateX(-6px); }
+}
+
+/* Tags synced to pinDropLoop */
+@keyframes tagLoopSync {
+  0%   { opacity: 0; transform: translateY(8px); }
+  12%  { opacity: 1; transform: translateY(0); }
+  68%  { opacity: 1; transform: translateY(0); }
+  82%  { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 0; transform: translateY(8px); }
+}
+
+@keyframes pinJump {
+  0%   { transform: translateY(0) scaleY(1); }
+  4%   { transform: translateY(-18px) scaleY(1.08); }
+  8%   { transform: translateY(-22px) scaleY(1.1); }
+  12%  { transform: translateY(-8px) scaleY(0.96); }
+  14%  { transform: translateY(4px) scaleY(0.94); }
+  16%  { transform: translateY(-4px) scaleY(1.02); }
+  20%  { transform: translateY(0) scaleY(1); }
+  100% { transform: translateY(0) scaleY(1); }
+}
+
+@keyframes tagUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@keyframes indFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Page entrance animation ─────────────────────────── */
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0);     }
+}
+
+.page-enter {
+  animation: page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Button click effects ─────────────────────────────── */
+
+/* Ripple wave that expands from the tap point */
+@keyframes click-ripple {
+  0%   { transform: scale(0);    opacity: 1;   }
+  60%  { transform: scale(1);    opacity: 0.3; }
+  100% { transform: scale(1.15); opacity: 0;   }
+}
+
+.click-ripple {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  transform: scale(0);
+  transform-origin: center;
+  animation: click-ripple 0.52s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  will-change: transform, opacity;
+  z-index: 10;
+}
+
+/* Press-down brightness dip — fast in, fast out */
+button:not([disabled]):active,
+a[href]:active {
+  filter: brightness(0.86) !important;
+  transition: filter 0.07s ease !important;
+}
+
+button:not([disabled]),
+a[href] {
+  transition: filter 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
 }

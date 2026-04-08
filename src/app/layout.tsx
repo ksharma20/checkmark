@@ -3,6 +3,7 @@ import "./globals.css";
 import { en } from "@/locales/en";
 import SwRegister from "@/components/SwRegister";
 import TopProgressBar from "@/components/shared/TopProgressBar";
+import RippleProvider from "@/components/RippleProvider";
 
 export const metadata: Metadata = {
   title: `${en.brand.name} — ${en.brand.tagline}`,
@@ -29,6 +30,7 @@ export default function RootLayout({
       <body>
         <TopProgressBar />
         <SwRegister />
+        <RippleProvider />
         {children}
       </body>
     </html>

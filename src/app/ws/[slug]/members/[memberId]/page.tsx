@@ -260,6 +260,23 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
   );
 }
 
+function formatDayHeading(isoDate: string): string {
+  const d = new Date(isoDate);
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function groupByDay(events: EventWithMatch[]): { date: string; label: string; items: EventWithMatch[] }[] {
+  const map = new Map<string, EventWithMatch[]>();
+  for (const ev of events) {
+    const day = ev.checkin_at.slice(0, 10); // YYYY-MM-DD
+    if (!map.has(day)) map.set(day, []);
+    map.get(day)!.push(ev);
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([date, items]) => ({ date, label: formatDayHeading(date + 'T00:00:00'), items }));
+}
+
 export default function MemberDetailPage() {
   const { slug, memberId } = useParams<{ slug: string; memberId: string }>();
   const [data, setData] = useState<TimelineResponse | null>(null);
@@ -496,8 +513,60 @@ export default function MemberDetailPage() {
         </p>
       )}
 
-      {events.map((ev) => (
-        <EventRow key={ev.id} ev={ev} />
+      {groupByDay(events).map(({ date, label, items }) => (
+        <div key={date} style={{ marginBottom: '8px' }}>
+          {/* Day heading */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginBottom: '10px',
+              marginTop: '20px',
+            }}
+          >
+            <div
+              style={{
+                width: '3px',
+                height: '16px',
+                borderRadius: '2px',
+                background: 'var(--brand)',
+                flexShrink: 0,
+              }}
+            />
+            <span
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '13px',
+                fontWeight: 700,
+                color: 'var(--text-secondary)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {label}
+            </span>
+            <div
+              style={{
+                flex: 1,
+                height: '1px',
+                background: 'rgba(27,77,255,0.3)',
+              }}
+            />
+            <span
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '11px',
+                color: 'var(--text-muted)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {items.length} {items.length === 1 ? 'event' : 'events'}
+            </span>
+          </div>
+          {items.map((ev) => (
+            <EventRow key={ev.id} ev={ev} />
+          ))}
+        </div>
       ))}
 
       {pagination.pages > 1 && (

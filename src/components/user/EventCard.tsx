@@ -74,6 +74,20 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
             {duration}
           </span>
         )}
+
+        <span
+          style={{
+            marginLeft: 'auto',
+            fontSize: '11px',
+            fontFamily: 'DM Sans, sans-serif',
+            color: 'var(--brand)',
+            background: 'color-mix(in srgb, var(--brand) 10%, transparent)',
+            padding: '2px 8px',
+            borderRadius: '20px',
+          }}
+        >
+          {geoLabel}
+        </span>
       </div>
 
       {/* Note */}

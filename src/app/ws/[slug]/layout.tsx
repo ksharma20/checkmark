@@ -1,5 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import PageTransition from "@/components/PageTransition";
+import NavTabs from "@/components/ws/NavTabs";
 
 import { en } from "@/locales/en";
 import { getServerUser } from "@/lib/auth";
@@ -42,7 +44,7 @@ export default async function WsSlugLayout({ children, params }: Props) {
     >
       {/* PWA meta tags */}
       <link rel="manifest" href="/manifest-ws.json" />
-      <meta name="theme-color" content="#1B4DFF" />
+      <meta name="theme-color" content="#ffffff" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <meta
@@ -53,49 +55,37 @@ export default async function WsSlugLayout({ children, params }: Props) {
       {/* Sticky header */}
       <header
         style={{
-          background: "var(--surface-0)",
-          borderBottom: "1px solid var(--border)",
           position: "sticky",
           top: 0,
           zIndex: 50,
+          boxShadow: "0 1px 0 rgba(27,77,255,0.15)",
         }}
       >
-        {/* Brand / workspace row */}
+        {/* Brand / workspace row — dark navy */}
         <div
           style={{
             display: "flex",
             alignItems: "center",
             height: "52px",
             padding: "0 16px",
-            gap: "6px",
+            gap: "8px",
+            background: "var(--header-bg)",
           }}
         >
-          {/* Brand name — shrinks away on very small screens */}
-          <span
-            style={{
-              fontFamily: "Syne, sans-serif",
-              fontWeight: 700,
-              fontSize: "15px",
-              color: "var(--brand)",
-              flexShrink: 0,
-            }}
-          >
-            {en.brand.name}
-          </span>
+          <img
+            src="/logo.png"
+            alt="CheckMark"
+            style={{ height: "45px", width: "auto", flexShrink: 0 }}
+          />
 
-          <span
-            style={{ color: "var(--border)", fontSize: "14px", flexShrink: 0 }}
-          >
-            /
-          </span>
+          <span style={{ color: "rgba(27,77,255,0.4)", fontSize: "16px", flexShrink: 0 }}>|</span>
 
-          {/* Workspace name — takes remaining space, truncates */}
           <span
             style={{
               fontFamily: "Syne, sans-serif",
               fontWeight: 600,
               fontSize: "14px",
-              color: "var(--navy)",
+              color: "#F1F5F9",
               flex: 1,
               overflow: "hidden",
               textOverflow: "ellipsis",
@@ -105,25 +95,17 @@ export default async function WsSlugLayout({ children, params }: Props) {
             {workspace.name}
           </span>
 
-          {/* Action buttons — always visible, never pushed out */}
-          <div
-            style={{
-              display: "flex",
-              gap: "6px",
-              alignItems: "center",
-              flexShrink: 0,
-            }}
-          >
+          <div style={{ display: "flex", gap: "6px", alignItems: "center", flexShrink: 0 }}>
             <Link
               href="/ws"
               style={{
                 fontFamily: "DM Sans, sans-serif",
-                fontSize: "13px",
-                color: "var(--text-secondary)",
+                fontSize: "12px",
+                color: "rgba(241,245,249,0.65)",
                 textDecoration: "none",
-                height: "30px",
-                padding: "0 8px",
-                border: "1px solid var(--border)",
+                height: "28px",
+                padding: "0 10px",
+                border: "1px solid rgba(27,77,255,0.35)",
                 borderRadius: "var(--radius-sm)",
                 display: "flex",
                 alignItems: "center",
@@ -136,12 +118,12 @@ export default async function WsSlugLayout({ children, params }: Props) {
               href="/me"
               style={{
                 fontFamily: "DM Sans, sans-serif",
-                fontSize: "13px",
-                color: "var(--text-secondary)",
+                fontSize: "12px",
+                color: "rgba(241,245,249,0.65)",
                 textDecoration: "none",
-                height: "30px",
-                padding: "0 8px",
-                border: "1px solid var(--border)",
+                height: "28px",
+                padding: "0 10px",
+                border: "1px solid rgba(27,77,255,0.35)",
                 borderRadius: "var(--radius-sm)",
                 display: "flex",
                 alignItems: "center",
@@ -153,44 +135,14 @@ export default async function WsSlugLayout({ children, params }: Props) {
           </div>
         </div>
 
-        {/* Nav tabs — horizontally scrollable, hides scrollbar */}
-        <nav
-          className="scroll-x"
-          style={{ display: "flex", padding: "0 16px", gap: "2px" }}
-        >
-          <NavTab href={`/ws/${slug}`} label="Dashboard" />
-          <NavTab href={`/ws/${slug}/people`} label="People" />
-          <NavTab href={`/ws/${slug}/insights`} label="Insights" />
-          <NavTab href={`/ws/${slug}/monthly`} label="Monthly" />
-          <NavTab href={`/ws/${slug}/disputes`} label="Disputes" />
-          <NavTab href={`/ws/${slug}/settings`} label="Settings" />
-        </nav>
+        {/* Nav tabs row — white background for contrast */}
+        <div style={{ background: "var(--surface-0)", borderBottom: "1px solid var(--border)" }}>
+          <NavTabs slug={slug} />
+        </div>
       </header>
 
-      <main style={{ flex: 1 }}>{children}</main>
+      <main style={{ flex: 1 }}><PageTransition>{children}</PageTransition></main>
       <PwaInstallPrompt />
     </div>
-  );
-}
-
-function NavTab({ href, label }: { href: string; label: string }) {
-  return (
-    <Link
-      href={href}
-      style={{
-        fontFamily: "DM Sans, sans-serif",
-        fontSize: "13px",
-        fontWeight: 500,
-        color: "var(--text-secondary)",
-        textDecoration: "none",
-        padding: "10px 12px",
-        borderBottom: "2px solid transparent",
-        display: "block",
-        whiteSpace: "nowrap",
-        flexShrink: 0,
-      }}
-    >
-      {label}
-    </Link>
   );
 }

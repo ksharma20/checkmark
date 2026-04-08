@@ -196,11 +196,18 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                 <div style={{ flex: 1 }}>
                   <Link
                     href={`/me/ws/${ws?.slug ?? m.workspace_id}`}
-                    style={{ textDecoration: 'none' }}
+                    style={{ textDecoration: 'none' }}>
+                  <p
+                    style={{
+                      fontFamily: 'DM Sans, sans-serif',
+                      fontWeight: 500,
+                      fontSize: '14px',
+                      color: 'var(--text-primary)',
+                      marginBottom: '2px',
+                    }}
                   >
-                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '2px' }}>
-                      {ws?.name ?? m.workspace_id}
-                    </p>
+                    {ws?.name ?? m.workspace_id}
+                  </p>
                   </Link>
                   <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize', marginBottom: counts[m.workspace_id] ? '4px' : '0' }}>
                     {m.role}

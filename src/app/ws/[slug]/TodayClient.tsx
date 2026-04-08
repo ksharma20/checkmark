@@ -52,6 +52,31 @@ function fmtDuration(hours: number): string {
   return `${h}hr ${m}min`
 }
 
+function getInitials(s: string): string {
+  const parts = s.trim().split(/\s+/)
+  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
+  return s.slice(0, 2).toUpperCase()
+}
+
+function Avatar({ name, status }: { name: string; status: 'present' | 'visited' | 'notIn' }) {
+  const theme = {
+    present: { bg: 'color-mix(in srgb, var(--brand) 15%, transparent)', color: 'var(--brand)', ring: 'var(--brand)' },
+    visited: { bg: 'color-mix(in srgb, var(--amber) 15%, transparent)', color: 'var(--amber)', ring: 'var(--amber)' },
+    notIn:   { bg: 'var(--surface-2)', color: 'var(--text-muted)', ring: 'transparent' },
+  }[status]
+  return (
+    <div style={{
+      width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0,
+      background: theme.bg, color: theme.color,
+      fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 700,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      boxShadow: status !== 'notIn' ? `0 0 0 2px ${theme.ring}` : 'none',
+    }}>
+      {getInitials(name)}
+    </div>
+  )
+}
+
 // ─── Row components ───────────────────────────────────────────────────────────
 
 function TrustBadge() {
@@ -97,7 +122,7 @@ function PersonRow({ member, tz, slug }: { member: DashboardMember; tz: string; 
         }}>
           {displayName}
           {member.event_count > 1 && (
-            <span style={{ marginLeft: '5px', fontSize: '11px', color: 'var(--text-muted)', fontWeight: 400 }}>
+            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif', flexShrink: 0 }}>
               ×{member.event_count}
             </span>
           )}
@@ -116,21 +141,27 @@ function PersonRow({ member, tz, slug }: { member: DashboardMember; tz: string; 
       {/* Row 2: email (optional) + time range */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
         {member.full_name && (
-          <span style={{
+          <div style={{
             fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>
             {member.email}
-          </span>
+          </div>
         )}
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
         {checkinTime && (
-          <span style={{
-            fontFamily: 'JetBrains Mono, monospace', fontSize: '12px',
-            color: 'var(--text-secondary)', whiteSpace: 'nowrap', marginLeft: 'auto',
-          }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>
             {checkinTime}{checkoutTime ? ` → ${checkoutTime}` : isActive ? ' →' : ''}
-          </span>
+          </div>
         )}
+        {dur !== null ? (
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--brand)', fontWeight: 600, marginTop: '2px' }}>
+            {fmtDuration(dur)}
+          </div>
+        ) : isActive ? (
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>…</div>
+        ) : null}
       </div>
     </Link>
   )
@@ -165,15 +196,17 @@ function NotInRow({ member, slug }: { member: DashboardMember; slug: string }) {
   )
 }
 
-function SectionLabel({ children }: { children: React.ReactNode }) {
+function SectionLabel({ children, color }: { children: React.ReactNode; color?: string }) {
   return (
-    <p style={{
-      fontFamily: 'Syne, sans-serif', fontSize: '11px', fontWeight: 600,
-      color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.06em',
-      marginBottom: '8px', marginTop: '24px',
-    }}>
-      {children}
-    </p>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px', marginTop: '22px' }}>
+      <div style={{ width: '3px', height: '14px', borderRadius: '2px', background: color ?? 'var(--border)', flexShrink: 0 }} />
+      <span style={{
+        fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 700,
+        color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.08em',
+      }}>
+        {children}
+      </span>
+    </div>
   )
 }
 
@@ -182,13 +215,14 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function TabPill({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button type="button" onClick={onClick} style={{
-      height: '32px', padding: '0 12px',
-      border: active ? '1px solid var(--navy)' : '1px solid var(--border)',
+      height: '34px', padding: '0 14px',
+      border: active ? '1px solid var(--brand)' : '1px solid var(--border)',
       borderRadius: '20px',
-      background: active ? 'var(--navy)' : 'var(--surface-0)',
+      background: active ? 'var(--brand)' : 'transparent',
       color: active ? '#fff' : 'var(--text-secondary)',
-      fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: active ? 500 : 400,
-      cursor: 'pointer', whiteSpace: 'nowrap',
+      boxShadow: active ? '0 2px 8px color-mix(in srgb, var(--brand) 35%, transparent)' : 'none',
+      fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: active ? 600 : 400,
+      cursor: 'pointer', whiteSpace: 'nowrap', transition: 'all 0.15s',
     }}>
       {children}
     </button>
@@ -218,23 +252,42 @@ function SignalPill({ value, active, onClick }: { value: SignalFilter; active: b
   )
 }
 
-function StatChip({ value, label, accent }: { value: number; label: string; accent?: boolean }) {
+function StatCard({ value, label, accent, icon }: { value: number; label: string; accent?: boolean; icon: React.ReactNode }) {
   return (
     <div style={{
-      background: 'var(--surface-0)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)', padding: '14px 20px', minWidth: '100px',
+      background: accent ? 'color-mix(in srgb, var(--brand) 5%, var(--surface-0))' : 'var(--surface-0)',
+      border: `1px solid ${accent ? 'color-mix(in srgb, var(--brand) 25%, transparent)' : 'var(--border)'}`,
+      borderTop: `3px solid ${accent ? 'var(--brand)' : 'var(--border)'}`,
+      borderRadius: 'var(--radius-md)',
+      padding: '14px 12px',
+      flex: '1 1 0',
+      minWidth: '0',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '6px',
     }}>
-      <div style={{
-        fontFamily: 'Syne, sans-serif', fontSize: '26px', fontWeight: 700,
-        color: accent ? 'var(--teal)' : 'var(--navy)', lineHeight: 1,
-      }}>
-        {value}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{
+          fontFamily: 'DM Sans, sans-serif', fontSize: '10px', fontWeight: 700,
+          color: accent ? 'var(--brand)' : 'var(--text-muted)',
+          textTransform: 'uppercase', letterSpacing: '0.08em',
+        }}>
+          {label}
+        </span>
+        <span style={{ color: accent ? 'var(--brand)' : 'var(--text-muted)' }}>{icon}</span>
       </div>
-      <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginTop: '3px' }}>
-        {label}
+      <div style={{ fontFamily: 'Syne, sans-serif', fontSize: '28px', fontWeight: 700, color: accent ? 'var(--brand)' : 'var(--navy)', lineHeight: 1 }}>
+        {value}
       </div>
     </div>
   )
+}
+
+const STAT_ICONS = {
+  present: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+  visited: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/><circle cx="12" cy="10" r="3"/></svg>,
+  notIn:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>,
+  total:   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
@@ -312,107 +365,116 @@ export default function TodayClient({ slug, tz }: Props) {
 
   return (
     <>
-      {/* Stat chips */}
-      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '16px' }}>
-        <StatChip value={counts.present} label="in office" accent={counts.present > 0} />
-        <StatChip value={counts.visited} label="visited" />
-        <StatChip value={counts.notIn} label="not in" />
-        <StatChip value={counts.total} label="total members" />
+      {/* ── Stat cards ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '10px', marginBottom: '20px' }}>
+        <StatCard value={counts.present} label="In office" accent={counts.present > 0} icon={STAT_ICONS.present} />
+        <StatCard value={counts.visited} label="Visited" icon={STAT_ICONS.visited} />
+        <StatCard value={counts.notIn} label="Not in" icon={STAT_ICONS.notIn} />
+        <StatCard value={counts.total} label="Members" icon={STAT_ICONS.total} />
       </div>
 
-      {/* ── Row 1: search + status tabs + sort ───────────────────────────────── */}
-      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '10px' }}>
-        <div style={{ position: 'relative', flex: '1 1 180px', minWidth: '160px' }}>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search by name or email…"
-            style={{
-              width: '100%', height: '36px', padding: '0 10px',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-              fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-              background: 'var(--surface-0)', color: 'var(--text-primary)',
-              outline: 'none', boxSizing: 'border-box',
-            }}
-          />
+      {/* ── Filter bar ── */}
+      <div style={{
+        background: 'var(--surface-0)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)', padding: '12px 14px', marginBottom: '16px',
+      }}>
+        {/* Row 1: search + sort controls */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '10px', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: '1 1 200px', minWidth: '160px' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', pointerEvents: 'none' }}>
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input
+              type="search" value={search}
+              onChange={(e) => handleSearchChange(e.target.value)}
+              placeholder="Search by name or email…"
+              style={{
+                width: '100%', height: '36px', padding: '0 10px 0 32px',
+                border: '1px solid var(--border)', borderRadius: '8px',
+                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                background: 'var(--surface-1)', color: 'var(--text-primary)',
+                outline: 'none', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <select
+              value={sortBy}
+              onChange={(e) => { setSortBy(e.target.value as SortBy); setPage(1) }}
+              style={{
+                height: '36px', padding: '0 8px', border: '1px solid var(--border)',
+                borderRadius: '8px', fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
+                background: 'var(--surface-1)', color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none',
+              }}
+            >
+              <option value="time">Sort: Time in</option>
+              <option value="name">Sort: Name</option>
+              <option value="duration">Sort: Duration</option>
+            </select>
+            <button type="button" onClick={() => { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); setPage(1) }}
+              title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
+              style={{
+                width: '36px', height: '36px', border: '1px solid var(--border)',
+                borderRadius: '8px', background: 'var(--surface-1)',
+                color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              {sortDir === 'asc' ? '↑' : '↓'}
+            </button>
+            <button type="button" onClick={() => setShowAdvanced(v => !v)}
+              style={{
+                height: '36px', padding: '0 10px',
+                border: showAdvanced ? '1px solid color-mix(in srgb, var(--brand) 40%, transparent)' : '1px solid var(--border)',
+                borderRadius: '8px',
+                background: showAdvanced ? 'color-mix(in srgb, var(--brand) 10%, transparent)' : 'var(--surface-1)',
+                color: showAdvanced ? 'var(--brand)' : 'var(--text-secondary)',
+                cursor: 'pointer', fontSize: '12px',
+                fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
+              }}
+            >
+              Filters {showAdvanced ? '▲' : '▼'}
+            </button>
+          </div>
         </div>
-
+        {/* Row 2: status tabs */}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
           <TabPill active={statusFilter === 'all'}     onClick={() => changeStatus('all')}>All</TabPill>
           <TabPill active={statusFilter === 'present'} onClick={() => changeStatus('present')}>In office ({counts.present})</TabPill>
           <TabPill active={statusFilter === 'visited'} onClick={() => changeStatus('visited')}>Visited ({counts.visited})</TabPill>
           <TabPill active={statusFilter === 'notIn'}   onClick={() => changeStatus('notIn')}>Not in ({counts.notIn})</TabPill>
         </div>
-
-        <div style={{ display: 'flex', gap: '6px', marginLeft: 'auto' }}>
-          <select
-            value={sortBy}
-            onChange={(e) => { setSortBy(e.target.value as SortBy); setPage(1) }}
-            style={{
-              height: '32px', padding: '0 8px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)', fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
-              background: 'var(--surface-0)', color: 'var(--text-secondary)', cursor: 'pointer', outline: 'none',
-            }}
-          >
-            <option value="time">Sort: Time in</option>
-            <option value="name">Sort: Name</option>
-            <option value="duration">Sort: Duration</option>
-          </select>
-          <button type="button" onClick={() => { setSortDir(d => d === 'asc' ? 'desc' : 'asc'); setPage(1) }}
-            title={sortDir === 'asc' ? 'Ascending' : 'Descending'}
-            style={{
-              width: '32px', height: '32px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)', background: 'var(--surface-0)',
-              color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '14px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            {sortDir === 'asc' ? '↑' : '↓'}
-          </button>
-          <button type="button" onClick={() => setShowAdvanced(v => !v)}
-            style={{
-              height: '32px', padding: '0 10px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)', background: showAdvanced ? 'var(--surface-2)' : 'var(--surface-0)',
-              color: 'var(--text-secondary)', cursor: 'pointer', fontSize: '12px',
-              fontFamily: 'DM Sans, sans-serif', whiteSpace: 'nowrap',
-            }}
-          >
-            Filters {showAdvanced ? '▲' : '▼'}
-          </button>
-        </div>
+        {/* Row 3: signal filters (advanced) */}
+        {showAdvanced && (
+          <div style={{
+            display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
+            marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--border)',
+          }}>
+            <span style={{ fontSize: '11px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-muted)' }}>
+              Signal:
+            </span>
+            {(['all', 'wifi', 'gps', 'ip', 'override'] as SignalFilter[]).map((v) => (
+              <SignalPill key={v} value={v} active={signalFilter === v} onClick={() => changeSignal(v)} />
+            ))}
+            {isFiltering && (
+              <button type="button" onClick={resetFilters} style={{
+                marginLeft: 'auto', height: '28px', padding: '0 10px',
+                border: '1px solid var(--border)', borderRadius: '6px',
+                background: 'var(--surface-0)', color: 'var(--text-muted)',
+                fontSize: '11px', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer',
+              }}>
+                Reset
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* ── Row 2: signal filters ─────────────────────────────────────────────── */}
-      {showAdvanced && (
-        <div style={{
-          display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center',
-          padding: '10px 14px', background: 'var(--surface-1)',
-          border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', marginBottom: '10px',
-        }}>
-          <span style={{ fontSize: '11px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-muted)', marginRight: '4px' }}>
-            Signal:
-          </span>
-          {(['all', 'wifi', 'gps', 'ip', 'override'] as SignalFilter[]).map((v) => (
-            <SignalPill key={v} value={v} active={signalFilter === v} onClick={() => changeSignal(v)} />
-          ))}
-          {isFiltering && (
-            <button type="button" onClick={resetFilters} style={{
-              marginLeft: 'auto', height: '28px', padding: '0 10px',
-              border: '1px solid var(--border)', borderRadius: '4px',
-              background: 'var(--surface-0)', color: 'var(--text-muted)',
-              fontSize: '11px', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer',
-            }}>
-              Reset
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* ── Loading skeleton ─────────────────────────────────────────────────── */}
+      {/* ── Loading skeleton ── */}
       {loading && (
         <div>
-          {[1, 2, 3, 4].map((i) => {
+          {[1, 2, 3].map((i) => {
             const sk: React.CSSProperties = {
               background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
               backgroundSize: '600px 100%',
@@ -421,25 +483,28 @@ export default function TodayClient({ slug, tz }: Props) {
             }
             return (
               <div key={i} style={{
-                display: 'grid', gridTemplateColumns: '1fr auto auto auto',
-                alignItems: 'center', gap: '16px', padding: '12px 16px',
+                display: 'flex', alignItems: 'center', gap: '12px',
+                padding: '12px 14px',
                 background: 'var(--surface-0)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-md)', marginBottom: '6px',
+                borderLeft: '3px solid var(--border)',
+                borderRadius: 'var(--radius-md)', marginBottom: '8px',
               }}>
-                <div>
+                <div style={{ ...sk, width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
                   <div style={{ ...sk, height: '13px', width: '120px', marginBottom: '6px' }} />
                   <div style={{ ...sk, height: '11px', width: '160px' }} />
                 </div>
-                <div style={{ ...sk, height: '12px', width: '80px' }} />
-                <div style={{ ...sk, height: '20px', width: '40px', borderRadius: '4px' }} />
-                <div style={{ ...sk, height: '12px', width: '40px' }} />
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ ...sk, height: '12px', width: '70px', marginBottom: '4px' }} />
+                  <div style={{ ...sk, height: '13px', width: '45px' }} />
+                </div>
               </div>
             )
           })}
         </div>
       )}
 
-      {/* ── Results ──────────────────────────────────────────────────────────── */}
+      {/* ── Results ── */}
       {!loading && (
         <>
           {/* Present */}

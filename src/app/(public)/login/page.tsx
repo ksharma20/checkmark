@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { en } from '@/locales/en'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -177,7 +178,6 @@ function EmailStep({
     const e = email.toLowerCase().trim()
     if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
       setEmailTouched(true)
-      setError('Please enter a valid email address')
       return
     }
     setLoading(true)
@@ -222,9 +222,20 @@ function EmailStep({
           fontWeight: 700,
           color: 'var(--navy)',
           marginBottom: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
         }}
       >
-        Welcome to {en.brand.name}
+        Welcome to{' '}
+        <Image
+          src="/logo.png"
+          alt={en.brand.name}
+          width={130}
+          height={38}
+          style={{ objectFit: 'contain', verticalAlign: 'middle' }}
+          priority
+        />
       </h1>
       <p
         style={{
@@ -330,16 +341,17 @@ function PasswordStep({
         <Input
           type="password"
           value={password}
-          onChange={setPassword}
+          onChange={(v) => { setPassword(v); if (error) setError(null) }}
           placeholder="Your password"
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && signIn()}
+          hasError={!!error}
         />
+        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={signIn} loading={loading}>
         Sign in
       </PrimaryBtn>
-      <ErrorMsg text={error} />
     </div>
   )
 }
@@ -408,16 +420,17 @@ function DeactivatedStep({
         <Input
           type="password"
           value={password}
-          onChange={setPassword}
+          onChange={(v) => { setPassword(v); if (error) setError(null) }}
           placeholder="Your password"
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && reactivate()}
+          hasError={!!error}
         />
+        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={reactivate} loading={loading}>
         Reactivate account
       </PrimaryBtn>
-      <ErrorMsg text={error} />
     </div>
   )
 }
@@ -515,16 +528,17 @@ function OtpStep({
         <Input
           type="text"
           value={code}
-          onChange={(v) => setCode(v.replace(/\D/g, '').slice(0, 6))}
+          onChange={(v) => { setCode(v.replace(/\D/g, '').slice(0, 6)); if (error) setError(null) }}
           placeholder="123456"
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && verify()}
+          hasError={!!error}
         />
+        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={verify} loading={loading}>
         Verify
       </PrimaryBtn>
-      <ErrorMsg text={error} />
       {resendMsg && (
         <p
           style={{
@@ -1077,16 +1091,43 @@ function LoginFlow() {
         justifyContent: 'center',
         background: 'var(--surface-1)',
         padding: '24px 16px',
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
+      {/* Subtle radial glow — matches landing page */}
+      <div style={{
+        pointerEvents: 'none',
+        position: 'absolute',
+        left: '50%',
+        top: '-10%',
+        width: '700px',
+        height: '500px',
+        transform: 'translateX(-50%)',
+        background: 'radial-gradient(ellipse at center, rgba(27,77,255,0.09) 0%, transparent 70%)',
+        zIndex: 0,
+      }} />
+      {/* Grid pattern — matches landing page */}
+      <div style={{
+        pointerEvents: 'none',
+        position: 'absolute',
+        inset: 0,
+        backgroundImage: 'linear-gradient(rgba(27,77,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(27,77,255,0.04) 1px, transparent 1px)',
+        backgroundSize: '60px 60px',
+        maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%)',
+        zIndex: 0,
+      }} />
       <div
         style={{
+          position: 'relative',
+          zIndex: 1,
           width: '100%',
           maxWidth: '420px',
           background: 'var(--surface-0)',
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
           padding: '32px 28px',
+          boxShadow: '0 0 40px rgba(27,77,255,0.08)',
         }}
       >
         {step === 'email' && (

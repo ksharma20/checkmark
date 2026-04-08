@@ -146,6 +146,12 @@ function ProfileSection({ initialName, email }: { initialName: string; email: st
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(initialName)
   const [savedName, setSavedName] = useState(initialName)
+
+  useEffect(() => {
+    setName(initialName)
+    setSavedName(initialName)
+  }, [initialName])
+  
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
 

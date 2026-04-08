@@ -21,11 +21,12 @@ const NOTIFICATION_MESSAGES = en.notifications.stale
 
 interface CheckinButtonsProps {
   activeEvent: PresenceEvent | null
+  name: string
 }
 
 type ToastType = 'success' | 'info' | 'error'
 
-export default function CheckinButtons({ activeEvent: initialActiveEvent }: CheckinButtonsProps) {
+export default function CheckinButtons({ activeEvent: initialActiveEvent, name }: CheckinButtonsProps) {
   const router = useRouter()
   const [state, setState] = useState<'checked_in' | 'checked_out'>(
     initialActiveEvent ? 'checked_in' : 'checked_out'
@@ -310,6 +311,19 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
 
   return (
     <div>
+      {/* Greeting */}
+      <p
+        style={{
+          fontFamily: 'Syne, sans-serif',
+          fontSize: '32px',
+          fontWeight: 700,
+          color: 'var(--navy)',
+          marginBottom: '6px',
+        }}
+      >
+        Hi, {name}
+      </p>
+
       {/* Date header */}
       <p
         style={{
@@ -385,12 +399,12 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
           style={{
             width: '100%',
             height: '64px',
-            background: 'transparent',
+            background: 'var(--surface-2)',
             color: 'var(--text-secondary)',
             border: '1px solid var(--border)',
             borderRadius: 'var(--radius-md)',
             fontSize: '15px',
-            fontWeight: 500,
+            fontWeight: 600,
             fontFamily: 'DM Sans, sans-serif',
             cursor: loading ? 'not-allowed' : 'pointer',
           }}

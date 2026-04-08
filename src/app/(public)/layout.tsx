@@ -1,3 +1,9 @@
+import PageTransition from '@/components/PageTransition';
+
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>
+  return (
+    <div style={{ minHeight: '100dvh', background: 'var(--surface-1)' }}>
+      <PageTransition>{children}</PageTransition>
+    </div>
+  );
 }
