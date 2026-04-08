@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import { queryWorkspaceEvents } from '@/lib/signals'
-import { getActiveMembersWithDetails, createAdminOverride, getWorkspaceOverrides } from '@/lib/db/queries/workspaces'
+import { getActiveMembersWithDetails, createAdminOverride, getWorkspaceOverrides, setEffectiveCheckout } from '@/lib/db/queries/workspaces'
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -18,6 +18,7 @@ export interface DisputeEvent {
   has_gps: boolean
   has_wifi: boolean
   overridden: boolean
+  checkout_location_mismatch: number | null
 }
 
 export interface DisputesResponse {
@@ -85,6 +86,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     has_gps: e.gps_lat !== null,
     has_wifi: e.wifi_ssid !== null,
     overridden: overriddenEventIds.has(e.id),
+    checkout_location_mismatch: e.checkout_location_mismatch ?? null,
   }))
 
   return NextResponse.json({
@@ -106,7 +108,11 @@ export async function POST(request: NextRequest, { params }: Props) {
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const body = await request.json()
-  const { event_id, note } = body as { event_id?: string; note?: string }
+  const { event_id, note, effective_checkout_at } = body as {
+    event_id?: string
+    note?: string
+    effective_checkout_at?: string | null
+  }
 
   if (!event_id) {
     return NextResponse.json({ error: 'event_id required' }, { status: 400 })
@@ -118,6 +124,10 @@ export async function POST(request: NextRequest, { params }: Props) {
     adminUserId: ctx.userId,
     note: note ?? null,
   })
+
+  if (effective_checkout_at) {
+    await setEffectiveCheckout(override.id, ctx.workspace.id, effective_checkout_at)
+  }
 
   return NextResponse.json({ override }, { status: 201 })
 }

@@ -4,6 +4,7 @@ import { getUserStats } from '@/lib/db/queries/stats'
 import { extractIp, getIpGeo } from '@/lib/geo'
 import { updateUserStats } from '@/lib/stats'
 import { reverseGeocodeLabel } from '@/lib/geo-label'
+import { evaluateTrust } from '@/lib/trust'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -27,6 +28,8 @@ export async function POST(request: NextRequest) {
     wifi_ssid?: string
     note?: string
     event_type?: string
+    device_info?: string | null
+    device_timezone?: string | null
   }
   try {
     body = await request.json()
@@ -49,6 +52,8 @@ export async function POST(request: NextRequest) {
     gpsAccuracyM: body.gps_accuracy_m ?? null,
     note: body.note ?? null,
     source: 'user_app',
+    deviceInfo: body.device_info ?? null,
+    deviceTimezone: body.device_timezone ?? null,
   })
 
   updateUserStats(userId).catch(console.error)
@@ -59,6 +64,20 @@ export async function POST(request: NextRequest) {
       .then((label) => { if (label) return updateEventLocationLabel(event.id, label) })
       .catch(() => {})
   }
+
+  // Fire-and-forget: evaluate trust signals async
+  evaluateTrust({
+    eventId: event.id,
+    userId,
+    gpsAccuracyM: event.gps_accuracy_m,
+    deviceTimezone: body.device_timezone ?? null,
+    ipGeoLat: event.ip_geo_lat,
+    ipGeoLng: event.ip_geo_lng,
+    ipAddress: event.ip_address,
+    gpsLat: event.gps_lat,
+    gpsLng: event.gps_lng,
+    checkinAt: event.checkin_at,
+  }).catch(() => {})
 
   const stats = await getUserStats(userId)
   return NextResponse.json({ event, stats })

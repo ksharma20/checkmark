@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { DisputeEvent, DisputesResponse } from '@/app/api/ws/[slug]/disputes/route'
+import { fmtHours } from '@/lib/client/format-time'
 
 const skeletonStyle: React.CSSProperties = {
   background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
@@ -23,8 +24,8 @@ function durationHours(checkin: string, checkout: string | null): string {
   if (!checkout) return '—'
   const cin = new Date(checkin.includes('T') ? checkin : checkin.replace(' ', 'T') + 'Z').getTime()
   const cout = new Date(checkout.includes('T') ? checkout : checkout.replace(' ', 'T') + 'Z').getTime()
-  const h = Math.round((cout - cin) / (1000 * 60 * 60) * 10) / 10
-  return `${h}h`
+  const h = (cout - cin) / 3_600_000
+  return fmtHours(h)
 }
 
 function initials(name: string): string {
@@ -50,6 +51,7 @@ export default function DisputesClient({ slug, tz }: Props) {
   const [overriding, setOverriding] = useState<string | null>(null)
   const [removing, setRemoving] = useState<string | null>(null)
   const [noteInputs, setNoteInputs] = useState<Record<string, string>>({})
+  const [checkoutInputs, setCheckoutInputs] = useState<Record<string, string>>({})
 
   const fetchDisputes = useCallback(async (start: string, end: string) => {
     setLoading(true)
@@ -66,10 +68,15 @@ export default function DisputesClient({ slug, tz }: Props) {
   async function handleOverride(eventId: string) {
     setOverriding(eventId)
     try {
+      const effectiveCheckout = checkoutInputs[eventId]
       const res = await fetch(`/api/ws/${slug}/disputes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ event_id: eventId, note: noteInputs[eventId] ?? '' }),
+        body: JSON.stringify({
+          event_id: eventId,
+          note: noteInputs[eventId] ?? '',
+          effective_checkout_at: effectiveCheckout ? new Date(effectiveCheckout).toISOString() : null,
+        }),
       })
       if (res.ok) await fetchDisputes(startDate, endDate)
     } finally {
@@ -181,6 +188,8 @@ export default function DisputesClient({ slug, tz }: Props) {
                     overriding={overriding === ev.event_id}
                     noteValue={noteInputs[ev.event_id] ?? ''}
                     onNoteChange={(v) => setNoteInputs((prev) => ({ ...prev, [ev.event_id]: v }))}
+                    checkoutValue={checkoutInputs[ev.event_id] ?? ''}
+                    onCheckoutChange={(v) => setCheckoutInputs((prev) => ({ ...prev, [ev.event_id]: v }))}
                     onOverride={() => handleOverride(ev.event_id)}
                   />
                 ))}
@@ -225,14 +234,17 @@ export default function DisputesClient({ slug, tz }: Props) {
 }
 
 function EventRow({
-  ev, tz, isLast, overriding, noteValue, onNoteChange, onOverride,
+  ev, tz, isLast, overriding, noteValue, onNoteChange, checkoutValue, onCheckoutChange, onOverride,
 }: {
   ev: DisputeEvent; tz: string; isLast: boolean
   overriding: boolean; noteValue: string
   onNoteChange: (v: string) => void
+  checkoutValue: string
+  onCheckoutChange: (v: string) => void
   onOverride: () => void
 }) {
   const ini = initials(ev.member_name)
+  const mismatchMetres = ev.checkout_location_mismatch
   return (
     <div style={{
       padding: '14px 16px',
@@ -257,7 +269,7 @@ function EventRow({
         <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', margin: 0 }}>
           {ev.member_email}
         </p>
-        <div style={{ marginTop: '6px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: '6px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-secondary)' }}>
             {formatUtc(ev.checkin_at, tz)}
           </span>
@@ -271,45 +283,78 @@ function EventRow({
           )}
           {ev.has_gps && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>GPS</span>}
           {ev.has_wifi && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>WiFi</span>}
+          {mismatchMetres !== null && mismatchMetres > 0 && (
+            <span title="Checked out from a different location" style={{
+              display: 'inline-flex', alignItems: 'center', height: '18px', padding: '0 6px',
+              borderRadius: '4px', fontSize: '11px', fontFamily: 'DM Sans, sans-serif', fontWeight: 600,
+              color: 'var(--amber)', background: 'color-mix(in srgb, var(--amber) 10%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--amber) 35%, transparent)',
+              whiteSpace: 'nowrap',
+            }}>
+              ⊘ {mismatchMetres}m away
+            </span>
+          )}
         </div>
         {ev.note && (
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px', fontStyle: 'italic' }}>
-            "{ev.note}"
+            &ldquo;{ev.note}&rdquo;
           </p>
         )}
       </div>
 
       {/* Override action */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-        <input
-          type="text"
-          placeholder="Note (optional)"
-          value={noteValue}
-          onChange={(e) => onNoteChange(e.target.value)}
-          style={{
-            height: '32px', padding: '0 10px', fontSize: '12px',
-            fontFamily: 'DM Sans, sans-serif',
-            border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-            background: 'var(--surface-0)', color: 'var(--text-primary)',
-            outline: 'none', width: '140px',
-          }}
-        />
-        <button
-          type="button"
-          disabled={overriding}
-          onClick={onOverride}
-          style={{
-            height: '32px', padding: '0 12px',
-            fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
-            background: 'var(--teal)', color: '#fff',
-            border: 'none', borderRadius: 'var(--radius-sm)',
-            cursor: overriding ? 'default' : 'pointer',
-            opacity: overriding ? 0.6 : 1,
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <input
+            type="text"
+            placeholder="Note (optional)"
+            value={noteValue}
+            onChange={(e) => onNoteChange(e.target.value)}
+            style={{
+              height: '32px', padding: '0 10px', fontSize: '12px',
+              fontFamily: 'DM Sans, sans-serif',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-0)', color: 'var(--text-primary)',
+              outline: 'none', width: '140px',
+            }}
+          />
+          <button
+            type="button"
+            disabled={overriding}
+            onClick={onOverride}
+            style={{
+              height: '32px', padding: '0 12px',
+              fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
+              background: 'var(--teal)', color: '#fff',
+              border: 'none', borderRadius: 'var(--radius-sm)',
+              cursor: overriding ? 'default' : 'pointer',
+              opacity: overriding ? 0.6 : 1,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {overriding ? 'Counting…' : 'Count this event'}
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <label style={{
+            fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)',
             whiteSpace: 'nowrap',
-          }}
-        >
-          {overriding ? 'Counting…' : 'Count this event'}
-        </button>
+          }}>
+            Effective checkout:
+          </label>
+          <input
+            type="datetime-local"
+            value={checkoutValue}
+            onChange={(e) => onCheckoutChange(e.target.value)}
+            style={{
+              height: '30px', padding: '0 8px', fontSize: '12px',
+              fontFamily: 'DM Sans, sans-serif',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
+              background: 'var(--surface-0)', color: 'var(--text-primary)',
+              outline: 'none',
+            }}
+          />
+        </div>
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { WorkspaceMember, Workspace } from '@/lib/db/queries/workspaces'
@@ -16,6 +16,22 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
   const [activeList, setActiveList] = useState(activeMemberships)
   const [pendingList, setPendingList] = useState(pendingMemberships)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [counts, setCounts] = useState<Record<string, { present: number; visited: number; notIn: number }>>({})
+
+  useEffect(() => {
+    activeList.forEach((m) => {
+      const ws = wsMap[m.workspace_id]
+      if (!ws?.slug) return
+      fetch(`/api/me/ws/${ws.slug}/counts`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.present !== undefined) {
+            setCounts((prev) => ({ ...prev, [m.workspace_id]: data }))
+          }
+        })
+        .catch(() => {})
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleLeave(workspaceId: string, wsName: string) {
     if (!confirm(`Leave ${wsName}? You will no longer appear in their presence dashboard.`)) return
@@ -178,27 +194,26 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                 }}
               >
                 <div style={{ flex: 1 }}>
-                  <p
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontWeight: 500,
-                      fontSize: '14px',
-                      color: 'var(--text-primary)',
-                      marginBottom: '2px',
-                    }}
+                  <Link
+                    href={`/me/ws/${ws?.slug ?? m.workspace_id}`}
+                    style={{ textDecoration: 'none' }}
                   >
-                    {ws?.name ?? m.workspace_id}
-                  </p>
-                  <p
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontSize: '12px',
-                      color: 'var(--text-muted)',
-                      textTransform: 'capitalize',
-                    }}
-                  >
+                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '14px', color: 'var(--text-primary)', marginBottom: '2px' }}>
+                      {ws?.name ?? m.workspace_id}
+                    </p>
+                  </Link>
+                  <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize', marginBottom: counts[m.workspace_id] ? '4px' : '0' }}>
                     {m.role}
                   </p>
+                  {counts[m.workspace_id] && (
+                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <span style={{ color: 'var(--teal)', fontWeight: 500 }}>{counts[m.workspace_id].present} in office</span>
+                      {' · '}
+                      <span>{counts[m.workspace_id].visited} visited</span>
+                      {' · '}
+                      <span>{counts[m.workspace_id].notIn} not in</span>
+                    </p>
+                  )}
                 </div>
                 {m.role !== 'admin' && (
                   <button

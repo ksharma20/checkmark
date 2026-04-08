@@ -28,6 +28,10 @@ export interface PresenceEvent {
   checkout_ip_geo_lng: number | null
   location_label: string | null
   deleted_at: string | null
+  checkout_location_mismatch: number | null
+  device_info: string | null
+  trust_flags: string | null
+  device_timezone: string | null
 }
 
 export async function createEvent(params: {
@@ -43,13 +47,16 @@ export async function createEvent(params: {
   note?: string | null
   source?: string
   apiTokenId?: string | null
+  deviceInfo?: string | null
+  deviceTimezone?: string | null
 }): Promise<PresenceEvent> {
   const id = crypto.randomUUID().replace(/-/g, '')
   await db.execute(
     `INSERT INTO presence_events
        (id, user_id, event_type, wifi_ssid, ip_address, ip_geo_lat, ip_geo_lng,
-        gps_lat, gps_lng, gps_accuracy_m, note, source, api_token_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        gps_lat, gps_lng, gps_accuracy_m, note, source, api_token_id,
+        device_info, device_timezone)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       params.userId,
@@ -64,6 +71,8 @@ export async function createEvent(params: {
       params.note ?? null,
       params.source ?? 'user_app',
       params.apiTokenId ?? null,
+      params.deviceInfo ?? null,
+      params.deviceTimezone ?? null,
     ]
   )
   return db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [id]) as Promise<PresenceEvent>
@@ -81,6 +90,7 @@ export async function checkoutEvent(
     checkoutIpGeoLat?: number | null
     checkoutIpGeoLng?: number | null
     checkoutReason?: string | null
+    checkoutLocationMismatch?: number | null
   }
 ): Promise<PresenceEvent | null> {
   await db.execute(
@@ -93,7 +103,8 @@ export async function checkoutEvent(
          checkout_wifi_ssid = ?,
          checkout_ip_address = ?,
          checkout_ip_geo_lat = ?,
-         checkout_ip_geo_lng = ?
+         checkout_ip_geo_lng = ?,
+         checkout_location_mismatch = ?
      WHERE id = ? AND user_id = ? AND checkout_at IS NULL`,
     [
       signals?.checkoutReason ?? null,
@@ -104,6 +115,7 @@ export async function checkoutEvent(
       signals?.checkoutIpAddress ?? null,
       signals?.checkoutIpGeoLat ?? null,
       signals?.checkoutIpGeoLng ?? null,
+      signals?.checkoutLocationMismatch ?? null,
       eventId,
       userId,
     ]
@@ -226,5 +238,12 @@ export async function getEventsForUsers(params: {
        AND deleted_at IS NULL
      ORDER BY checkin_at DESC`,
     [...params.userIds, params.start, params.end]
+  )
+}
+
+export async function updateEventTrustFlags(eventId: string, flags: string[]): Promise<void> {
+  await db.execute(
+    'UPDATE presence_events SET trust_flags = ? WHERE id = ?',
+    [JSON.stringify(flags), eventId]
   )
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { en } from "@/locales/en";
 import SwRegister from "@/components/SwRegister";
+import TopProgressBar from "@/components/shared/TopProgressBar";
 
 export const metadata: Metadata = {
   title: `${en.brand.name} — ${en.brand.tagline}`,
@@ -26,6 +27,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
+        <TopProgressBar />
         <SwRegister />
         {children}
       </body>

@@ -17,6 +17,7 @@ export interface DashboardMember {
     checkin_at: string
     checkout_at: string | null
     matched_by: MatchedBy
+    trust_flags: string[]
   } | null
   event_count: number
 }
@@ -97,7 +98,12 @@ export async function GET(
       full_name: member.full_name,
       presence_status,
       latest_event: latest
-        ? { checkin_at: latest.checkin_at, checkout_at: latest.checkout_at, matched_by: latest.matched_by }
+        ? {
+            checkin_at: latest.checkin_at,
+            checkout_at: latest.checkout_at,
+            matched_by: latest.matched_by,
+            trust_flags: latest.trust_flags ? (JSON.parse(latest.trust_flags) as string[]) : [],
+          }
         : null,
       event_count: userEvents.length,
     }

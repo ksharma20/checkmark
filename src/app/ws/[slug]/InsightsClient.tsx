@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { InsightInterval, InsightBucket, InsightsResponse } from '@/app/api/ws/[slug]/insights/route'
+import { fmtHours } from '@/lib/client/format-time'
 
 interface Props { slug: string }
 
@@ -135,7 +136,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
                     >
                       {valueKey === 'unique_users'
                         ? `${val}/${totalMembers}`
-                        : `${val}h`}
+                        : fmtHours(val)}
                     </text>
                   </g>
                 )}
@@ -277,7 +278,7 @@ export default function InsightsClient({ slug }: Props) {
             />
             <StatCard
               label="Hours logged"
-              value={`${Math.round(totalHours * 10) / 10}h`}
+              value={fmtHours(totalHours)}
               sub="total tracked"
               color="var(--brand)"
             />

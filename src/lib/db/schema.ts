@@ -73,6 +73,10 @@ CREATE TABLE IF NOT EXISTS presence_events (
   source                TEXT NOT NULL DEFAULT 'user_app',
   api_token_id          TEXT REFERENCES user_api_tokens(id),
   deleted_at            TEXT,
+  checkout_location_mismatch INTEGER,
+  device_info           TEXT,
+  trust_flags           TEXT,
+  device_timezone       TEXT,
   created_at            TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -141,6 +145,7 @@ CREATE TABLE IF NOT EXISTS admin_overrides (
   presence_event_id TEXT NOT NULL REFERENCES presence_events(id),
   admin_user_id    TEXT NOT NULL REFERENCES users(id),
   note             TEXT,
+  effective_checkout_at TEXT,
   created_at       TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

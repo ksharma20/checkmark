@@ -4,11 +4,6 @@ import { useState } from 'react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
 import { fmtTime, durationLabel } from '@/lib/client/format-time'
 
-const EVENT_TYPE_LABELS: Record<string, string> = {
-  office_checkin: 'Office',
-  client_visit: 'Client visit',
-  manual_log: 'Manual',
-}
 
 interface EventCardProps {
   event: PresenceEvent
@@ -22,7 +17,6 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
   const [saving, setSaving] = useState(false)
 
   const duration = durationLabel(event.checkin_at, event.checkout_at)
-  const typeLabel = EVENT_TYPE_LABELS[event.event_type] ?? event.event_type
 
   // "1:37 PM — 2:15 PM" or just "1:37 PM"
   const timeRange = event.checkout_at
@@ -80,20 +74,6 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
             {duration}
           </span>
         )}
-
-        <span
-          style={{
-            marginLeft: 'auto',
-            fontSize: '11px',
-            fontFamily: 'DM Sans, sans-serif',
-            color: 'var(--brand)',
-            background: 'color-mix(in srgb, var(--brand) 10%, transparent)',
-            padding: '2px 8px',
-            borderRadius: '20px',
-          }}
-        >
-          {typeLabel}
-        </span>
       </div>
 
       {/* Note */}

@@ -36,7 +36,7 @@ function slugify(text: string): string {
 export async function POST(request: NextRequest) {
   let body: {
     email?: string
-    fullName?: string
+    full_name?: string
     password?: string
     accountType?: 'personal' | 'org'
     // org-only fields
@@ -53,12 +53,12 @@ export async function POST(request: NextRequest) {
   }
 
   const email = (body.email ?? '').toLowerCase().trim()
-  const fullName = (body.fullName ?? '').trim()
+  const full_name = (body.full_name ?? '').trim()
   const password = body.password ?? ''
   const accountType = body.accountType ?? 'personal'
 
   if (!email) return apiError('Email is required', 'MISSING_EMAIL', 400)
-  if (!fullName) return apiError('Full name is required', 'MISSING_NAME', 400)
+  if (!full_name) return apiError('Full name is required', 'MISSING_NAME', 400)
   const pwCheck = validatePassword(password)
   if (!pwCheck.valid) return apiError(pwCheck.error, 'WEAK_PASSWORD', 400)
 
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
   }
 
   const passwordHash = await hashPassword(password)
-  const user = await createUser({ email, passwordHash, fullName })
+  const user = await createUser({ email, passwordHash, fullName: full_name })
 
   // Link any pending invited memberships for this email to the new user account
   await linkUserToMemberRecord(email, user.id)
@@ -137,7 +137,7 @@ export async function POST(request: NextRequest) {
   const redirect = getRedirectAfterLogin(adminWorkspaces)
 
   return NextResponse.json({
-    user: { id: user.id, email: user.email, fullName: user.full_name },
+    user: { id: user.id, email: user.email, full_name: user.full_name },
     redirect,
   })
 }

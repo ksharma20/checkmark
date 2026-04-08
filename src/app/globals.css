@@ -91,3 +91,7 @@ code, pre, .mono {
   0%   { background-position: -600px 0; }
   100% { background-position: 600px 0; }
 }
+
+@keyframes cm-spin {
+  to { transform: rotate(360deg); }
+}

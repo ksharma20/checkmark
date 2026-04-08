@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import type { AnalyticsMember, AnalyticsResponse } from '@/app/api/ws/[slug]/analytics/route'
+import { fmtHours } from '@/lib/client/format-time'
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -125,10 +126,10 @@ function MemberCard({ m, workingDays, signalsConfigured }: { m: AnalyticsMember;
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
-            {m.total_hours}h
+            {fmtHours(m.total_hours)}
           </div>
           <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
-            {m.avg_daily_hours}h avg
+            {fmtHours(m.avg_daily_hours)} avg
           </div>
         </div>
       </div>
@@ -225,14 +226,14 @@ function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; 
 
       <div style={{ textAlign: 'right' }}>
         <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
-          {m.total_hours}h
+          {fmtHours(m.total_hours)}
         </p>
         <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>total</p>
       </div>
 
       <div style={{ textAlign: 'right' }}>
         <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
-          {m.avg_daily_hours}h
+          {fmtHours(m.avg_daily_hours)}
         </p>
         <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>avg/day</p>
         {m.multi_location_days > 0 && (
@@ -378,7 +379,7 @@ export default function AnalyticsClient({ slug }: Props) {
           ) : (
             <StatChip label="Check-ins" value={data.members.reduce((s, m) => s + m.office_days + m.wfh_days, 0)} sub="total across team" />
           )}
-          <StatChip label="Hours tracked" value={`${Math.round(totalHours * 10) / 10}h`} sub="total logged" />
+          <StatChip label="Hours tracked" value={fmtHours(totalHours)} sub="total logged" />
           <StatChip label="Avg days" value={avgAttendance} sub="attended per person" />
         </div>
       )}

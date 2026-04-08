@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
   const redirect = getRedirectAfterLogin(adminWorkspaces)
 
   return NextResponse.json({
-    user: { id: user.id, email: user.email, fullName: user.full_name },
+    user: { id: user.id, email: user.email, full_name: user.full_name },
     redirect,
   })
 }

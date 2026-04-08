@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import type { PresenceEvent } from '@/lib/db/queries/events'
-import { fmtTimeOnDate } from '@/lib/client/format-time'
+import { fmtTimeOnDate, fmtHours } from '@/lib/client/format-time'
 import { en } from '@/locales/en'
 import {
   STALE_NOTIF_KEY,
@@ -11,6 +11,8 @@ import {
   NOTIF_TAG_STALE,
   NOTIF_TAG_AUTO_CHECKOUT,
 } from '@/lib/constants'
+import { startProgress, stopProgress } from '@/components/shared/TopProgressBar'
+import { collectDeviceInfo } from '@/lib/client/device-info'
 
 // Notification schedule (hours from check-in): 4, 8, 12, 16, 18, 20, 22 — then auto-checkout at 24h
 const NOTIFICATION_SCHEDULE_H = [4, 8, 12, 16, 18, 20, 22]
@@ -190,10 +192,12 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
   async function handleCheckin() {
     if (state !== 'checked_out' || loading) return
     setLoading(true)
+    startProgress()
     try {
       const gps = await collectGps()
       const wifi = getWifiSsid()
       const gpsCoords = gps.ok ? gps : null
+      const deviceInfo = await collectDeviceInfo().catch(() => null)
 
       const res = await fetch('/api/checkin', {
         method: 'POST',
@@ -203,6 +207,8 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
           gps_lng: gpsCoords?.lng,
           gps_accuracy_m: gpsCoords?.accuracy ? Math.round(gpsCoords.accuracy) : undefined,
           wifi_ssid: wifi ?? undefined,
+          device_info: deviceInfo ? JSON.stringify(deviceInfo) : null,
+          device_timezone: deviceInfo?.timezone ?? null,
         }),
       })
 
@@ -232,6 +238,7 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
     } catch {
       showToast('Network error. Please try again.', 'error')
     } finally {
+      stopProgress()
       setLoading(false)
     }
   }
@@ -239,6 +246,7 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
   async function handleCheckout() {
     if (state !== 'checked_in' || loading) return
     setLoading(true)
+    startProgress()
     try {
       const gps = await collectGps()
       const wifi = getWifiSsid()
@@ -258,7 +266,7 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
       const data = await res.json()
 
       if (res.ok) {
-        const hrs = data.duration_hours ? `${data.duration_hours.toFixed(1)}h` : ''
+        const hrs = data.duration_hours ? fmtHours(data.duration_hours) : ''
         setState('checked_out')
         setActiveEvent(null)
         notifTimers.current.forEach(clearTimeout)
@@ -280,6 +288,7 @@ export default function CheckinButtons({ activeEvent: initialActiveEvent }: Chec
     } catch {
       showToast('Network error. Please try again.', 'error')
     } finally {
+      stopProgress()
       setLoading(false)
     }
   }

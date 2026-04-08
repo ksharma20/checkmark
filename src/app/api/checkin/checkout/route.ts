@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenEventToday, checkoutEvent } from '@/lib/db/queries/events'
 import { updateUserStats } from '@/lib/stats'
-import { extractIp, getIpGeo } from '@/lib/geo'
+import { extractIp, getIpGeo, haversineMetres } from '@/lib/geo'
+import { getGpsSignalsForUser } from '@/lib/db/queries/workspaces'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -36,6 +37,21 @@ export async function POST(request: NextRequest) {
   const ip = extractIp(request)
   const geo = await getIpGeo(ip)
 
+  // Compute checkout_location_mismatch using workspace-configured GPS radius
+  let checkoutLocationMismatch: number | null = null
+  if (body.gps_lat != null && body.gps_lng != null) {
+    const gpsSignals = await getGpsSignalsForUser(userId)
+    if (gpsSignals.length > 0) {
+      let minDist = Infinity
+      let matchedRadius = 300
+      for (const sig of gpsSignals) {
+        const dist = haversineMetres(body.gps_lat, body.gps_lng, sig.gps_lat, sig.gps_lng)
+        if (dist < minDist) { minDist = dist; matchedRadius = sig.gps_radius_m }
+      }
+      checkoutLocationMismatch = minDist <= matchedRadius ? null : Math.round(minDist)
+    }
+  }
+
   const event = await checkoutEvent(openEvent.id, userId, {
     checkoutGpsLat: body.gps_lat ?? null,
     checkoutGpsLng: body.gps_lng ?? null,
@@ -45,6 +61,7 @@ export async function POST(request: NextRequest) {
     checkoutIpGeoLat: geo?.lat ?? null,
     checkoutIpGeoLng: geo?.lng ?? null,
     checkoutReason: body.reason ?? null,
+    checkoutLocationMismatch,
   })
 
   if (!event) {

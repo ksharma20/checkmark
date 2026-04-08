@@ -41,6 +41,14 @@ export default async function MePage() {
   }, 0)
   const locationsThisMonth = stats?.distinct_locations_this_month ?? 0
 
+  function fmtHours(hours: number): string {
+    const h = Math.floor(hours)
+    const m = Math.round((hours - h) * 60)
+    if (h === 0) return `${m}min`
+    if (m === 0) return `${h}hr`
+    return `${h}hr ${m}min`
+  }
+
   // Workspace names for the orgs strip
   const workspaceIds = memberships.map((m) => m.workspace_id)
   const workspaces = await getWorkspacesByIds(workspaceIds)
@@ -70,9 +78,9 @@ export default async function MePage() {
         }}
       >
         {[
-          { value: distinctDaysThisMonth, label: 'days' },
-          { value: `${hoursThisMonth.toFixed(1)}`, label: 'hrs' },
-          { value: locationsThisMonth, label: 'places' },
+          { value: distinctDaysThisMonth, label: 'days', valueSize: '22px' },
+          { value: fmtHours(hoursThisMonth), label: 'this month', valueSize: '16px' },
+          { value: locationsThisMonth, label: 'places', valueSize: '22px' },
         ].map((chip) => (
           <div
             key={chip.label}
@@ -87,7 +95,7 @@ export default async function MePage() {
             <div
               style={{
                 fontFamily: 'Syne, sans-serif',
-                fontSize: '22px',
+                fontSize: chip.valueSize,
                 fontWeight: 700,
                 color: 'var(--navy)',
                 lineHeight: 1,

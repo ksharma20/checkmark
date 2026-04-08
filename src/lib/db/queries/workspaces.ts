@@ -40,6 +40,7 @@ export interface AdminOverride {
   presence_event_id: string
   admin_user_id: string
   note: string | null
+  effective_checkout_at: string | null
   created_at: string
 }
 
@@ -609,5 +610,36 @@ export async function deleteSignalConfig(signalId: string, workspaceId: string):
   await db.execute(
     'DELETE FROM workspace_signal_config WHERE id = ? AND workspace_id = ?',
     [signalId, workspaceId]
+  )
+}
+
+export interface GpsSignalForUser {
+  gps_lat: number
+  gps_lng: number
+  gps_radius_m: number
+}
+
+export async function getGpsSignalsForUser(userId: string): Promise<GpsSignalForUser[]> {
+  return db.query<GpsSignalForUser>(
+    `SELECT wsc.gps_lat, wsc.gps_lng, COALESCE(wsc.gps_radius_m, 300) as gps_radius_m
+     FROM workspace_signal_config wsc
+     INNER JOIN workspace_members wm ON wm.workspace_id = wsc.workspace_id
+     WHERE wm.user_id = ?
+       AND wm.status = 'active'
+       AND wsc.signal_type = 'gps'
+       AND wsc.is_active = 1
+       AND wsc.gps_lat IS NOT NULL`,
+    [userId]
+  )
+}
+
+export async function setEffectiveCheckout(
+  overrideId: string,
+  workspaceId: string,
+  effectiveCheckoutAt: string
+): Promise<void> {
+  await db.execute(
+    `UPDATE admin_overrides SET effective_checkout_at = ? WHERE id = ? AND workspace_id = ?`,
+    [effectiveCheckoutAt, overrideId, workspaceId]
   )
 }

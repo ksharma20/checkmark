@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import type { DashboardMember, DashboardResponse } from '@/app/api/ws/[slug]/dashboard/route'
 import type { MatchedBy } from '@/lib/signals'
 import { formatInTz, durationHours } from '@/lib/timezone'
@@ -46,28 +47,48 @@ function SignalBadge({ matchedBy }: { matchedBy: MatchedBy }) {
 function fmtDuration(hours: number): string {
   const h = Math.floor(hours)
   const m = Math.round((hours - h) * 60)
-  if (h === 0) return `${m}m`
-  if (m === 0) return `${h}h`
-  return `${h}h ${m}m`
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}hr`
+  return `${h}hr ${m}min`
 }
 
 // ─── Row components ───────────────────────────────────────────────────────────
 
-function PersonRow({ member, tz }: { member: DashboardMember; tz: string }) {
+function TrustBadge() {
+  return (
+    <span title="Suspicious trust signals detected" style={{
+      display: 'inline-flex', alignItems: 'center', height: '18px', padding: '0 5px',
+      borderRadius: '4px', fontSize: '11px', fontFamily: 'DM Sans, sans-serif', fontWeight: 600,
+      color: 'var(--amber)', background: 'color-mix(in srgb, var(--amber) 12%, transparent)',
+      border: '1px solid color-mix(in srgb, var(--amber) 40%, transparent)',
+      whiteSpace: 'nowrap', flexShrink: 0,
+    }}>
+      ⚠
+    </span>
+  )
+}
+
+function PersonRow({ member, tz, slug }: { member: DashboardMember; tz: string; slug: string }) {
   const ev = member.latest_event
   const isActive = member.presence_status === 'present'
   const checkinTime = ev ? formatInTz(ev.checkin_at, tz, 'time') : null
   const checkoutTime = ev?.checkout_at ? formatInTz(ev.checkout_at, tz, 'time') : null
   const dur = ev ? durationHours(ev.checkin_at, ev.checkout_at) : null
   const displayName = member.full_name ?? member.email
+  const hasTrustIssue = (ev?.trust_flags?.length ?? 0) > 0
 
   return (
-    <div style={{
-      padding: '11px 14px',
-      background: 'var(--surface-0)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)', marginBottom: '6px',
-    }}>
-      {/* Row 1: name + signal + duration */}
+    <Link
+      href={`/ws/${slug}/members/${member.user_id}`}
+      style={{
+        display: 'block', textDecoration: 'none',
+        padding: '11px 14px',
+        background: 'var(--surface-0)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)', marginBottom: '6px',
+        cursor: 'pointer',
+      }}
+    >
+      {/* Row 1: name + trust badge + signal + duration */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '3px' }}>
         <span style={{
           fontFamily: 'DM Sans, sans-serif', fontWeight: 500, fontSize: '14px',
@@ -81,6 +102,7 @@ function PersonRow({ member, tz }: { member: DashboardMember; tz: string }) {
             </span>
           )}
         </span>
+        {hasTrustIssue && <TrustBadge />}
         {ev && <SignalBadge matchedBy={ev.matched_by} />}
         <span style={{
           fontFamily: 'JetBrains Mono, monospace', fontSize: '12px',
@@ -110,17 +132,21 @@ function PersonRow({ member, tz }: { member: DashboardMember; tz: string }) {
           </span>
         )}
       </div>
-    </div>
+    </Link>
   )
 }
 
-function NotInRow({ member }: { member: DashboardMember }) {
+function NotInRow({ member, slug }: { member: DashboardMember; slug: string }) {
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px',
-      background: 'var(--surface-0)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)', marginBottom: '6px', opacity: 0.65,
-    }}>
+    <Link
+      href={`/ws/${slug}/members/${member.user_id}`}
+      style={{
+        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px',
+        background: 'var(--surface-0)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-md)', marginBottom: '6px', opacity: 0.65,
+        textDecoration: 'none', cursor: 'pointer',
+      }}
+    >
       <span style={{
         fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)',
         flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -135,7 +161,7 @@ function NotInRow({ member }: { member: DashboardMember }) {
           {member.email}
         </span>
       )}
-    </div>
+    </Link>
   )
 }
 
@@ -420,7 +446,7 @@ export default function TodayClient({ slug, tz }: Props) {
           {(statusFilter === 'all' || statusFilter === 'present') && presentMembers.length > 0 && (
             <>
               {statusFilter === 'all' && <SectionLabel>In office now ({counts.present})</SectionLabel>}
-              {presentMembers.map((m) => <PersonRow key={m.member_id} member={m} tz={tz} />)}
+              {presentMembers.map((m) => <PersonRow key={m.member_id} member={m} tz={tz} slug={slug} />)}
             </>
           )}
 
@@ -428,7 +454,7 @@ export default function TodayClient({ slug, tz }: Props) {
           {(statusFilter === 'all' || statusFilter === 'visited') && visitedMembers.length > 0 && (
             <>
               {statusFilter === 'all' && <SectionLabel>Visited today ({counts.visited})</SectionLabel>}
-              {visitedMembers.map((m) => <PersonRow key={m.member_id} member={m} tz={tz} />)}
+              {visitedMembers.map((m) => <PersonRow key={m.member_id} member={m} tz={tz} slug={slug} />)}
             </>
           )}
 
@@ -436,7 +462,7 @@ export default function TodayClient({ slug, tz }: Props) {
           {(statusFilter === 'all' || statusFilter === 'notIn') && notInMembers.length > 0 && (
             <>
               {statusFilter === 'all' && <SectionLabel>Not in today ({counts.notIn})</SectionLabel>}
-              {notInMembers.map((m) => <NotInRow key={m.member_id} member={m} />)}
+              {notInMembers.map((m) => <NotInRow key={m.member_id} member={m} slug={slug} />)}
             </>
           )}
 

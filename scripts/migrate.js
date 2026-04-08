@@ -194,6 +194,15 @@ const ADDITIVE_MIGRATIONS = [
 
   // workspaces
   `ALTER TABLE workspaces ADD COLUMN archived_at TEXT`,
+
+  // presence_events — feedback round 1
+  `ALTER TABLE presence_events ADD COLUMN checkout_location_mismatch INTEGER`,
+  `ALTER TABLE presence_events ADD COLUMN device_info TEXT`,
+  `ALTER TABLE presence_events ADD COLUMN trust_flags TEXT`,
+  `ALTER TABLE presence_events ADD COLUMN device_timezone TEXT`,
+
+  // admin_overrides — effective checkout for regularization
+  `ALTER TABLE admin_overrides ADD COLUMN effective_checkout_at TEXT`,
 ]
 
 // ─── SQLite runner (local dev) ────────────────────────────────────────────────
@@ -201,11 +210,11 @@ const ADDITIVE_MIGRATIONS = [
 function runSQLite() {
   const Database = require('better-sqlite3')
   const dbPath   = path.join(__dirname, '../checkmark.db')
-  const oldPath  = path.join(__dirname, '../checkmark.db')
+  const oldPath = path.join(__dirname, "../checkmark.db");
 
   if (!fs.existsSync(dbPath) && fs.existsSync(oldPath)) {
     fs.copyFileSync(oldPath, dbPath)
-    console.log('✓ Copied checkmark.db → checkmark.db')
+    console.log("✓ Copied checkmark.db → checkmark.db");
   }
 
   const db = new Database(dbPath)

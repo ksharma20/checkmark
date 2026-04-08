@@ -688,7 +688,7 @@ function PersonalSetupStep({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          fullName: fullName.trim(),
+          full_name: fullName.trim(),
           password,
           accountType: 'personal',
         }),
@@ -871,7 +871,7 @@ function OrgSetupStep({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
-          fullName: fullName.trim(),
+          full_name: fullName.trim(),
           password,
           accountType: 'org',
           orgName: orgName.trim(),

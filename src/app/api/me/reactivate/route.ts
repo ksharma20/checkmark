@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     adminWorkspaces.length === 1 ? `/ws/${adminWorkspaces[0].slug}` : '/ws'
 
   return NextResponse.json({
-    user: { id: user.id, email: user.email, fullName: user.full_name },
+    user: { id: user.id, email: user.email, full_name: user.full_name },
     redirect,
   })
 }

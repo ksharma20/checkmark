@@ -48,16 +48,19 @@ export function utcDateKey(utcStr: string): string {
 }
 
 /**
- * Duration between two UTC strings: "45m" or "3.5h".
+ * Duration between two UTC strings: "45min", "4hr", "4hr 30min".
  * Returns null if checkoutStr is null/empty.
  */
 export function durationLabel(checkinStr: string, checkoutStr: string | null): string | null {
   if (!checkoutStr) return null
   const diff = parseUtc(checkoutStr).getTime() - parseUtc(checkinStr).getTime()
   if (diff <= 0) return null
-  const hrs = diff / 3_600_000
-  if (hrs < 1) return `${Math.round(hrs * 60)}m`
-  return `${hrs.toFixed(1)}h`
+  const totalMins = Math.round(diff / 60_000)
+  const hrs = Math.floor(totalMins / 60)
+  const mins = totalMins % 60
+  if (hrs === 0) return `${mins}min`
+  if (mins === 0) return `${hrs}hr`
+  return `${hrs}hr ${mins}min`
 }
 
 /**
@@ -67,6 +70,19 @@ export function durationHoursNum(checkinStr: string, checkoutStr: string | null)
   if (!checkoutStr) return 0
   const diff = parseUtc(checkoutStr).getTime() - parseUtc(checkinStr).getTime()
   return diff > 0 ? diff / 3_600_000 : 0
+}
+
+/**
+ * Converts a decimal hours number to "Xhr Ymin" format.
+ * Examples: 1.5 → "1hr 30min", 2.3 → "2hr 18min", 0.75 → "45min", 2.0 → "2hr".
+ * Use this everywhere a numeric hours value needs to be displayed to a user.
+ */
+export function fmtHours(hours: number): string {
+  const h = Math.floor(hours)
+  const m = Math.round((hours - h) * 60)
+  if (h === 0) return `${m}min`
+  if (m === 0) return `${h}hr`
+  return `${h}hr ${m}min`
 }
 
 /**

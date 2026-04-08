@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { en } from '@/locales/en'
+import LoadingButton from '@/components/shared/LoadingButton'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -141,54 +142,56 @@ function StatusMsg({ msg }: { msg: { text: string; ok: boolean } | null }) {
 
 // ─── Profile section ──────────────────────────────────────────────────────────
 
-function ProfileSection() {
-  const [fullName, setFullName] = useState('')
-  const [email, setEmail] = useState('')
+function ProfileSection({ initialName, email }: { initialName: string; email: string }) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [name, setName] = useState(initialName)
+  const [savedName, setSavedName] = useState(initialName)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
 
-  useEffect(() => {
-    fetch('/api/me')
-      .then((r) => r.json())
-      .then((d) => {
-        setFullName(d.user?.fullName ?? '')
-        setEmail(d.user?.email ?? '')
-      })
-      .catch(() => {})
-  }, [])
-
-  async function save() {
-    setLoading(true)
-    setStatus(null)
+  async function handleSave() {
+    setLoading(true); setStatus(null)
     try {
-      const res = await fetch('/api/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fullName }),
-      })
-      setStatus(res.ok ? { text: 'Name updated', ok: true } : { text: 'Update failed', ok: false })
-    } finally {
-      setLoading(false)
-    }
+      const res = await fetch("/api/me", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ full_name: name }),
+      });
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) { setSavedName(name); setIsEditing(false); setStatus({ text: 'Saved', ok: true }) }
+      else { setStatus({ text: data.error ?? 'Failed to save', ok: false }) }
+    } finally { setLoading(false) }
   }
+
+  function handleCancel() { setName(savedName); setIsEditing(false); setStatus(null) }
 
   return (
     <SectionCard title="Profile">
-      {email && (
-        <div style={{ marginBottom: '12px' }}>
-          <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'DM Sans, sans-serif', marginBottom: '5px' }}>
-            Email
-          </label>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-primary)', padding: '10px 12px', background: 'var(--surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-            {email}
-          </p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ marginBottom: '12px' }}>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'DM Sans, sans-serif', marginBottom: '4px' }}>Email</label>
+            <p style={{ fontSize: '14px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-muted)', padding: '6px 0' }}>{email}</p>
+          </div>
+          <div>
+            <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'DM Sans, sans-serif', marginBottom: '4px' }}>Full name</label>
+            {isEditing
+              ? <input type="text" value={name} onChange={(e) => setName(e.target.value)} autoFocus style={{ width: '100%', height: '44px', padding: '0 12px', border: '1px solid var(--brand)', borderRadius: 'var(--radius-md)', fontSize: '14px', fontFamily: 'DM Sans, sans-serif', background: 'var(--surface-0)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box' }} />
+              : <p style={{ fontSize: '14px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-primary)', padding: '6px 0' }}>{savedName || '—'}</p>
+            }
+          </div>
+        </div>
+        {!isEditing && (
+          <button onClick={() => setIsEditing(true)} style={{ marginLeft: '12px', background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '6px 14px', fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', cursor: 'pointer', flexShrink: 0 }}>Edit</button>
+        )}
+      </div>
+      {isEditing && (
+        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+          <LoadingButton loading={loading} onClick={handleSave}>Save</LoadingButton>
+          <LoadingButton variant="outline" onClick={handleCancel}>Cancel</LoadingButton>
         </div>
       )}
-      <FieldInput label="Full name" value={fullName} onChange={setFullName} placeholder="Your name" />
-      <Btn onClick={save} loading={loading}>
-        Save
-      </Btn>
-      <StatusMsg msg={status} />
+      {status && <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: status.ok ? 'var(--teal)' : 'var(--danger)', marginTop: '8px' }}>{status.text}</p>}
     </SectionCard>
   )
 }
@@ -279,52 +282,49 @@ function EmailSection() {
 // ─── Password section ─────────────────────────────────────────────────────────
 
 function PasswordSection() {
+  const [isEditing, setIsEditing] = useState(false)
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
 
-  async function changePassword() {
-    setStatus(null)
-    if (next !== confirm) {
-      setStatus({ text: 'New passwords do not match', ok: false })
-      return
-    }
-    if (next.length < 8) {
-      setStatus({ text: 'Password must be at least 8 characters', ok: false })
-      return
-    }
-    setLoading(true)
+  function handleCancel() { setCurrent(''); setNext(''); setConfirm(''); setIsEditing(false); setStatus(null) }
+
+  async function handleSave() {
+    if (next.length < 8) { setStatus({ text: 'Password must be at least 8 characters', ok: false }); return }
+    if (next !== confirm) { setStatus({ text: 'Passwords do not match', ok: false }); return }
+    setLoading(true); setStatus(null)
     try {
-      const res = await fetch('/api/me/password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentPassword: current, newPassword: next }),
-      })
-      if (res.ok) {
-        setStatus({ text: 'Password changed', ok: true })
-        setCurrent('')
-        setNext('')
-        setConfirm('')
-      } else {
-        const data = await res.json()
-        setStatus({ text: data.error || 'Failed', ok: false })
-      }
-    } finally {
-      setLoading(false)
-    }
+      const res = await fetch('/api/me/password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: current, newPassword: next }) })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) { handleCancel(); setStatus({ text: 'Password updated', ok: true }) }
+      else { setStatus({ text: data.error ?? 'Failed', ok: false }) }
+    } finally { setLoading(false) }
   }
 
   return (
     <SectionCard title="Password">
-      <FieldInput label="Current password" type="password" value={current} onChange={setCurrent} />
-      <FieldInput label="New password" type="password" value={next} onChange={setNext} placeholder="At least 8 characters" />
-      <FieldInput label="Confirm new password" type="password" value={confirm} onChange={setConfirm} />
-      <Btn onClick={changePassword} loading={loading}>
-        Change password
-      </Btn>
-      <StatusMsg msg={status} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        {!isEditing && (
+          <>
+            <p style={{ fontSize: '14px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-muted)' }}>••••••••</p>
+            <button onClick={() => setIsEditing(true)} style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', padding: '6px 14px', fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', cursor: 'pointer' }}>Edit</button>
+          </>
+        )}
+      </div>
+      {isEditing && (
+        <>
+          <FieldInput label="Current password" type="password" value={current} onChange={setCurrent} />
+          <FieldInput label="New password" type="password" value={next} onChange={setNext} />
+          <FieldInput label="Confirm new password" type="password" value={confirm} onChange={setConfirm} />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+            <LoadingButton loading={loading} onClick={handleSave}>Save</LoadingButton>
+            <LoadingButton variant="outline" onClick={handleCancel}>Cancel</LoadingButton>
+          </div>
+        </>
+      )}
+      {status && <p style={{ fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: status.ok ? 'var(--teal)' : 'var(--danger)', marginTop: '8px' }}>{status.text}</p>}
     </SectionCard>
   )
 }
@@ -869,6 +869,19 @@ function DangerSection() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const [profileName, setProfileName] = useState('')
+  const [profileEmail, setProfileEmail] = useState('')
+
+  useEffect(() => {
+    fetch('/api/me')
+      .then((r) => r.json())
+      .then((d) => {
+        setProfileName(d.user?.full_name ?? "");
+        setProfileEmail(d.user?.email ?? '')
+      })
+      .catch(() => {})
+  }, [])
+
   return (
     <div style={{ maxWidth: "480px", margin: "0 auto", padding: "20px 16px" }}>
       <h1
@@ -882,10 +895,9 @@ export default function SettingsPage() {
       >
         Settings
       </h1>
-      <ProfileSection />
+      <ProfileSection initialName={profileName} email={profileEmail} />
       <EmailSection />
       <PasswordSection />
-      <TokensSection />
       <OrgSection />
       <LogoutSection />
       <DangerSection />

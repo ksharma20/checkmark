@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   }
   const user = await getUserById(userId)
   if (!user) return NextResponse.json({ error: 'User not found', code: 'NOT_FOUND' }, { status: 404 })
-  return NextResponse.json({ user: { id: user.id, email: user.email, fullName: user.full_name } })
+  return NextResponse.json({ user: { id: user.id, email: user.email, full_name: user.full_name } })
 }
 
 export async function PATCH(request: NextRequest) {
@@ -19,19 +19,19 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
-  let body: { fullName?: string }
+  let body: { full_name?: string }
   try {
     body = await request.json()
   } catch {
     return NextResponse.json({ error: 'Invalid body', code: 'INVALID_BODY' }, { status: 400 })
   }
 
-  const fullName = (body.fullName ?? '').trim()
-  if (!fullName) {
-    return NextResponse.json({ error: 'fullName is required', code: 'MISSING_FIELD' }, { status: 400 })
+  const full_name = (body.full_name ?? '').trim()
+  if (!full_name) {
+    return NextResponse.json({ error: 'full_name is required', code: 'MISSING_FIELD' }, { status: 400 })
   }
 
-  await updateUserName(userId, fullName)
+  await updateUserName(userId, full_name)
   return NextResponse.json({ success: true })
 }
 
