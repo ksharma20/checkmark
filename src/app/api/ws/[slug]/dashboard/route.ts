@@ -18,16 +18,24 @@ export interface DashboardMember {
     checkout_at: string | null
     matched_by: MatchedBy
     trust_flags: string[]
+    wifi_ssid: string | null
+    ip_address: string
+    gps_lat: number | null
+    gps_lng: number | null
+    location_label: string | null
   } | null
   event_count: number
 }
 
 export interface DashboardResponse {
   members: DashboardMember[]
+  all_members: DashboardMember[]
   total: number
   page: number
   limit: number
-  counts: { present: number; visited: number; notIn: number; total: number }
+  counts: { present: number; visited: number; notIn: number; total: number; office: number; remote: number }
+  location_counts: { label: string; count: number }[]
+  workspace_name: string
 }
 
 function nextDayStr(dateStr: string): string {
@@ -103,6 +111,11 @@ export async function GET(
             checkout_at: latest.checkout_at,
             matched_by: latest.matched_by,
             trust_flags: latest.trust_flags ? (JSON.parse(latest.trust_flags) as string[]) : [],
+            wifi_ssid: latest.wifi_ssid,
+            ip_address: latest.ip_address,
+            gps_lat: latest.gps_lat,
+            gps_lng: latest.gps_lng,
+            location_label: latest.location_label,
           }
         : null,
       event_count: userEvents.length,
@@ -115,6 +128,8 @@ export async function GET(
     visited: allMembers.filter((m) => m.presence_status === 'visited').length,
     notIn: allMembers.filter((m) => m.presence_status === 'notIn').length,
     total: allMembers.length,
+    office: allMembers.filter((m) => m.presence_status !== 'notIn' && (m.latest_event?.matched_by === 'wifi' || m.latest_event?.matched_by === 'gps')).length,
+    remote: allMembers.filter((m) => m.presence_status !== 'notIn' && m.latest_event?.matched_by !== 'wifi' && m.latest_event?.matched_by !== 'gps').length,
   }
 
   // Apply filters
@@ -163,10 +178,23 @@ export async function GET(
     return sortDir === 'asc' ? cmp : -cmp
   })
 
+  // Location counts from all active members (unfiltered, current presence)
+  const locationMap = new Map<string, number>()
+  for (const m of allMembers) {
+    if (m.presence_status === 'notIn') continue
+    const isOffice = m.latest_event?.matched_by === 'wifi' || m.latest_event?.matched_by === 'gps'
+    const label = m.latest_event?.location_label
+      ?? (isOffice ? (m.latest_event?.matched_by === 'wifi' ? 'Office (Wi-Fi)' : 'Office (GPS)') : 'Remote')
+    locationMap.set(label, (locationMap.get(label) ?? 0) + 1)
+  }
+  const location_counts = [...locationMap.entries()]
+    .map(([label, count]) => ({ label, count }))
+    .sort((a, b) => b.count - a.count)
+
   // Paginate
   const total = filtered.length
   const offset = (page - 1) * limit
   const paged = filtered.slice(offset, offset + limit)
 
-  return NextResponse.json({ members: paged, total, page, limit, counts } satisfies DashboardResponse)
+  return NextResponse.json({ members: paged, all_members: allMembers, total, page, limit, counts, location_counts, workspace_name: workspace.name } satisfies DashboardResponse)
 }

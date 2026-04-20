@@ -303,7 +303,7 @@ function EventRow({
       </div>
 
       {/* Override action */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0, alignItems: 'flex-end' }}>
+      <div style={{ flex: '0 0 100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
         <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
           <input
             type="text"
@@ -311,11 +311,12 @@ function EventRow({
             value={noteValue}
             onChange={(e) => onNoteChange(e.target.value)}
             style={{
+              flex: 1, minWidth: 0,
               height: '32px', padding: '0 10px', fontSize: '12px',
               fontFamily: 'DM Sans, sans-serif',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
               background: 'var(--surface-0)', color: 'var(--text-primary)',
-              outline: 'none', width: '140px',
+              outline: 'none',
             }}
           />
           <button
@@ -323,6 +324,7 @@ function EventRow({
             disabled={overriding}
             onClick={onOverride}
             style={{
+              flexShrink: 0,
               height: '32px', padding: '0 12px',
               fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
               background: 'var(--teal)', color: '#fff',
@@ -338,7 +340,7 @@ function EventRow({
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <label style={{
             fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)',
-            whiteSpace: 'nowrap',
+            whiteSpace: 'nowrap', flexShrink: 0,
           }}>
             Effective checkout:
           </label>
@@ -347,6 +349,7 @@ function EventRow({
             value={checkoutValue}
             onChange={(e) => onCheckoutChange(e.target.value)}
             style={{
+              flex: 1, minWidth: 0,
               height: '30px', padding: '0 8px', fontSize: '12px',
               fontFamily: 'DM Sans, sans-serif',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { KeyRound, Trash2 } from 'lucide-react'
 
 interface Member {
   member_id: string
@@ -177,7 +178,7 @@ function TransferOwnershipModal({ slug, target, onDone, onCancel }: TransferModa
                   cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1,
                 }}
               >
-                {loading ? 'Sending code…' : 'Continue — send verification code'}
+                {loading ? 'Sending code…' : 'Send verification code'}
               </button>
               <button
                 type="button"
@@ -471,6 +472,7 @@ export default function PeopleClient({ slug }: Props) {
           members.map((m, i) => (
             <div
               key={m.member_id}
+              className="member-row"
               style={{
                 display: "flex",
                 alignItems: "center",
@@ -532,27 +534,33 @@ export default function PeopleClient({ slug }: Props) {
                 )}
               </div>
 
-              {/* Role */}
-              <span
-                style={{
-                  fontSize: "12px",
-                  fontFamily: "DM Sans, sans-serif",
-                  color: "var(--text-muted)",
-                  flexShrink: 0,
-                }}
-              >
-                {m.role}
-              </span>
+              {/* Role + Status + Actions — wraps below name on mobile */}
+              <div className="member-meta" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+                <span
+                  style={{
+                    fontSize: "12px",
+                    fontFamily: "DM Sans, sans-serif",
+                    color: "var(--text-muted)",
+                  }}
+                >
+                  {m.role}
+                </span>
 
-              {/* Status badge */}
-              <div style={{ flexShrink: 0 }}>{statusBadge(m.status)}</div>
+                <span className="member-status-badge">{statusBadge(m.status)}</span>
+                <span
+                  className="member-status-dot"
+                  title={m.status === 'active' ? 'Active' : m.status === 'pending_consent' ? 'Invite sent' : 'Declined'}
+                  style={{
+                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
+                    background: m.status === 'active' ? 'var(--teal)' : m.status === 'pending_consent' ? 'var(--amber)' : 'var(--danger)',
+                    display: 'none',
+                  }}
+                />
 
-              {/* Actions */}
-              <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                {/* Transfer ownership — only for active non-admin members, shown only to current admin */}
                 {m.role !== "admin" && m.status === "active" && (
                   <button
                     onClick={() => setTransferTarget(m)}
+                    title="Make owner"
                     style={{
                       background: "none",
                       border: "1px solid var(--border)",
@@ -562,30 +570,37 @@ export default function PeopleClient({ slug }: Props) {
                       fontFamily: "DM Sans, sans-serif",
                       cursor: "pointer",
                       padding: "3px 8px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
                     }}
                   >
-                    Make owner
+                    <KeyRound className="member-btn-icon" size={14} />
+                    <span className="member-btn-label">Make owner</span>
                   </button>
                 )}
 
-                {/* Remove */}
                 {m.role !== "admin" && (
                   <button
                     onClick={() => remove(m.member_id)}
                     disabled={removingId === m.member_id}
+                    title="Remove member"
                     style={{
                       background: "none",
                       border: "none",
                       color: "var(--danger)",
                       fontSize: "12px",
                       fontFamily: "DM Sans, sans-serif",
-                      cursor:
-                        removingId === m.member_id ? "not-allowed" : "pointer",
+                      cursor: removingId === m.member_id ? "not-allowed" : "pointer",
                       padding: "0 4px",
                       opacity: removingId === m.member_id ? 0.5 : 1,
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "4px",
                     }}
                   >
-                    Remove
+                    <Trash2 className="member-btn-icon" size={13} />
+                    <span className="member-btn-label">Remove</span>
                   </button>
                 )}
               </div>

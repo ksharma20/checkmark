@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import { getActiveMemberIds } from '@/lib/db/queries/workspaces'
-import { getEventsForUsers } from '@/lib/db/queries/events'
 import { queryWorkspaceEvents } from '@/lib/signals'
 
 interface Props { params: Promise<{ slug: string }> }
@@ -63,19 +62,64 @@ export async function GET(request: NextRequest, { params }: Props) {
   // Compute date range and bucket definitions based on interval
   let startDate: string
   let endDate: string
-  type BucketDef = { key: string; label: string; match: (dt: Date) => boolean }
+  type BucketDef = {
+    key: string
+    label: string
+    match: (dt: Date) => boolean
+    // When set, use presence-based counting (session spans the bucket window)
+    matchPresence?: (cinDt: Date, coutDt: Date | null) => boolean
+  }
   let bucketDefs: BucketDef[] = []
 
   if (interval === 'today') {
-    startDate = todayStr + 'T00:00:00Z'
-    endDate = todayStr + 'T23:59:59Z'
-    // Hourly buckets: 12 AM to 11 PM
-    for (let h = 0; h < 24; h++) {
+    const tz = ctx.workspace.display_timezone || 'UTC'
+
+    // Helper: date string (YYYY-MM-DD) in workspace timezone
+    const localDateStr = (dt: Date) =>
+      new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(dt)
+
+    // Helper: local hour (0-23) in workspace timezone
+    const localHour = (dt: Date) => {
+      const s = new Intl.DateTimeFormat('en-US', { timeZone: tz, hour: 'numeric', hour12: false }).format(dt)
+      return parseInt(s, 10) % 24 // some locales return "24" for midnight
+    }
+
+    // "Today" in workspace timezone
+    const localToday = localDateStr(now)
+    const nowLocalH = localHour(now)
+
+    // Fetch a ±1 day UTC window to capture all events that are "today" in any timezone offset
+    const [ly, lm, ld] = localToday.split('-').map(Number)
+    startDate = new Date(Date.UTC(ly, lm - 1, ld - 1)).toISOString().slice(0, 10) + 'T00:00:00Z'
+    endDate   = new Date(Date.UTC(ly, lm - 1, ld + 1)).toISOString().slice(0, 10) + 'T23:59:59Z'
+
+    // Only generate buckets up to current local hour — no future zero-count buckets
+    // so the graph stops at now instead of dropping to zero for hours that haven't happened
+    for (let h = 0; h <= nowLocalH; h++) {
       const label = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`
+      const bucketH = h  // capture for closure
+
       bucketDefs.push({
         key: zp(h),
         label,
-        match: (dt) => dt.getUTCHours() === h && dt.toISOString().slice(0, 10) === todayStr,
+        match: (dt) => localDateStr(dt) === localToday && localHour(dt) === bucketH,
+        // Presence-based: person counts for every hour from check-in until checkout
+        // This makes the graph stay flat (e.g. check-in 8AM still in office → flat line 8→now)
+        matchPresence: (cinDt, coutDt) => {
+          const cinDate = localDateStr(cinDt)
+          const cinH = localHour(cinDt)
+
+          // Checked in after this bucket — not present yet
+          if (cinDate > localToday || (cinDate === localToday && cinH > bucketH)) return false
+
+          // Still active (no checkout) — present in all hours from check-in through now
+          if (!coutDt) return true
+
+          // Checked out — present only if checkout is in this hour or later
+          const coutDate = localDateStr(coutDt)
+          const coutH = localHour(coutDt)
+          return coutDate > localToday || (coutDate === localToday && coutH >= bucketH)
+        },
       })
     }
   } else if (interval === 'week') {
@@ -176,6 +220,25 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   // Build buckets
   const buckets: InsightBucket[] = bucketDefs.map((def) => {
+    if (def.matchPresence) {
+      // Presence-based: count users whose session spans this hour window
+      const present = events.filter((ev) => {
+        const cinDt = new Date(ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z')
+        const coutDt = ev.checkout_at
+          ? new Date(ev.checkout_at.includes('T') ? ev.checkout_at : ev.checkout_at.replace(' ', 'T') + 'Z')
+          : null
+        return def.matchPresence!(cinDt, coutDt)
+      })
+      return {
+        label: def.label,
+        key: def.key,
+        unique_users: new Set(present.map((e) => e.user_id)).size,
+        total_checkins: present.length,
+        total_hours: sessionHours(present),
+      }
+    }
+
+    // Default: bucket by checkin_at timestamp
     const matching = events.filter((ev) => def.match(new Date(
       ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z'
     )))

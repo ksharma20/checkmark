@@ -22,7 +22,8 @@ export default async function PeoplePage({ params }: Props) {
   }
 
   return (
-    <div style={{ maxWidth: '640px', margin: '0 auto', padding: '24px 20px' }}>
+    <div style={{ minHeight: '100dvh', background: 'var(--surface-1)', padding: '24px 20px' }}>
+    <div style={{ maxWidth: '640px', margin: '0 auto' }}>
       <h1
         style={{
           fontFamily: 'Syne, sans-serif',
@@ -35,6 +36,7 @@ export default async function PeoplePage({ params }: Props) {
         People
       </h1>
       <PeopleClient slug={slug} />
+    </div>
     </div>
   )
 }

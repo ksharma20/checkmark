@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { DNS_VERIFY_SUBDOMAIN, DNS_VERIFY_VALUE_PREFIX } from '@/lib/constants'
+import { en } from '@/locales/en'
+
+const DNS_VERIFY_SUBDOMAIN    = en.constants.dnsVerifySubdomain
+const DNS_VERIFY_VALUE_PREFIX = en.constants.dnsVerifyValuePrefix
 
 // ─── Timezone options ─────────────────────────────────────────────────────────
 

@@ -5,12 +5,10 @@ import { useRouter } from 'next/navigation'
 import type { PresenceEvent } from '@/lib/db/queries/events'
 import { fmtTimeOnDate, fmtHours } from '@/lib/client/format-time'
 import { en } from '@/locales/en'
-import {
-  STALE_NOTIF_KEY,
-  STALE_NOTIF_EVENT_KEY,
-  NOTIF_TAG_STALE,
-  NOTIF_TAG_AUTO_CHECKOUT,
-} from '@/lib/constants'
+const STALE_NOTIF_KEY        = en.constants.staleNotifKey
+const STALE_NOTIF_EVENT_KEY  = en.constants.staleNotifEventKey
+const NOTIF_TAG_STALE        = en.constants.notifTagStale
+const NOTIF_TAG_AUTO_CHECKOUT = en.constants.notifTagAutoCheckout
 import { startProgress, stopProgress } from '@/components/shared/TopProgressBar'
 import { collectDeviceInfo } from '@/lib/client/device-info'
 

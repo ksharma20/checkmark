@@ -92,6 +92,15 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.no-scrollbar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.no-scrollbar::-webkit-scrollbar {
+  width: 0 !important;
+  display: none !important;
+}
+
 /* Horizontal scroll container that hides its scrollbar (nav tabs, etc.) */
 .scroll-x {
   overflow-x: auto;
@@ -297,3 +306,54 @@ a[href] {
   transition: filter 0.18s ease;
   -webkit-tap-highlight-color: transparent;
 }
+
+/* ── Workspace sidebar — collapsible ─────────────────────── */
+
+/* Mobile: JS controls collapse state; only lock max-width when fully collapsed */
+@media (max-width: 767px) {
+  .ws-sidebar-bottom  { display: none !important; }
+}
+
+/* ── People / member row — mobile layout ── */
+@media (max-width: 540px) {
+  .member-row {
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+  }
+  .member-meta {
+    flex: 0 0 100% !important;
+    padding-left: 48px !important; /* align with name (36px avatar + 12px gap) */
+    margin-top: 6px !important;
+  }
+  .member-btn-label    { display: none !important; }
+  .member-btn-icon     { display: block !important; }
+  .member-status-badge { display: none !important; }
+  .member-status-dot   { display: block !important; }
+}
+
+/* Default: show label, hide icon */
+.member-btn-icon { display: none; }
+
+/* ── Dashboard responsive ─────────────────────────────────── */
+
+/* Mobile: tighten page padding */
+@media (max-width: 479px) {
+  .dash-page { padding: 12px !important; }
+}
+
+/* Mobile: stat cards go full-width */
+@media (max-width: 479px) {
+  .dash-stat-card { flex: 1 1 100% !important; min-width: 0 !important; }
+}
+
+/* Mobile + small tablet: graphs stack vertically */
+@media (max-width: 639px) {
+  .dash-graph-item { flex: 1 1 100% !important; min-width: 0 !important; }
+}
+
+/* Attendance table: horizontal scroll on small screens */
+.dash-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.dash-table-min { min-width: 640px; }

@@ -1,6 +1,5 @@
-// Single source of truth for all brand strings and user-facing copy.
-// To rename the product: change `brand` below — every string that embeds
-// the brand name is built from it, so it updates everywhere automatically.
+// Single source of truth for all brand strings, user-facing copy, and
+// technical identifiers. To rename the product: change `brand` below.
 
 const brand = 'CheckMark'
 
@@ -76,6 +75,29 @@ export const en = {
       revoke: `Your data always belongs to you. You can revoke access at any time from your ${brand} profile.`,
       footer: `${brand} is a presence intelligence platform that lets employees own their work history.`,
     },
+  },
+
+  constants: {
+    // ── Auth cookies ──────────────────────────────────────────────────────────
+    cookieSession:        'cm_session',
+    cookieOtp:            'cm_otp_ok',
+
+    // ── Domain verification ───────────────────────────────────────────────────
+    // DNS TXT: _checkmark-verify.{domain}  IN TXT  "checkmark-verify={token}"
+    dnsVerifySubdomain:   '_checkmark-verify',
+    dnsVerifyValuePrefix: 'checkmark-verify',
+
+    // ── Database ──────────────────────────────────────────────────────────────
+    dbFile:               'checkmark.db',
+
+    // ── HTTP ──────────────────────────────────────────────────────────────────
+    geoUserAgent:         'CheckMark/1.0 (presence-platform)',
+
+    // ── Browser storage / notification tags (CheckinButtons) ─────────────────
+    staleNotifKey:        'cm_stale_notif_count',
+    staleNotifEventKey:   'cm_stale_notif_event',
+    notifTagStale:        'cm-stale-checkin',
+    notifTagAutoCheckout: 'cm-auto-checkout',
   },
 
   notifications: {

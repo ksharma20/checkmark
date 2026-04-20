@@ -1,7 +1,7 @@
 // DB abstraction layer — better-sqlite3 (local dev) | Turso/libSQL (production)
 // All query files use this interface; switching backends requires no query changes.
 
-import { DB_FILE } from "@/lib/constants";
+import { en } from "@/locales/en";
 
 export type QueryResult<T> = T[];
 
@@ -27,7 +27,7 @@ function createSQLiteDB(): DB {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require("better-sqlite3");
   const path = require("path") as typeof import("path");
-  const dbPath = path.join(process.cwd(), DB_FILE);
+  const dbPath = path.join(process.cwd(), en.constants.dbFile);
   const sqlite = new Database(dbPath) as import("better-sqlite3").Database;
 
   sqlite.pragma("journal_mode = WAL");

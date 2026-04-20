@@ -3,7 +3,7 @@
  * Called once at check-in time and stored in presence_events.location_label.
  * Never called from client components — avoids 429s from repeated browser-side requests.
  */
-import { GEO_USER_AGENT } from '@/lib/constants'
+import { en } from '@/locales/en'
 
 export async function reverseGeocodeLabel(lat: number, lng: number): Promise<string | null> {
   try {
@@ -11,7 +11,7 @@ export async function reverseGeocodeLabel(lat: number, lng: number): Promise<str
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
       {
         headers: {
-          'User-Agent': GEO_USER_AGENT,
+          'User-Agent': en.constants.geoUserAgent,
           'Accept-Language': 'en',
         },
         cache: 'no-store',

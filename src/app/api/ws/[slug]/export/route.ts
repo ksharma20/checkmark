@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
-import { getPlanLimits } from '@/lib/plans'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 
@@ -45,15 +44,6 @@ export async function GET(request: NextRequest, { params }: Props) {
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { workspace } = ctx
-  const planLimits = getPlanLimits(workspace.plan)
-
-  if (!planLimits.csvExport) {
-    return NextResponse.json(
-      { error: 'CSV export requires Starter or Growth plan', code: 'PLAN_REQUIRED' },
-      { status: 402 }
-    )
-  }
-
   const url = new URL(request.url)
   const now = new Date()
   const defaultYear = now.getUTCFullYear()

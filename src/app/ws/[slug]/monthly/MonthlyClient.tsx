@@ -15,7 +15,6 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function dayColor(status: DayStatus, signalsConfigured: boolean): string {
   if (status === 'future') return 'transparent'
@@ -37,12 +36,6 @@ function dayBorder(status: DayStatus, signalsConfigured: boolean): string {
   return 'transparent'
 }
 
-function dayLabel(status: DayStatus, signalsConfigured: boolean): string {
-  if (status === 'office') return signalsConfigured ? 'O' : '✓'
-  if (status === 'remote') return 'R'
-  if (status === 'absent') return '—'
-  return ''
-}
 
 interface CalendarCellProps {
   day: number
@@ -91,7 +84,7 @@ function CalendarCell({ day, dateStr, status, signalsConfigured }: CalendarCellP
         color: s === 'future' ? 'var(--text-muted)' : 'var(--text-primary)',
         fontWeight: s === 'office' ? 600 : 400,
       }}>
-        {s === 'future' ? day : dayLabel(s, signalsConfigured)}
+        {day}
       </span>
     </div>
   )
@@ -332,32 +325,6 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
         </div>
       )}
 
-      {/* Day header */}
-      {data && (
-        <div style={{
-          display: 'flex', gap: '3px', alignItems: 'center',
-          padding: '6px 16px 6px 192px',
-          borderBottom: '1px solid var(--border)',
-          overflowX: 'auto',
-          minWidth: 'max-content',
-        }}>
-          {Array.from({ length: data.days_in_month }, (_, i) => {
-            const d = i + 1
-            const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-            const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay()
-            return (
-              <div key={d} style={{
-                width: '28px', textAlign: 'center',
-                fontFamily: 'JetBrains Mono, monospace', fontSize: '9px',
-                color: (dow === 0 || dow === 6) ? 'var(--text-muted)' : 'var(--text-secondary)',
-              }}>
-                <div>{DAY_LABELS[dow]}</div>
-                <div>{d}</div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {/* Content */}
       {loading ? (

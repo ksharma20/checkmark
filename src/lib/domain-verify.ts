@@ -1,6 +1,9 @@
 import { createHmac } from 'crypto'
 import dns from 'dns'
-import { DNS_VERIFY_SUBDOMAIN, DNS_VERIFY_VALUE_PREFIX } from '@/lib/constants'
+import { en } from '@/locales/en'
+
+const DNS_VERIFY_SUBDOMAIN   = en.constants.dnsVerifySubdomain
+const DNS_VERIFY_VALUE_PREFIX = en.constants.dnsVerifyValuePrefix
 
 // Returns a deterministic HMAC token for a workspace+domain pair.
 // Admin must add TXT record: {DNS_VERIFY_SUBDOMAIN}.{domain} IN TXT "{DNS_VERIFY_VALUE_PREFIX}={token}"
