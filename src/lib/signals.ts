@@ -1,4 +1,4 @@
-import { getWorkspaceSignals } from './db/queries/signals'
+import { getWorkspaceSignals, WorkspaceSignalConfig } from './db/queries/signals'
 import { getActiveMemberIds } from './db/queries/workspaces'
 import { getEventsForUsers, PresenceEvent } from './db/queries/events'
 import { getOverrideEventIds } from './db/queries/workspaces'
@@ -8,10 +8,11 @@ import { historyStartDate, getPlanLimits } from './plans'
 
 export { haversineMetres }
 
-export type MatchedBy = 'wifi' | 'gps' | 'ip' | 'none' | 'override'
+export type MatchedBy = 'verified' | 'partial' | 'none' | 'override'
 
 export interface PresenceEventWithMatch extends PresenceEvent {
   matched_by: MatchedBy
+  matched_signals: string[]  // which signal types actually matched: e.g. ['gps', 'wifi']
 }
 
 export interface QueryWorkspaceEventsOptions {
@@ -73,77 +74,96 @@ export async function queryWorkspaceEvents(
   const signals = await getWorkspaceSignals(workspaceId)
   const overrideEventIds = await getOverrideEventIds(workspaceId)
 
-  // Config-light mode: no signals configured OR admin override
-  if (signals.length === 0 || options.overrideShowAll) {
+  // Config-light mode: no signals configured at all — return all events unfiltered
+  if (signals.length === 0) {
     return filteredEvents.map((event) => ({
       ...event,
-      matched_by: overrideEventIds.has(event.id) ? 'override' : 'none',
+      matched_by: overrideEventIds.has(event.id) ? 'override' as MatchedBy : 'none' as MatchedBy,
+      matched_signals: [] as string[],
     }))
   }
 
   // Signal matching mode
   // WiFi hashes need async bcrypt comparison — collect them first
+  type GpsSignal = WorkspaceSignalConfig & { gps_lat: number; gps_lng: number }
+  type IpSignal = WorkspaceSignalConfig & { ip_geo_lat: number; ip_geo_lng: number }
+
   const wifiSignals = signals.filter((s) => s.signal_type === 'wifi' && s.wifi_ssid_hash)
-  const gpsSignals = signals.filter((s) => s.signal_type === 'gps' && s.gps_lat !== null && s.gps_lng !== null)
-  const ipSignals = signals.filter((s) => s.signal_type === 'ip' && s.ip_geo_lat !== null && s.ip_geo_lng !== null)
+  const gpsSignals = signals.filter((s): s is GpsSignal =>
+    s.signal_type === 'gps' && s.gps_lat !== null && s.gps_lng !== null
+  )
+  const ipSignals = signals.filter((s): s is IpSignal =>
+    s.signal_type === 'ip' && s.ip_geo_lat !== null && s.ip_geo_lng !== null
+  )
+
+  // Determine which signal types are configured for this workspace
+  const configuredTypes = new Set<string>()
+  if (gpsSignals.length > 0) configuredTypes.add('gps')
+  if (ipSignals.length > 0) configuredTypes.add('ip')
+  if (wifiSignals.length > 0) configuredTypes.add('wifi')
 
   const result: PresenceEventWithMatch[] = []
 
   for (const event of filteredEvents) {
-    // Admin override takes precedence
+    // Admin override always passes through — bypass signal matching entirely
     if (overrideEventIds.has(event.id)) {
-      result.push({ ...event, matched_by: 'override' })
+      result.push({ ...event, matched_by: 'override', matched_signals: [] })
       continue
     }
 
-    let matchedBy: MatchedBy = 'none'
+    const matched = new Set<string>()
 
-    // Check GPS signals
-    if (matchedBy === 'none' && event.gps_lat !== null && event.gps_lng !== null) {
+    // GPS: check if event GPS coords match any configured GPS signal within radius
+    if (configuredTypes.has('gps') && event.gps_lat !== null && event.gps_lng !== null) {
       for (const signal of gpsSignals) {
         const radius = options.overrideGpsRadius ?? signal.gps_radius_m ?? 300
-        const distance = haversineMetres(
-          event.gps_lat,
-          event.gps_lng,
-          signal.gps_lat!,
-          signal.gps_lng!
-        )
-        if (distance < radius) {
-          matchedBy = 'gps'
+        if (haversineMetres(event.gps_lat, event.gps_lng, signal.gps_lat, signal.gps_lng) <= radius) {
+          matched.add('gps')
           break
         }
       }
     }
 
-    // Check IP signals
-    if (matchedBy === 'none' && event.ip_geo_lat !== null && event.ip_geo_lng !== null) {
+    // IP: check if event IP geo coords match any configured IP signal within proximity
+    if (configuredTypes.has('ip') && event.ip_geo_lat !== null && event.ip_geo_lng !== null) {
       for (const signal of ipSignals) {
-        const distance = haversineMetres(
-          event.ip_geo_lat,
-          event.ip_geo_lng,
-          signal.ip_geo_lat!,
-          signal.ip_geo_lng!
-        )
-        if (distance < (signal.ip_proximity_m ?? 500)) {
-          matchedBy = 'ip'
+        if (haversineMetres(event.ip_geo_lat, event.ip_geo_lng, signal.ip_geo_lat, signal.ip_geo_lng) <= (signal.ip_proximity_m ?? 500)) {
+          matched.add('ip')
           break
         }
       }
     }
 
-    // Check WiFi signals (async bcrypt)
-    if (matchedBy === 'none' && event.wifi_ssid && wifiSignals.length > 0) {
+    // WiFi: async bcrypt comparison — O(events × wifi_configs), cost 12 per compare (~300ms each).
+    // Bounded by plan.maxLocations (free/starter=1, growth=5). Acceptable at current scale.
+    // Future: replace bcrypt with HMAC for O(1) comparison at query time.
+    if (configuredTypes.has('wifi') && event.wifi_ssid && wifiSignals.length > 0) {
       for (const signal of wifiSignals) {
-        const matches = await verifyWifiSsid(event.wifi_ssid, signal.wifi_ssid_hash!)
-        if (matches) {
-          matchedBy = 'wifi'
+        if (await verifyWifiSsid(event.wifi_ssid, signal.wifi_ssid_hash!)) {
+          matched.add('wifi')
           break
         }
       }
     }
 
-    result.push({ ...event, matched_by: matchedBy })
+    // AND semantics: ALL configured types must match
+    const allMatched = configuredTypes.size > 0 && [...configuredTypes].every(t => matched.has(t))
+    const anyMatched = matched.size > 0
+    const matched_by: MatchedBy = allMatched ? 'verified' : anyMatched ? 'partial' : 'none'
+
+    result.push({ ...event, matched_by, matched_signals: [...matched] })
   }
 
   return result
+}
+
+/**
+ * Returns true only if the event was fully verified AND checkout location matched.
+ * Used to determine whether hours count as "in office" presence.
+ */
+export function eventCountsAsOfficePresence(event: PresenceEventWithMatch): boolean {
+  if (event.matched_by !== 'verified') return false
+  // If checkout GPS was captured and mismatched office location, don't count hours
+  if (event.checkout_location_mismatch !== null && event.checkout_location_mismatch > 0) return false
+  return true
 }

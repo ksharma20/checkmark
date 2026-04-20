@@ -49,8 +49,8 @@ export async function POST(request: NextRequest) {
   const activeWorkspaces = await getAdminWorkspacesForUser(userId)
   if (activeWorkspaces.length >= 1) {
     return NextResponse.json(
-      { error: 'You already have an active workspace. Archive it before creating a new one.', code: 'WORKSPACE_LIMIT' },
-      { status: 402 }
+      { error: 'You already have a workspace. Contact us to create additional workspaces.', code: 'WORKSPACE_LIMIT_REACHED' },
+      { status: 403 }
     )
   }
 

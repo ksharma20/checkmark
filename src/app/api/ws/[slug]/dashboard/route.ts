@@ -17,12 +17,14 @@ export interface DashboardMember {
     checkin_at: string
     checkout_at: string | null
     matched_by: MatchedBy
+    matched_signals: string[]
     trust_flags: string[]
     wifi_ssid: string | null
     ip_address: string
     gps_lat: number | null
     gps_lng: number | null
     location_label: string | null
+    checkout_location_mismatch: number | null
   } | null
   event_count: number
 }
@@ -110,12 +112,14 @@ export async function GET(
             checkin_at: latest.checkin_at,
             checkout_at: latest.checkout_at,
             matched_by: latest.matched_by,
+            matched_signals: latest.matched_signals,
             trust_flags: latest.trust_flags ? (JSON.parse(latest.trust_flags) as string[]) : [],
             wifi_ssid: latest.wifi_ssid,
             ip_address: latest.ip_address,
             gps_lat: latest.gps_lat,
             gps_lng: latest.gps_lng,
             location_label: latest.location_label,
+            checkout_location_mismatch: latest.checkout_location_mismatch ?? null,
           }
         : null,
       event_count: userEvents.length,
@@ -128,8 +132,8 @@ export async function GET(
     visited: allMembers.filter((m) => m.presence_status === 'visited').length,
     notIn: allMembers.filter((m) => m.presence_status === 'notIn').length,
     total: allMembers.length,
-    office: allMembers.filter((m) => m.presence_status !== 'notIn' && (m.latest_event?.matched_by === 'wifi' || m.latest_event?.matched_by === 'gps')).length,
-    remote: allMembers.filter((m) => m.presence_status !== 'notIn' && m.latest_event?.matched_by !== 'wifi' && m.latest_event?.matched_by !== 'gps').length,
+    office: allMembers.filter((m) => m.presence_status !== 'notIn' && (m.latest_event?.matched_by === 'verified' || m.latest_event?.matched_by === 'override')).length,
+    remote: allMembers.filter((m) => m.presence_status !== 'notIn' && m.latest_event?.matched_by !== 'verified' && m.latest_event?.matched_by !== 'override').length,
   }
 
   // Apply filters
@@ -182,9 +186,12 @@ export async function GET(
   const locationMap = new Map<string, number>()
   for (const m of allMembers) {
     if (m.presence_status === 'notIn') continue
-    const isOffice = m.latest_event?.matched_by === 'wifi' || m.latest_event?.matched_by === 'gps'
+    const isOffice = m.latest_event?.matched_by === 'verified' || m.latest_event?.matched_by === 'override'
+    const signalLabels = m.latest_event?.matched_signals ?? []
     const label = m.latest_event?.location_label
-      ?? (isOffice ? (m.latest_event?.matched_by === 'wifi' ? 'Office (Wi-Fi)' : 'Office (GPS)') : 'Remote')
+      ?? (isOffice
+        ? (signalLabels.includes('wifi') ? 'Office (Wi-Fi)' : signalLabels.includes('gps') ? 'Office (GPS)' : 'Office')
+        : 'Remote')
     locationMap.set(label, (locationMap.get(label) ?? 0) + 1)
   }
   const location_counts = [...locationMap.entries()]

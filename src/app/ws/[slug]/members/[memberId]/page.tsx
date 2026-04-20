@@ -4,14 +4,39 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { fmtTime, durationLabel } from "@/lib/client/format-time";
 import type { MatchedBy } from "@/lib/signals";
+// MatchedBy is kept for the EventWithMatch type below
 
-const SIGNAL_BADGE: Record<MatchedBy, { label: string; color: string }> = {
-  wifi: { label: "WiFi", color: "var(--teal)" },
-  gps: { label: "GPS", color: "var(--brand)" },
-  ip: { label: "IP", color: "var(--amber)" },
-  override: { label: "Override", color: "#8B5CF6" },
-  none: { label: "—", color: "var(--text-muted)" },
-};
+function SignalBadge({ matchedBy, matchedSignals }: { matchedBy: string; matchedSignals?: string[] }) {
+  if (matchedBy === 'override') {
+    return (
+      <span style={{ background: '#7C3AED', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+        Override
+      </span>
+    )
+  }
+  if (matchedBy === 'verified') {
+    const labels = (matchedSignals ?? []).map(s => s.toUpperCase()).join('+')
+    return (
+      <span style={{ background: 'var(--teal)', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+        ✓ {labels || 'Verified'}
+      </span>
+    )
+  }
+  if (matchedBy === 'partial') {
+    const labels = (matchedSignals ?? []).map(s => s.toUpperCase()).join('+')
+    return (
+      <span style={{ background: 'var(--amber)', color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+        ~ {labels || 'Partial'}
+      </span>
+    )
+  }
+  // 'none' or unknown
+  return (
+    <span style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', border: '1px solid var(--border)', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>
+      Unverified
+    </span>
+  )
+}
 
 const TRUST_LABELS: Record<string, string> = {
   mock_gps_suspected: "Mock GPS — accuracy ≤1m (likely fake GPS app)",
@@ -37,6 +62,7 @@ interface EventWithMatch {
   checkin_at: string;
   checkout_at: string | null;
   matched_by: MatchedBy;
+  matched_signals: string[];
   trust_flags: string | null;
   checkout_location_mismatch: number | null;
   wifi_ssid: string | null;
@@ -128,7 +154,6 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
       return null;
     }
   })();
-  const badge = SIGNAL_BADGE[ev.matched_by];
   const dur = durationLabel(ev.checkin_at, ev.checkout_at);
   return (
     <div
@@ -170,20 +195,8 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
             {dur}
           </span>
         )}
-        <span
-          style={{
-            marginLeft: "auto",
-            fontSize: "11px",
-            fontFamily: "DM Sans, sans-serif",
-            fontWeight: 600,
-            color: badge.color,
-            background: `color-mix(in srgb,${badge.color} 12%,transparent)`,
-            padding: "2px 7px",
-            borderRadius: "4px",
-            border: `1px solid ${badge.color}`,
-          }}
-        >
-          {badge.label}
+        <span style={{ marginLeft: "auto" }}>
+          <SignalBadge matchedBy={ev.matched_by} matchedSignals={ev.matched_signals} />
         </span>
         {flags && flags.length > 0 && <TrustPopover flags={flags} />}
         {ev.checkout_location_mismatch != null && (

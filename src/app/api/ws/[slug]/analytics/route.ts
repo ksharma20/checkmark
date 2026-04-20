@@ -143,7 +143,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     const checkinLocations: [number, number][] = []
 
     for (const [, dayEvents] of byDay) {
-      const hasOffice = dayEvents.some((e) => e.matched_by === 'wifi' || e.matched_by === 'gps' || e.matched_by === 'ip' || e.matched_by === 'override')
+      const hasOffice = dayEvents.some((e) => e.matched_by === 'verified' || e.matched_by === 'override')
       const hasAny = dayEvents.length > 0
 
       if (hasOffice) {

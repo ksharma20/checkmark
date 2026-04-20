@@ -137,7 +137,7 @@ export async function getUsersMatchingDomainNotInWorkspace(
 ): Promise<{ id: string; email: string }[]> {
   return db.query<{ id: string; email: string }>(
     `SELECT u.id, u.email FROM users u
-     WHERE u.email LIKE ? AND u.email_verified = 1
+     WHERE u.email LIKE ? AND u.email_verified = 1 AND u.deleted_at IS NULL
      AND u.id NOT IN (
        SELECT user_id FROM workspace_members
        WHERE workspace_id = ? AND user_id IS NOT NULL AND status = 'active'
@@ -425,7 +425,7 @@ export async function getActiveMembersWithDetails(workspaceId: string): Promise<
   return db.query<MemberWithUser>(
     `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name
      FROM workspace_members wm
-     LEFT JOIN users u ON u.id = wm.user_id
+     LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
      WHERE wm.workspace_id = ? AND wm.status = 'active' AND wm.user_id IS NOT NULL
      ORDER BY u.full_name ASC, wm.email ASC`,
     [workspaceId]
@@ -505,7 +505,7 @@ export async function getAllMembersWithDetails(workspaceId: string): Promise<Mem
   return db.query<MemberWithUserFull>(
     `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, wm.status, wm.added_at, u.full_name
      FROM workspace_members wm
-     LEFT JOIN users u ON u.id = wm.user_id
+     LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
      WHERE wm.workspace_id = ?
      ORDER BY wm.added_at DESC`,
     [workspaceId]

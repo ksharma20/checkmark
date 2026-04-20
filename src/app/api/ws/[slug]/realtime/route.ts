@@ -78,9 +78,11 @@ export async function GET(
     if (!locationMap.has(label)) locationMap.set(label, new Set())
   }
   for (const ev of recentEvents) {
-    const isOffice = ev.matched_by === 'wifi' || ev.matched_by === 'gps'
+    const isOffice = ev.matched_by === 'verified' || ev.matched_by === 'override'
     const loc = ev.location_label
-      ?? (isOffice ? (ev.matched_by === 'wifi' ? 'Office (Wi-Fi)' : 'Office (GPS)') : 'Remote')
+      ?? (isOffice
+        ? (ev.matched_signals.includes('wifi') ? 'Office (Wi-Fi)' : ev.matched_signals.includes('gps') ? 'Office (GPS)' : 'Office')
+        : 'Remote')
     const users = locationMap.get(loc) ?? new Set()
     users.add(ev.user_id)
     locationMap.set(loc, users)

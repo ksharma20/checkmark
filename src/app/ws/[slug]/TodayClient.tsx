@@ -266,7 +266,25 @@ function MembersModal({
                         </div>
                       )}
                     </div>
-                    <StatusBadge member={m} />
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px', flexShrink: 0 }}>
+                      <StatusBadge member={m} />
+                      {m.latest_event?.checkout_location_mismatch != null && m.latest_event.checkout_location_mismatch > 0 && (
+                        <span
+                          title={`Checked out from a different location (${Math.round(m.latest_event.checkout_location_mismatch)}m away from office). Hours may not count as in-office.`}
+                          style={{
+                            fontSize: '11px',
+                            color: 'var(--amber)',
+                            fontFamily: 'var(--font-mono, monospace)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            cursor: 'default',
+                          }}
+                        >
+                          ⚠ Left from different location
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </Link>
               )
@@ -836,7 +854,7 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           title="In Office"
           value={counts.office}
           sub="via Wi-Fi or GPS"
-          onClick={() => setModal({ title: 'In Office', members: (data?.all_members ?? []).filter(m => m.presence_status !== 'notIn' && (m.latest_event?.matched_by === 'wifi' || m.latest_event?.matched_by === 'gps')) })}
+          onClick={() => setModal({ title: 'In Office', members: (data?.all_members ?? []).filter(m => m.presence_status !== 'notIn' && (m.latest_event?.matched_by === 'verified' || m.latest_event?.matched_by === 'override')) })}
           icon={<Monitor size={16} />}
         />
         <StatCard
@@ -844,7 +862,7 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           title="Remote"
           value={counts.remote}
           sub="working remotely"
-          onClick={() => setModal({ title: 'Remote', members: (data?.all_members ?? []).filter(m => m.presence_status !== 'notIn' && m.latest_event?.matched_by !== 'wifi' && m.latest_event?.matched_by !== 'gps') })}
+          onClick={() => setModal({ title: 'Remote', members: (data?.all_members ?? []).filter(m => m.presence_status !== 'notIn' && m.latest_event?.matched_by !== 'verified' && m.latest_event?.matched_by !== 'override') })}
           icon={<Home size={16} />}
         />
       </div>

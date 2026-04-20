@@ -45,7 +45,7 @@ function countWorkdays(year: number, month: number): number {
 }
 
 function isOfficeMatch(matchedBy: MatchedBy): boolean {
-  return matchedBy === 'wifi' || matchedBy === 'gps' || matchedBy === 'ip' || matchedBy === 'override'
+  return matchedBy === 'verified' || matchedBy === 'override'
 }
 
 /**
