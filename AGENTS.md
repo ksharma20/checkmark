@@ -161,3 +161,24 @@ Before editing any of these files, always read them first:
 - Introduce new npm dependencies without noting it in the PR description
 - Change signal matching from AND to OR logic
 - Trust userId or workspaceId from request body without JWT verification
+
+---
+
+## Keeping Docs in Sync
+
+**REQUIRED:** Whenever you change code that affects documented behaviour — API routes, auth flow, signal matching logic, plan limits, cookie settings, DB schema, environment variables — you MUST also update the relevant docs:
+
+1. `README.md` — update the affected section
+2. `CLAUDE.md` — update invariants, architecture, or key rules if affected
+3. `AGENTS.md` — update conventions or patterns if affected
+
+Never let code and docs diverge. Stale docs cause bugs in future AI-assisted sessions because agents rely on them for context.
+
+**What counts as "documented behaviour":**
+- Adding/removing/renaming API routes
+- Changing HTTP status codes or error codes
+- Modifying auth flow (cookies, OTP, JWT)
+- Changing signal matching semantics
+- Adding DB columns or tables
+- Changing plan limits or feature flags
+- Adding/removing environment variables

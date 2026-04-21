@@ -163,6 +163,15 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens(expires_at);
+
+CREATE TABLE IF NOT EXISTS rate_limit_log (
+  id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  key        TEXT NOT NULL,
+  action     TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_limit_key_action ON rate_limit_log(key, action, created_at DESC);
 `
 
 const ADDITIVE_MIGRATIONS = [
@@ -203,6 +212,24 @@ const ADDITIVE_MIGRATIONS = [
 
   // admin_overrides — effective checkout for regularization
   `ALTER TABLE admin_overrides ADD COLUMN effective_checkout_at TEXT`,
+
+  // user_api_tokens — fast prefix lookup (O(1) instead of O(n) bcrypt scan)
+  `ALTER TABLE user_api_tokens ADD COLUMN token_prefix TEXT`,
+  `CREATE INDEX IF NOT EXISTS idx_api_tokens_prefix ON user_api_tokens(token_prefix)`,
+
+  // presence_events — scheduled midnight auto-checkout
+  `ALTER TABLE presence_events ADD COLUMN scheduled_checkout_at TEXT`,
+
+  // push_subscriptions — Web Push
+  `CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id)`,
 ]
 
 // ─── SQLite runner (local dev) ────────────────────────────────────────────────

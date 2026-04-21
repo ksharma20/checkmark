@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createEvent, getOpenEventToday, updateEventLocationLabel } from '@/lib/db/queries/events'
+import { createEvent, getOpenEventToday, setScheduledCheckout, updateEventLocationLabel } from '@/lib/db/queries/events'
+import { getRateLimitCount, recordRateLimitHit } from '@/lib/db/queries/users'
 import { getUserStats } from '@/lib/db/queries/stats'
 import { extractIp, getIpGeo } from '@/lib/geo'
 import { updateUserStats } from '@/lib/stats'
@@ -11,6 +12,16 @@ export async function POST(request: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
+
+  // Rate limit: max 10 check-ins per user per hour (prevents spam)
+  const checkinKey = `checkin:${userId}`
+  if (await getRateLimitCount(checkinKey, 'checkin', 60) >= 10) {
+    return NextResponse.json(
+      { error: 'Too many check-ins. Try again later.', code: 'RATE_LIMITED' },
+      { status: 429 }
+    )
+  }
+  await recordRateLimitHit(checkinKey, 'checkin')
 
   // State machine: reject if already checked in
   const openEvent = await getOpenEventToday(userId)
@@ -55,6 +66,12 @@ export async function POST(request: NextRequest) {
     deviceInfo: body.device_info ?? null,
     deviceTimezone: body.device_timezone ?? null,
   })
+  if (!event)
+    return NextResponse.json({ error: 'Check-in failed', code: 'DB_ERROR' }, { status: 500 })
+
+  // Schedule auto-checkout 12 hours after check-in
+  const autoCheckoutAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+  await setScheduledCheckout(event.id, autoCheckoutAt)
 
   updateUserStats(userId).catch(console.error)
 
@@ -80,5 +97,5 @@ export async function POST(request: NextRequest) {
   }).catch(() => {})
 
   const stats = await getUserStats(userId)
-  return NextResponse.json({ event, stats })
+  return NextResponse.json({ event: { ...event, scheduled_checkout_at: autoCheckoutAt }, stats })
 }

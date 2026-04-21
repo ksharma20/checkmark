@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { getAllActiveApiTokens, touchApiToken } from '@/lib/db/queries/users'
+import { getApiTokensByPrefix, touchApiToken } from '@/lib/db/queries/users'
+import { tokenPrefix } from '@/lib/auth'
 import { createEvent, updateEventLocationLabel } from '@/lib/db/queries/events'
 import { updateUserStats } from '@/lib/stats'
 import { extractIp, getIpGeo } from '@/lib/geo'
@@ -25,12 +26,13 @@ export async function POST(request: NextRequest) {
   const raw = authHeader.slice(7).trim() // cm_<hex> or just <hex>
   const plain = raw.startsWith('cm_') ? raw.slice(3) : raw
 
-  // Find matching token by bcrypt comparison (O(n), acceptable for v1)
-  const allTokens = await getAllActiveApiTokens()
+  // Find matching token via prefix index (O(1) lookup) then bcrypt verify
+  const prefix = tokenPrefix(plain)
+  const candidates = await getApiTokensByPrefix(prefix)
   let matchedToken = null
-  for (const token of allTokens) {
-    if (await bcrypt.compare(plain, token.token_hash)) {
-      matchedToken = token
+  for (const candidate of candidates) {
+    if (await bcrypt.compare(plain, candidate.token_hash)) {
+      matchedToken = candidate
       break
     }
   }
@@ -73,6 +75,8 @@ export async function POST(request: NextRequest) {
     source: 'api_token',
     apiTokenId: matchedToken.id,
   })
+  if (!event)
+    return NextResponse.json({ error: 'Check-in failed', code: 'DB_ERROR' }, { status: 500 })
 
   updateUserStats(matchedToken.user_id).catch(console.error)
 

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserByEmailIncludeDeleted } from '@/lib/db/queries/users'
+import { getUserByEmailIncludeDeleted, getRateLimitCount, recordRateLimitHit } from '@/lib/db/queries/users'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
 import { verifyPassword, createJwt, setSessionCookie } from '@/lib/auth'
+import { extractIp } from '@/lib/geo'
 
 function apiError(message: string, code: string, status: number) {
   return NextResponse.json({ error: message, code }, { status })
@@ -25,6 +26,14 @@ export async function POST(request: NextRequest) {
   if (!email) {
     return apiError('Email is required', 'MISSING_EMAIL', 400)
   }
+
+  // Rate limit: max 10 login attempts per IP per 15 min
+  const ip = extractIp(request)
+  const ipKey = `login:${ip}`
+  if (await getRateLimitCount(ipKey, 'login', 15) >= 10) {
+    return apiError('Too many login attempts. Try again in 15 minutes.', 'RATE_LIMITED', 429)
+  }
+  await recordRateLimitHit(ipKey, 'login')
 
   // Step 1: Check if user exists (frontend uses check-email, but kept for safety)
   if (!body.password) {

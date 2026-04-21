@@ -29,20 +29,22 @@ export async function evaluateTrust(params: EvalParams): Promise<void> {
     flags.push('mock_gps_suspected')
   }
 
-  // 2. Timezone mismatch: browser tz offset vs approximate IP geo tz
+  // 2. Timezone mismatch: browser timezone vs IP geolocation timezone
   if (params.deviceTimezone && params.ipGeoLng !== null) {
     try {
-      const ipOffset = Math.round(params.ipGeoLng / 15) * 60 // approx minutes east of UTC
+      const ipOffset = Math.round(params.ipGeoLng / 15) * 60 // approximate minutes east of UTC
       const tzName = params.deviceTimezone
-      // Get browser offset from timezone name
-      const browserOffsetNeg = new Date().toLocaleString('en', { timeZone: tzName, timeZoneName: 'shortOffset' })
-        .match(/GMT([+-]\d+(?::\d+)?)/)?.[1]
-      if (browserOffsetNeg) {
-        const [h, m = '0'] = browserOffsetNeg.replace('+', '').split(':')
-        const browserOffset = parseInt(h) * 60 + (parseInt(h) >= 0 ? 1 : -1) * parseInt(m)
+      // Use en-US locale to ensure consistent GMT+/-HH:MM format regardless of server locale
+      const sample = new Date().toLocaleString('en-US', { timeZone: tzName, timeZoneName: 'shortOffset' })
+      const match = sample.match(/GMT([+-])(\d+)(?::(\d+))?/)
+      if (match) {
+        const sign = match[1] === '+' ? 1 : -1
+        const hours = parseInt(match[2], 10)
+        const minutes = parseInt(match[3] ?? '0', 10)
+        const browserOffset = sign * (hours * 60 + minutes)
         if (Math.abs(browserOffset - ipOffset) > 90) flags.push('timezone_mismatch')
       }
-    } catch { /* skip */ }
+    } catch { /* skip if timezone name is invalid */ }
   }
 
   // 3. VPN/proxy check via ip-api

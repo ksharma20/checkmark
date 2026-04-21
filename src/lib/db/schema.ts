@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS user_api_tokens (
   user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
   token_hash  TEXT NOT NULL,
+  token_prefix TEXT, -- first 8 chars of raw token for fast lookup
   scopes      TEXT NOT NULL DEFAULT 'checkin:write',
   last_used_at TEXT,
   revoked_at  TEXT,
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS presence_events (
   event_type            TEXT NOT NULL DEFAULT 'office_checkin',
   checkin_at            TEXT NOT NULL DEFAULT (datetime('now')),
   checkout_at           TEXT,
+  scheduled_checkout_at TEXT,
   checkout_reason       TEXT,
   note                  TEXT,
   location_label        TEXT,
@@ -168,4 +170,24 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_revoked_tokens_expires ON revoked_tokens(expires_at);
+
+CREATE TABLE IF NOT EXISTS rate_limit_log (
+  id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  key        TEXT NOT NULL,
+  action     TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_rate_limit_key_action ON rate_limit_log(key, action, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id          TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  endpoint    TEXT NOT NULL UNIQUE,
+  p256dh      TEXT NOT NULL,
+  auth        TEXT NOT NULL,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id);
 `;

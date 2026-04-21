@@ -38,6 +38,17 @@ export async function POST(request: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'This person is already an active member', code: 'ALREADY_MEMBER' }, { status: 409 })
   }
 
+  // Block re-invite if consent is already pending — don't silently reset their token
+  if (existing?.status === 'pending_consent') {
+    return NextResponse.json(
+      {
+        error: 'An invite is already pending for this email. Wait for them to respond, or remove the existing invite first.',
+        code: 'INVITE_PENDING',
+      },
+      { status: 409 }
+    )
+  }
+
   const consentToken = crypto.randomUUID()
   const consentTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 

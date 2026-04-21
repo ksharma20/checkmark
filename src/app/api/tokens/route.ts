@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserApiTokens, createApiToken } from '@/lib/db/queries/users'
+import { tokenPrefix } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
 
 export async function GET(request: NextRequest) {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     .join('')
 
   const tokenHash = await bcrypt.hash(plainToken, 10)
-  const token = await createApiToken({ userId, name, tokenHash })
+  const token = await createApiToken({ userId, name, tokenHash, tokenPrefix: tokenPrefix(plainToken) })
 
   return NextResponse.json({
     token: { id: token.id, name: token.name, created_at: token.created_at },

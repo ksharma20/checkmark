@@ -90,6 +90,8 @@ import { db } from '@/lib/db'
 | `cm_session` | JWT session (httpOnly, SameSite=Lax, secure in prod) | 30 days |
 | `cm_otp_ok` | OTP verified proof (httpOnly) | 15 min |
 
+> **SameSite=Lax** is intentional — `Strict` causes PWA session loss on iOS/Android cold-open (the PWA→browser navigation is treated as cross-origin). `Lax` preserves sessions while still blocking cross-site POST requests.
+
 - JWT carries `jti` (UUID) for revocation — checked on every server-side request via `getSessionFromCookies()`
 - Edge middleware (`proxy.ts`) does signature-only verification — fast, no DB hit
 - Node.js route handlers call `getSessionFromCookies()` which checks `revoked_tokens` table

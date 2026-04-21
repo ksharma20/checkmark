@@ -32,6 +32,7 @@ export interface PresenceEvent {
   device_info: string | null
   trust_flags: string | null
   device_timezone: string | null
+  scheduled_checkout_at: string | null
 }
 
 export async function createEvent(params: {
@@ -49,7 +50,7 @@ export async function createEvent(params: {
   apiTokenId?: string | null
   deviceInfo?: string | null
   deviceTimezone?: string | null
-}): Promise<PresenceEvent> {
+}): Promise<PresenceEvent | null> {
   const id = crypto.randomUUID().replace(/-/g, '')
   await db.execute(
     `INSERT INTO presence_events
@@ -75,7 +76,7 @@ export async function createEvent(params: {
       params.deviceTimezone ?? null,
     ]
   )
-  return db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [id]) as Promise<PresenceEvent>
+  return db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [id])
 }
 
 export async function checkoutEvent(
@@ -245,5 +246,21 @@ export async function updateEventTrustFlags(eventId: string, flags: string[]): P
   await db.execute(
     'UPDATE presence_events SET trust_flags = ? WHERE id = ?',
     [JSON.stringify(flags), eventId]
+  )
+}
+
+export async function setScheduledCheckout(eventId: string, scheduledCheckoutAt: string): Promise<void> {
+  await db.execute(
+    'UPDATE presence_events SET scheduled_checkout_at = ? WHERE id = ?',
+    [scheduledCheckoutAt, eventId]
+  )
+}
+
+export async function getOpenEvent(userId: string): Promise<PresenceEvent | null> {
+  return db.queryOne<PresenceEvent>(
+    `SELECT * FROM presence_events
+     WHERE user_id = ? AND checkout_at IS NULL AND deleted_at IS NULL
+     ORDER BY checkin_at DESC LIMIT 1`,
+    [userId]
   )
 }

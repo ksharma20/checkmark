@@ -165,3 +165,8 @@ export async function getServerUser(): Promise<{ userId: string; email: string }
   if (!userId || !email) return null
   return { userId, email }
 }
+
+/** Returns the first 8 characters of a raw token for fast DB prefix lookup */
+export function tokenPrefix(rawToken: string): string {
+  return rawToken.slice(0, 8)
+}

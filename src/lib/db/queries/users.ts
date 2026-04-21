@@ -177,6 +177,7 @@ export interface UserApiToken {
   user_id: string
   name: string
   token_hash: string
+  token_prefix: string | null
   scopes: string
   last_used_at: string | null
   revoked_at: string | null
@@ -194,13 +195,26 @@ export async function createApiToken(params: {
   userId: string
   name: string
   tokenHash: string
+  tokenPrefix: string
 }): Promise<UserApiToken> {
   const id = crypto.randomUUID().replace(/-/g, '')
   await db.execute(
-    `INSERT INTO user_api_tokens (id, user_id, name, token_hash) VALUES (?, ?, ?, ?)`,
-    [id, params.userId, params.name, params.tokenHash]
+    `INSERT INTO user_api_tokens (id, user_id, name, token_hash, token_prefix) VALUES (?, ?, ?, ?, ?)`,
+    [id, params.userId, params.name, params.tokenHash, params.tokenPrefix]
   )
-  return db.queryOne<UserApiToken>('SELECT * FROM user_api_tokens WHERE id = ?', [id]) as Promise<UserApiToken>
+  const created = await db.queryOne<UserApiToken>('SELECT * FROM user_api_tokens WHERE id = ?', [id])
+  if (!created) throw new Error('Failed to create API token')
+  return created
+}
+
+export async function getApiTokensByPrefix(prefix: string): Promise<UserApiToken[]> {
+  return db.query<UserApiToken>(
+    `SELECT t.id, t.user_id, t.name, t.token_hash, t.scopes, t.last_used_at, t.revoked_at, t.created_at
+     FROM user_api_tokens t
+     JOIN users u ON u.id = t.user_id
+     WHERE t.token_prefix = ? AND t.revoked_at IS NULL AND u.deleted_at IS NULL`,
+    [prefix]
+  )
 }
 
 export async function revokeApiToken(tokenId: string, userId: string): Promise<void> {
@@ -228,4 +242,27 @@ export async function touchApiToken(tokenId: string): Promise<void> {
     `UPDATE user_api_tokens SET last_used_at = datetime('now') WHERE id = ?`,
     [tokenId]
   )
+}
+
+// ─── Rate Limiting ────────────────────────────────────────────────────────────
+
+export async function getRateLimitCount(key: string, action: string, windowMinutes: number): Promise<number> {
+  const since = new Date(Date.now() - windowMinutes * 60 * 1000).toISOString()
+  const row = await db.queryOne<{ cnt: number }>(
+    'SELECT COUNT(*) as cnt FROM rate_limit_log WHERE key = ? AND action = ? AND created_at >= ?',
+    [key, action, since]
+  )
+  return row?.cnt ?? 0
+}
+
+export async function recordRateLimitHit(key: string, action: string): Promise<void> {
+  await db.execute(
+    'INSERT INTO rate_limit_log (key, action) VALUES (?, ?)',
+    [key, action]
+  )
+}
+
+export async function pruneRateLimitLog(): Promise<void> {
+  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  await db.execute('DELETE FROM rate_limit_log WHERE created_at < ?', [cutoff])
 }
