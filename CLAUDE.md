@@ -47,7 +47,7 @@ Config-light mode (no signals configured):
   → all events from active members pass through
 ```
 
-`MatchedBy` field tracks the worst signal (which one failed), or `'verified'` if all pass.
+`MatchedBy` values: `'verified'` (all configured signals matched) | `'partial'` (some matched) | `'none'` (no signals matched) | `'override'` (admin override bypassed matching)
 
 Admin overrides (`admin_overrides` table) bypass signal matching entirely. Never apply signal logic to overridden events.
 
@@ -76,7 +76,8 @@ import { db } from '@/lib/db'
 - `workspaces.ts` — workspaces + members + overrides
 - `signals.ts` — workspace signal configs
 - `stats.ts` — user stats
-- `tokens.ts` — API tokens
+- `tokens.ts` — API tokens (separate from users.ts)
+- `push.ts` — push subscriptions
 
 ### Migration
 `scripts/migrate.js` — idempotent. `ALTER TABLE` wrapped in try/catch. Run: `node scripts/migrate.js`.
@@ -170,6 +171,8 @@ Enforce in `queryWorkspaceEvents()` — plan gate applied before signal matching
 5. **Location labels** — set asynchronously post-check-in via Nominatim. May be NULL — that's acceptable, not a bug
 6. **Checkout signals** — GPS/WiFi/IP collected at checkout too. Both check-in AND checkout signals stored
 7. **Admin overrides** — stored in `admin_overrides` table, never modify original `presence_events` row
+8. **Rate limiting** — `rate_limit_log` table: IP-keyed for login (10 attempts per 15 min), user-keyed for checkin (10 per hr). Use `getRateLimitCount` + `recordRateLimitHit` from `lib/db/queries/users.ts`.
+9. **API token O(1) lookup** — `token_prefix` column stores first 8 chars of the raw token. Always use prefix lookup in `POST /api/v1/checkin`. Never skip it.
 
 ---
 

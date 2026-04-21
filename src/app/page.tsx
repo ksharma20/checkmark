@@ -12,6 +12,7 @@ import Industries from '@/components/Industries';
 import Marquee from '@/components/Marquee';
 import Navigation from '@/components/Navigation';
 import SectionDivider from '@/components/SectionDivider';
+import ComingSoon from '@/components/ComingSoon';
 
 export default function Home() {
   useEffect(() => {
@@ -78,6 +79,10 @@ export default function Home() {
       <div className="bg-[#1E2D3D]">
         <FAQ />
       </div>
+      <SectionDivider />
+
+      {/* 9 — ComingSoon: base */}
+      <ComingSoon />
 
       <CTABandFooter />
     </main>

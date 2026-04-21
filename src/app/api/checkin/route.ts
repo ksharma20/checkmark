@@ -76,10 +76,22 @@ export async function POST(request: NextRequest) {
   updateUserStats(userId).catch(console.error)
 
   // Fire-and-forget: resolve GPS to human label and store (avoids client-side 429s)
+  // Retries once after 30s on failure
   if (event.gps_lat !== null && event.gps_lng !== null) {
-    reverseGeocodeLabel(event.gps_lat, event.gps_lng)
-      .then((label) => { if (label) return updateEventLocationLabel(event.id, label) })
-      .catch(() => {})
+    const lat = event.gps_lat
+    const lng = event.gps_lng
+    const tryGeocode = (attempt: number): void => {
+      reverseGeocodeLabel(lat, lng)
+        .then((label) => {
+          if (label) return updateEventLocationLabel(event.id, label)
+        })
+        .catch(() => {
+          if (attempt < 2) {
+            setTimeout(() => tryGeocode(attempt + 1), 30_000)
+          }
+        })
+    }
+    tryGeocode(1)
   }
 
   // Fire-and-forget: evaluate trust signals async

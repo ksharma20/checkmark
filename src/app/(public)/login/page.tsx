@@ -7,7 +7,7 @@ import { en } from '@/locales/en'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = 'email' | 'password' | 'otp' | 'accountType' | 'personal' | 'org' | 'deactivated'
+type Step = 'email' | 'password' | 'otp' | 'accountType' | 'personal' | 'org' | 'deactivated' | 'forgotPassword' | 'resetPassword'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 
@@ -278,10 +278,12 @@ function PasswordStep({
   email,
   onBack,
   onSuccess,
+  onForgotPassword,
 }: {
   email: string
   onBack: () => void
   onSuccess: (redirect: string) => void
+  onForgotPassword: () => void
 }) {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -352,6 +354,24 @@ function PasswordStep({
       <PrimaryBtn onClick={signIn} loading={loading}>
         Sign in
       </PrimaryBtn>
+      <button
+        type="button"
+        onClick={onForgotPassword}
+        style={{
+          background: 'none',
+          border: 'none',
+          color: 'var(--text-secondary)',
+          fontSize: '13px',
+          fontFamily: 'DM Sans, sans-serif',
+          cursor: 'pointer',
+          padding: '8px 0',
+          textDecoration: 'underline',
+          display: 'block',
+          marginTop: '4px',
+        }}
+      >
+        Forgot password?
+      </button>
     </div>
   )
 }
@@ -569,6 +589,181 @@ function OtpStep({
       >
         {resending ? 'Sending…' : 'Resend code'}
       </button>
+    </div>
+  )
+}
+
+// ─── Forgot password step ─────────────────────────────────────────────────────
+
+function ForgotPasswordStep({
+  email: initialEmail,
+  onBack,
+  onCodeSent,
+}: {
+  email: string
+  onBack: () => void
+  onCodeSent: (email: string) => void
+}) {
+  const [email, setEmail] = useState(initialEmail)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function sendResetCode() {
+    const e = email.toLowerCase().trim()
+    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+      setError('Please enter a valid email address')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: e }),
+      })
+      if (res.ok) {
+        onCodeSent(e)
+      } else {
+        const data = await res.json()
+        setError(data.error || 'Failed to send reset code')
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <BackLink onClick={onBack} />
+      <h1
+        style={{
+          fontFamily: 'Syne, sans-serif',
+          fontSize: '22px',
+          fontWeight: 700,
+          color: 'var(--navy)',
+          marginBottom: '4px',
+        }}
+      >
+        Reset your password
+      </h1>
+      <p
+        style={{
+          fontFamily: 'DM Sans, sans-serif',
+          fontSize: '14px',
+          color: 'var(--text-secondary)',
+          marginBottom: '24px',
+        }}
+      >
+        Enter your email and we&apos;ll send a reset code.
+      </p>
+      <FieldGroup label="Email address">
+        <Input
+          type="email"
+          value={email}
+          onChange={(v) => { setEmail(v); if (error) setError(null) }}
+          placeholder="your@email.com"
+          autoFocus
+          onKeyDown={(e) => e.key === 'Enter' && sendResetCode()}
+        />
+        <ErrorMsg text={error} />
+      </FieldGroup>
+      <PrimaryBtn onClick={sendResetCode} loading={loading}>
+        Send reset code
+      </PrimaryBtn>
+    </div>
+  )
+}
+
+// ─── Reset password step ──────────────────────────────────────────────────────
+
+function ResetPasswordStep({
+  email,
+  onSuccess,
+}: {
+  email: string
+  onSuccess: (redirect: string) => void
+}) {
+  const [password, setPassword] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function resetPassword() {
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, newPassword: password }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        onSuccess(data.redirect ?? '/me')
+      } else {
+        setError(data.error ?? 'Reset failed')
+      }
+    } catch {
+      setError('Something went wrong. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <h1
+        style={{
+          fontFamily: 'Syne, sans-serif',
+          fontSize: '22px',
+          fontWeight: 700,
+          color: 'var(--navy)',
+          marginBottom: '4px',
+        }}
+      >
+        Set new password
+      </h1>
+      <p
+        style={{
+          fontFamily: 'DM Sans, sans-serif',
+          fontSize: '13px',
+          color: 'var(--text-secondary)',
+          marginBottom: '24px',
+        }}
+      >
+        {email}
+      </p>
+      <p
+        style={{
+          fontFamily: 'DM Sans, sans-serif',
+          fontSize: '14px',
+          color: 'var(--text-secondary)',
+          marginBottom: '16px',
+        }}
+      >
+        Choose a new password (min 8 characters).
+      </p>
+      <FieldGroup label="New password">
+        <Input
+          type="password"
+          value={password}
+          onChange={(v) => { setPassword(v); if (error) setError(null) }}
+          placeholder="New password"
+          autoFocus
+          onKeyDown={(e) => e.key === 'Enter' && resetPassword()}
+          hasError={!!error}
+        />
+        <ErrorMsg text={error} />
+      </FieldGroup>
+      <PrimaryBtn onClick={resetPassword} loading={loading}>
+        Set new password
+      </PrimaryBtn>
     </div>
   )
 }
@@ -1072,6 +1267,7 @@ function LoginFlow() {
   const searchParams = useSearchParams()
   const [step, setStep] = useState<Step>('email')
   const [email, setEmail] = useState('')
+  const [isResetFlow, setIsResetFlow] = useState(false)
 
   function handleSuccess(redirect: string) {
     const invite = searchParams.get('invite')
@@ -1142,13 +1338,20 @@ function LoginFlow() {
             email={email}
             onBack={() => setStep('email')}
             onSuccess={handleSuccess}
+            onForgotPassword={() => { setIsResetFlow(false); setStep('forgotPassword') }}
           />
         )}
         {step === 'otp' && (
           <OtpStep
             email={email}
-            onBack={() => setStep('email')}
-            onVerified={() => setStep('accountType')}
+            onBack={() => setStep(isResetFlow ? 'forgotPassword' : 'email')}
+            onVerified={() => {
+              if (isResetFlow) {
+                setStep('resetPassword')
+              } else {
+                setStep('accountType')
+              }
+            }}
           />
         )}
         {step === 'accountType' && (
@@ -1175,6 +1378,23 @@ function LoginFlow() {
           <DeactivatedStep
             email={email}
             onBack={() => setStep('email')}
+            onSuccess={handleSuccess}
+          />
+        )}
+        {step === 'forgotPassword' && (
+          <ForgotPasswordStep
+            email={email}
+            onBack={() => setStep('password')}
+            onCodeSent={(e) => {
+              setEmail(e)
+              setIsResetFlow(true)
+              setStep('otp')
+            }}
+          />
+        )}
+        {step === 'resetPassword' && (
+          <ResetPasswordStep
+            email={email}
             onSuccess={handleSuccess}
           />
         )}

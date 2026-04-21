@@ -50,15 +50,16 @@ export async function proxy(request: NextRequest) {
 
 function isPublicApiRoute(pathname: string): boolean {
   const PUBLIC_API_ROUTES = [
-    '/api/auth/login',
-    '/api/auth/register',
-    '/api/auth/otp/send',
-    '/api/auth/otp/verify',
-    '/api/auth/logout',
-    '/api/auth/check-email',
-    '/api/workspace/check-slug',
-    '/api/me/reactivate',
-  ]
+    "/api/auth/login",
+    "/api/auth/register",
+    "/api/auth/otp/send",
+    "/api/auth/otp/verify",
+    "/api/auth/logout",
+    "/api/auth/check-email",
+    "/api/auth/reset-password",
+    "/api/workspace/check-slug",
+    "/api/me/reactivate",
+  ];
   return PUBLIC_API_ROUTES.some((route) => pathname === route || pathname.startsWith(route))
 }
 
