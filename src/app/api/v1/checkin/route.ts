@@ -15,7 +15,7 @@ import { reverseGeocodeLabel } from '@/lib/geo-label'
  * Authorization: Bearer cm_<token>
  *
  * Body (all optional):
- *   gps_lat, gps_lng, gps_accuracy_m, wifi_ssid, note, event_type
+ *   gps_lat, gps_lng, gps_accuracy_m, note, event_type
  */
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('Authorization')
@@ -48,7 +48,6 @@ export async function POST(request: NextRequest) {
     gps_lat?: number
     gps_lng?: number
     gps_accuracy_m?: number
-    wifi_ssid?: string
     note?: string
     event_type?: string
   }
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
   const event = await createEvent({
     userId: matchedToken.user_id,
     eventType: body.event_type ?? 'office_checkin',
-    wifiSsid: body.wifi_ssid ?? null,
     ipAddress: ip,
     ipGeoLat: geo?.lat ?? null,
     ipGeoLng: geo?.lng ?? null,

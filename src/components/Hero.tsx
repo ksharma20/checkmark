@@ -28,7 +28,7 @@ export default function Hero() {
       </h1>
 
       <p className="mb-12 max-w-[560px] animate-fade-up text-base leading-relaxed text-checkmark-text-muted md:text-xl" style={{ animationDelay: '0.35s' }}>
-        CheckMark replaces manual check-ins, WhatsApp selfies, and Zoho chaos with one tap, verified by WiFi, GPS, and IP.
+        CheckMark replaces manual check-ins, WhatsApp selfies, and Zoho chaos with one tap, verified by GPS and IP.
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-4 animate-fade-up" style={{ animationDelay: '0.5s' }} id="hero-cta">
@@ -92,7 +92,7 @@ function PinScene() {
       </div>
 
       <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2.5">
-        {['WiFi ✓', 'GPS ✓', 'IP ✓'].map((label, i) => (
+        {['GPS ✓', 'IP ✓'].map((label, i) => (
           <div key={label} className="flex items-center gap-1 rounded-full border border-[rgba(27,77,255,0.25)] bg-[rgba(26,38,53,0.9)] px-3 py-1 text-xs font-semibold text-checkmark-brand backdrop-blur-lg" style={{ opacity: 0, animation: `tagLoopSync 2s ${2.05 + i * 0.1}s ease infinite` }}>
             <span>{label}</span>
           </div>

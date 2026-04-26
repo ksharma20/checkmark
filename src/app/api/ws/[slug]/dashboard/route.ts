@@ -20,7 +20,6 @@ export interface DashboardMember {
     event_type: string
     matched_signals: string[]
     trust_flags: string[]
-    wifi_ssid: string | null
     ip_address: string
     gps_lat: number | null
     gps_lng: number | null
@@ -116,7 +115,6 @@ export async function GET(
             event_type: latest.event_type,
             matched_signals: latest.matched_signals,
             trust_flags: latest.trust_flags ? (JSON.parse(latest.trust_flags) as string[]) : [],
-            wifi_ssid: latest.wifi_ssid,
             ip_address: latest.ip_address,
             gps_lat: latest.gps_lat,
             gps_lng: latest.gps_lng,
@@ -134,8 +132,8 @@ export async function GET(
     visited: allMembers.filter((m) => m.presence_status === 'visited').length,
     notIn: allMembers.filter((m) => m.presence_status === 'notIn').length,
     total: allMembers.length,
-    office: allMembers.filter((m) => m.presence_status === 'present' && m.latest_event?.event_type !== 'remote_checkin' && m.latest_event?.matched_by !== 'unverified').length,
-    remote: allMembers.filter((m) => m.presence_status === 'present' && (m.latest_event?.event_type === 'remote_checkin' || m.latest_event?.matched_by === 'unverified')).length,
+    office: allMembers.filter((m) => m.presence_status === 'present' && m.latest_event?.event_type !== 'remote_checkin' && (m.latest_event?.matched_by === 'verified' || m.latest_event?.matched_by === 'override')).length,
+    remote: allMembers.filter((m) => m.presence_status === 'present' && (m.latest_event?.event_type === 'remote_checkin' || m.latest_event?.matched_by === 'partial')).length,
   }
 
   // Apply filters
@@ -190,7 +188,7 @@ export async function GET(
     if (m.presence_status === 'notIn') continue
     const isRemote = m.latest_event?.event_type === 'remote_checkin'
     const label = m.latest_event?.location_label
-      ?? (isRemote ? 'Remote' : (m.latest_event?.matched_by === 'wifi' ? 'Office (Wi-Fi)' : m.latest_event?.matched_by === 'gps' ? 'Office (GPS)' : 'Office'))
+      ?? (isRemote ? 'Remote' : (m.latest_event?.matched_signals?.includes('wifi') ? 'Office (Wi-Fi)' : m.latest_event?.matched_signals?.includes('gps') ? 'Office (GPS)' : 'Office'))
     locationMap.set(label, (locationMap.get(label) ?? 0) + 1)
   }
   const location_counts = [...locationMap.entries()]

@@ -3,12 +3,11 @@ import { getActiveMemberIds } from './db/queries/workspaces'
 import { getEventsForUsers, PresenceEvent } from './db/queries/events'
 import { getOverrideEventIds } from './db/queries/workspaces'
 import { haversineMetres } from './geo'
-import { verifyWifiSsid } from './auth'
 import { historyStartDate, getPlanLimits } from './plans'
 
 export { haversineMetres }
 
-export type MatchedBy = 'wifi' | 'gps' | 'ip' | 'none' | 'unverified' | 'override'
+export type MatchedBy = 'verified' | 'partial' | 'none' | 'override'
 
 export interface PresenceEventWithMatch extends PresenceEvent {
   matched_by: MatchedBy
@@ -74,21 +73,19 @@ export async function queryWorkspaceEvents(
   const signals = await getWorkspaceSignals(workspaceId)
   const overrideEventIds = await getOverrideEventIds(workspaceId)
 
-  // Config-light mode: no signals configured at all — return all events unfiltered
+  // Config-light mode: no signals configured — all events pass through as verified
   if (signals.length === 0) {
     return filteredEvents.map((event) => ({
       ...event,
-      matched_by: overrideEventIds.has(event.id) ? 'override' as MatchedBy : 'none' as MatchedBy,
+      matched_by: overrideEventIds.has(event.id) ? 'override' as MatchedBy : 'verified' as MatchedBy,
       matched_signals: [] as string[],
     }))
   }
 
   // Signal matching mode
-  // WiFi hashes need async bcrypt comparison — collect them first
   type GpsSignal = WorkspaceSignalConfig & { gps_lat: number; gps_lng: number }
   type IpSignal = WorkspaceSignalConfig & { ip_geo_lat: number; ip_geo_lng: number }
 
-  const wifiSignals = signals.filter((s) => s.signal_type === 'wifi' && s.wifi_ssid_hash)
   const gpsSignals = signals.filter((s): s is GpsSignal =>
     s.signal_type === 'gps' && s.gps_lat !== null && s.gps_lng !== null
   )
@@ -100,7 +97,6 @@ export async function queryWorkspaceEvents(
   const configuredTypes = new Set<string>()
   if (gpsSignals.length > 0) configuredTypes.add('gps')
   if (ipSignals.length > 0) configuredTypes.add('ip')
-  if (wifiSignals.length > 0) configuredTypes.add('wifi')
 
   const result: PresenceEventWithMatch[] = []
 
@@ -111,10 +107,10 @@ export async function queryWorkspaceEvents(
       continue
     }
 
-    let matchedBy: MatchedBy = 'unverified'
+    const matched = new Set<string>()
 
-    // Check GPS signals
-    if (matchedBy === 'unverified' && event.gps_lat !== null && event.gps_lng !== null) {
+    // GPS: check if event GPS coords match any configured GPS signal within radius
+    if (configuredTypes.has('gps') && event.gps_lat !== null && event.gps_lng !== null) {
       for (const signal of gpsSignals) {
         const radius = options.overrideGpsRadius ?? signal.gps_radius_m ?? 300
         if (haversineMetres(event.gps_lat, event.gps_lng, signal.gps_lat, signal.gps_lng) <= radius) {
@@ -124,21 +120,11 @@ export async function queryWorkspaceEvents(
       }
     }
 
-    // Check IP signals
-    if (matchedBy === 'unverified' && event.ip_geo_lat !== null && event.ip_geo_lng !== null) {
+    // IP: check if event IP geo coords match any configured IP signal within proximity
+    if (configuredTypes.has('ip') && event.ip_geo_lat !== null && event.ip_geo_lng !== null) {
       for (const signal of ipSignals) {
         if (haversineMetres(event.ip_geo_lat, event.ip_geo_lng, signal.ip_geo_lat, signal.ip_geo_lng) <= (signal.ip_proximity_m ?? 500)) {
           matched.add('ip')
-          break
-        }
-      }
-    }
-
-    // Check WiFi signals (async bcrypt)
-    if (matchedBy === 'unverified' && event.wifi_ssid && wifiSignals.length > 0) {
-      for (const signal of wifiSignals) {
-        if (await verifyWifiSsid(event.wifi_ssid, signal.wifi_ssid_hash!)) {
-          matched.add('wifi')
           break
         }
       }

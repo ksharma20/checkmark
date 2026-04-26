@@ -33,7 +33,7 @@ const openItems = [
   {
     icon: "📡",
     title: "Signal matching algorithm",
-    body: 'The logic that determines whether a check-in counts as "present" based on WiFi, GPS, and IP signals.',
+    body: 'The logic that determines whether a check-in counts as "present" based on GPS and IP signals.',
   },
   {
     icon: "📖",

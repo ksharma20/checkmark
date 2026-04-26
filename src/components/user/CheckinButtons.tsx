@@ -155,7 +155,7 @@ export default function CheckinButtons({
     message: string;
     type: ToastType;
   } | null>(null);
-  const notifTimers = useRef<number[]>([]);
+  const notifTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Listen for push messages from the service worker — show in-app toast + play chime
   useEffect(() => {
@@ -203,7 +203,7 @@ export default function CheckinButtons({
           NOTIFICATION_MESSAGES[hour]?.body ??
           `${hour}h since check-in — still working?`;
         notifTimers.current.push(
-          window.setTimeout(() => {
+          setTimeout(() => {
             void fireStaleNotification(hour, () => showToast(toastMsg, "info"));
           }, delay),
         );
@@ -298,19 +298,12 @@ export default function CheckinButtons({
     });
   }
 
-  function getWifiSsid(): string | null {
-    if (typeof navigator === "undefined") return null;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (navigator as any).connection?.ssid ?? null;
-  }
-
   async function handleCheckin() {
     if (state !== "checked_out" || loading) return;
     setLoading(true);
     startProgress();
     try {
       const gps = await collectGps();
-      const wifi = getWifiSsid();
       const gpsCoords = gps.ok ? gps : null;
       const deviceInfo = await collectDeviceInfo().catch(() => null);
 
@@ -323,7 +316,6 @@ export default function CheckinButtons({
           gps_accuracy_m: gpsCoords?.accuracy
             ? Math.round(gpsCoords.accuracy)
             : undefined,
-          wifi_ssid: wifi ?? undefined,
           device_info: deviceInfo ? JSON.stringify(deviceInfo) : null,
           device_timezone: deviceInfo?.timezone ?? null,
         }),
@@ -358,7 +350,6 @@ export default function CheckinButtons({
     startProgress();
     try {
       const gps = await collectGps();
-      const wifi = getWifiSsid();
       const gpsCoords = gps.ok ? gps : null;
 
       const res = await fetch("/api/checkin/checkout", {
@@ -370,7 +361,6 @@ export default function CheckinButtons({
           gps_accuracy_m: gpsCoords?.accuracy
             ? Math.round(gpsCoords.accuracy)
             : undefined,
-          wifi_ssid: wifi ?? undefined,
         }),
       });
 

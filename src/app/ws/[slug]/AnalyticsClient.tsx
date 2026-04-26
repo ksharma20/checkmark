@@ -464,7 +464,7 @@ export default function AnalyticsClient({ slug }: Props) {
               borderBottom: '1px solid var(--border)',
               fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)',
             }}>
-              No location signals configured — all check-ins are shown. Configure GPS/WiFi signals in Settings to distinguish office vs remote days.
+              No location signals configured — all check-ins are shown. Configure GPS or IP signals in Settings to distinguish office vs remote days.
             </div>
           )}
           {isNarrow ? (

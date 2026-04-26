@@ -8,7 +8,6 @@ export interface PresenceEvent {
   checkout_at: string | null
   checkout_reason: string | null
   note: string | null
-  wifi_ssid: string | null
   ip_address: string
   ip_geo_lat: number | null
   ip_geo_lng: number | null
@@ -22,7 +21,6 @@ export interface PresenceEvent {
   checkout_gps_lat: number | null
   checkout_gps_lng: number | null
   checkout_gps_accuracy_m: number | null
-  checkout_wifi_ssid: string | null
   checkout_ip_address: string | null
   checkout_ip_geo_lat: number | null
   checkout_ip_geo_lng: number | null
@@ -39,7 +37,6 @@ export interface PresenceEvent {
 export async function createEvent(params: {
   userId: string
   eventType?: string
-  wifiSsid?: string | null
   ipAddress: string
   ipGeoLat?: number | null
   ipGeoLng?: number | null
@@ -55,15 +52,14 @@ export async function createEvent(params: {
   const id = crypto.randomUUID().replace(/-/g, '')
   await db.execute(
     `INSERT INTO presence_events
-       (id, user_id, event_type, wifi_ssid, ip_address, ip_geo_lat, ip_geo_lng,
+       (id, user_id, event_type, ip_address, ip_geo_lat, ip_geo_lng,
         gps_lat, gps_lng, gps_accuracy_m, note, source, api_token_id,
         device_info, device_timezone)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       params.userId,
       params.eventType ?? 'office_checkin',
-      params.wifiSsid ?? null,
       params.ipAddress,
       params.ipGeoLat ?? null,
       params.ipGeoLng ?? null,
@@ -87,7 +83,6 @@ export async function checkoutEvent(
     checkoutGpsLat?: number | null
     checkoutGpsLng?: number | null
     checkoutGpsAccuracyM?: number | null
-    checkoutWifiSsid?: string | null
     checkoutIpAddress?: string | null
     checkoutIpGeoLat?: number | null
     checkoutIpGeoLng?: number | null
@@ -103,7 +98,6 @@ export async function checkoutEvent(
          checkout_gps_lat = ?,
          checkout_gps_lng = ?,
          checkout_gps_accuracy_m = ?,
-         checkout_wifi_ssid = ?,
          checkout_ip_address = ?,
          checkout_ip_geo_lat = ?,
          checkout_ip_geo_lng = ?,
@@ -115,7 +109,6 @@ export async function checkoutEvent(
       signals?.checkoutGpsLat ?? null,
       signals?.checkoutGpsLng ?? null,
       signals?.checkoutGpsAccuracyM ?? null,
-      signals?.checkoutWifiSsid ?? null,
       signals?.checkoutIpAddress ?? null,
       signals?.checkoutIpGeoLat ?? null,
       signals?.checkoutIpGeoLng ?? null,

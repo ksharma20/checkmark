@@ -54,7 +54,7 @@ const features = [
 ];
 
 const privacyFacts = [
-  { q: 'What we store', a: 'Your check-in time, check-out time, GPS coordinates (if you share them), WiFi network name, and IP address. That\'s it.' },
+  { q: 'What we store', a: 'Your check-in time, check-out time, GPS coordinates (if you share them), and IP address. That\'s it.' },
   { q: 'What we don\'t store', a: 'We don\'t track your location in the background. We don\'t read your contacts, calendar, or any other app data. We only record what you explicitly submit.' },
   { q: 'Who can see your data', a: 'Only you — and any organisation you explicitly consent to share with. You can see every organisation that has access and revoke it instantly.' },
   { q: 'How long we keep it', a: 'Your data is retained for 7 years from the date it was created, then permanently deleted. You can request deletion earlier from your account settings.' },

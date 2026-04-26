@@ -27,13 +27,12 @@ const teamTypes = [
     icon: "🏢",
     title: "Hybrid office teams",
     subtitle: "Office attendance, simplified.",
-    body: `Employees tap once when they arrive. checkmark verifies presence using a combination of WiFi
-    SSID, GPS, and IP geofencing — whichever signals are available. The admin dashboard shows who's
-    in right now, who visited today, and who worked remote. No clocking machines. No app installs.
-    Works in any browser.`,
+    body: `Employees tap once when they arrive. checkmark verifies presence using GPS and IP geofencing.
+    The admin dashboard shows who's in right now, who visited today, and who worked remote.
+    No clocking machines. No app installs. Works in any browser.`,
     points: [
       "Works in co-working spaces and private offices",
-      "Multi-signal verification (WiFi + GPS + IP)",
+      "Multi-signal verification (GPS + IP)",
       "Monthly attendance grid with CSV export",
       "Allowance calculation (coming soon)",
     ],
@@ -63,7 +62,7 @@ const setupSteps = [
   {
     n: "02",
     title: "Register your office location",
-    body: "Add your office WiFi SSID, GPS coordinates (we detect them automatically), or set a geofence radius. Mix and match signals.",
+    body: "Add GPS coordinates (we detect them automatically) or set a geofence radius. Mix and match signals.",
   },
   {
     n: "03",
@@ -83,7 +82,6 @@ const setupSteps = [
 ];
 
 const signals = [
-  { icon: '📶', name: 'WiFi SSID', body: 'When a member\'s device connects to the registered office WiFi network, their check-in is automatically verified.' },
   { icon: '📍', name: 'GPS geofence', body: 'A GPS radius around your office. Members within the fence when they check in are verified. Configurable radius from 50m to 2km.' },
   { icon: '🌐', name: 'IP geofencing', body: 'If the member\'s IP address resolves to a location near your office, it counts as a supporting signal.' },
   { icon: '✍️', name: 'Manual override', body: 'Admin can mark any member present manually. Useful for guests, hardware failures, or mixed-signal environments.' },

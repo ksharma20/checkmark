@@ -365,7 +365,7 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
               borderBottom: '1px solid var(--border)',
               fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)',
             }}>
-              No location signals configured — all check-ins counted as present. Configure GPS/WiFi signals in Settings to distinguish office vs remote.
+              No location signals configured — all check-ins counted as present. Configure GPS or IP signals in Settings to distinguish office vs remote.
             </div>
           )}
           {data.members.map((member) => (

@@ -209,11 +209,11 @@ App runs at `http://localhost:3000`.
 | `users`                   | User accounts — email, password hash, name                          |
 | `otp_codes`               | 6-digit OTPs for signup and verification                            |
 | `user_api_tokens`         | Personal API tokens for programmatic check-ins                      |
-| `presence_events`         | Core table — every check-in/check-out, GPS, WiFi, IP                |
+| `presence_events`         | Core table — every check-in/check-out, GPS, IP                      |
 | `workspaces`              | Organisations — slug, name, plan, org_type, timezone, `archived_at` |
 | `workspace_domains`       | Email domains for auto-enrolment                                    |
 | `workspace_members`       | User ↔ workspace membership, role, consent status                   |
-| `workspace_signal_config` | GPS / WiFi / IP signal configs for presence matching                |
+| `workspace_signal_config` | GPS / IP signal configs for presence matching                       |
 | `admin_overrides`         | Additive admin overrides — audit log, never modifies events         |
 | `user_stats`              | Pre-computed streaks, totals — upserted after every check-in        |
 | `revoked_tokens`          | Invalidated JWT IDs (jti) — checked on every authenticated request  |
@@ -317,7 +317,7 @@ Server-rendered shell + client-rendered state. Shows:
 - Today's check-in list (server-rendered, refreshed via `router.refresh()` after mutations)
 - Workspace strip: each workspace the user is active in, with days count
 
-**GPS flow in CheckinButtons:** `navigator.geolocation.getCurrentPosition()` is called on button tap. If denied, check-in still proceeds with null GPS — a toast explains why. WiFi SSID is read from `navigator.connection?.ssid` (Chrome desktop/Android only).
+**GPS flow in CheckinButtons:** `navigator.geolocation.getCurrentPosition()` is called on button tap. If denied, check-in still proceeds with null GPS — a toast explains why.
 
 **Stale check-in notifications:** On first check-in, the browser is asked for Notification permission. If granted, Web Push notifications are sent at 4h, 8h, 12h, 16h, 18h, 20h, 22h from check-in time. At T+12h a 15-minute warning is sent with a "Still here? Extend by 8h" action. Auto-checkout fires at T+12h from check-in via `POST /api/checkin/checkout` with `reason: maximum_hours_exceeded`. The reason is stored in `presence_events.checkout_reason`. Notification timers are cancelled on manual checkout.
 
@@ -441,7 +441,7 @@ Server-rendered. Shows who is present right now, who visited today, and who hasn
 
 | Badge                        | Colour     | Meaning                                                     |
 | ---------------------------- | ---------- | ----------------------------------------------------------- |
-| ✓ GPS+WiFi (all signals)     | Teal       | `verified` — all configured signals matched                 |
+| ✓ GPS+IP (all signals)       | Teal       | `verified` — all configured signals matched                 |
 | ~ GPS (some signals)         | Amber      | `partial` — some configured signals matched                 |
 | Unverified                   | Muted grey | `none` — no signals matched                                 |
 | Override                     | Purple     | Admin override applied                                      |
@@ -546,7 +546,7 @@ Single `db` object with `query`, `queryOne`, `execute`, `transaction`. Switches 
 The core dashboard function. Given a workspace and date range:
 
 1. Gets active member user IDs (honours plan user limit)
-2. Gets signal configs (GPS / WiFi / IP)
+2. Gets signal configs (GPS / IP)
 3. If **no signal configs**: returns all events (config-light mode)
 4. If **signal configs exist**: tests each event against ALL configured signal types (AND semantics)
 5. Returns each event with a `matched_by` field: `'verified'` (all signals matched) | `'partial'` (some matched) | `'none'` (no match) | `'override'` (admin override)
@@ -632,8 +632,8 @@ Navigate to `/login`. A single 6-state machine handles everything:
 Your presence dashboard. Everything here belongs to you:
 
 - Status line: "Checked in at 10:15 AM" or "Not checked in yet" — always your browser's local timezone
-- **"I'm here"** — visible only when checked out. Collects GPS from the browser, sends `POST /api/checkin` with lat/lng/WiFi SSID. The server creates a `presence_events` row, fires a Nominatim reverse-geocode in the background (stored as `location_label`), and updates your streak + monthly stats.
-- **"I'm leaving"** — visible only when checked in. Sends `POST /api/checkin/checkout` with GPS/WiFi again. Stamps `checkout_at` on the open event.
+- **"I'm here"** — visible only when checked out. Collects GPS from the browser, sends `POST /api/checkin` with lat/lng. The server creates a `presence_events` row, fires a Nominatim reverse-geocode in the background (stored as `location_label`), and updates your streak + monthly stats.
+- **"I'm leaving"** — visible only when checked in. Sends `POST /api/checkin/checkout` with GPS. Stamps `checkout_at` on the open event.
 - 3 stat chips: days this month / hours logged / distinct locations
 - Today's event list: each card shows check-in time, check-out time, location label, and an inline note editor
 
@@ -676,7 +676,7 @@ What the dashboard query does:
 3. Calls `queryWorkspaceEvents(workspace.id, plan, { startDate, endDate })`:
    - Fetches active member IDs (capped by plan's `maxUsers`)
    - Fetches all their presence events in the date range
-   - **Signal matching**: each event tested against GPS proximity (Haversine < radius), WiFi SSID (bcrypt compare), IP geolocation proximity. No match → `matched_by: 'none'`
+   - **Signal matching**: each event tested against GPS proximity (Haversine < radius), IP geolocation proximity. No match → `matched_by: 'none'`
    - Config-light mode: if no signals are configured, all events pass through
    - Admin overrides bypass signal matching entirely
 4. Groups members: **In office now** (open event) · **Visited today** (closed events) · **Not in** (no events today)
@@ -689,7 +689,7 @@ All members: active, invited, declined. Invite by email → consent email sent. 
 **Settings tab — `/ws/:slug/settings`**
 
 - Edit workspace name and timezone
-- **Signal config**: add GPS (lat/lng + radius, auto-detects workspace timezone from coordinates), WiFi SSID (bcrypt-hashed, shown as `abc***`), or IP (geocoded from your server-side IP)
+- **Signal config**: add GPS (lat/lng + radius, auto-detects workspace timezone from coordinates) or IP (geocoded from your server-side IP)
 - **Domain verification**: add a domain → DNS TXT record generated → click "Check verification" → server resolves DNS, marks domain verified (scoped `WHERE id = ? AND workspace_id = ?` at DB level), auto-enrolls any existing users whose email matches
 - **Archive workspace**: soft-archives the workspace (`archived_at` stamped). All data preserved. Workspace moves to "Archived" section in `/ws` picker.
 
@@ -720,7 +720,6 @@ All members: active, invited, declined. Invite by email → consent email sent. 
 | **Logout invalidation**     | `jti` inserted into `revoked_tokens` on logout; `getSessionFromCookies()` checks revocation on every server-component/route-handler request                                                                                                                                                            |
 | **CSRF**                    | `SameSite=Lax` on `cm_session` — `Strict` was causing session loss on PWA cold-opens on Android and iOS (PWA-to-browser cross-origin navigation). `Lax` still blocks cross-site POST mutations; only same-site GET navigations carry the cookie cross-origin.                                                                                                                                                                                                                             |
 | **Password storage**        | bcrypt at cost 12. Minimum 8 chars enforced server-side on both registration and password change. Never stored in plaintext.                                                                                                                                                                           |
-| **WiFi SSID storage**       | bcrypt hash — raw SSID never persisted, cannot be reversed                                                                                                                                                                                                                                             |
 | **OTP brute force**         | 5-attempt lockout per code; max 3 sends per 15 minutes per email                                                                                                                                                                                                                                             |
 | **Reserved slugs**          | 20+ blocked names (api, admin, me, ws, etc.) at the `check-slug` API level                                                                                                                                                                                                                             |
 | **Consent token hijacking** | Three-layer validation: status must be `pending_consent`, token must not be expired, logged-in email must match invited email                                                                                                                                                                          |

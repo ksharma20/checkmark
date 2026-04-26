@@ -143,7 +143,6 @@ interface SignalRow {
   id: string
   signal_type: string
   location_name: string | null
-  wifi_ssid_display: string | null
   gps_lat: number | null
   gps_lng: number | null
   gps_radius_m: number | null
@@ -399,13 +398,12 @@ function SignalsSection({ slug }: { slug: string }) {
 
   function signalLabel(s: SignalRow) {
     if (s.signal_type === 'gps') return `GPS — ${s.location_name ?? 'Office'} (${s.gps_lat?.toFixed(4)}, ${s.gps_lng?.toFixed(4)}, ${s.gps_radius_m}m radius)`
-    if (s.signal_type === 'wifi') return `WiFi — ${s.location_name ?? ''} SSID: ${s.wifi_ssid_display ?? '***'}`
     if (s.signal_type === 'ip') return `IP — lat ${s.ip_geo_lat?.toFixed(4)}, lng ${s.ip_geo_lng?.toFixed(4)}`
     return s.signal_type
   }
 
   function typeBadge(type: string) {
-    const colors: Record<string, string> = { gps: 'var(--brand)', wifi: 'var(--teal)', ip: 'var(--amber)' }
+    const colors: Record<string, string> = { gps: 'var(--brand)', ip: 'var(--amber)' }
     return (
       <span style={{
         fontSize: '11px',

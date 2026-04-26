@@ -3,7 +3,6 @@ import { requireWsAdmin } from '@/lib/ws-admin'
 import { getSignalConfigs, addSignalConfig, updateWorkspace } from '@/lib/db/queries/workspaces'
 import { timezoneFromCoords } from '@/lib/timezone-server'
 import { getIpGeo, extractIp } from '@/lib/geo'
-import bcrypt from 'bcryptjs'
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -13,10 +12,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const signals = await getSignalConfigs(ctx.workspace.id)
-  // Never return raw wifi hashes
-  return NextResponse.json({
-    signals: signals.map(({ wifi_ssid_hash: _h, ...s }) => s),
-  })
+  return NextResponse.json({ signals })
 }
 
 export async function POST(request: NextRequest, { params }: Props) {
@@ -37,8 +33,8 @@ export async function POST(request: NextRequest, { params }: Props) {
   }
 
   const signalType = body.signal_type
-  if (!signalType || !['gps', 'wifi', 'ip'].includes(signalType)) {
-    return NextResponse.json({ error: 'signal_type must be gps, wifi, or ip', code: 'INVALID_SIGNAL_TYPE' }, { status: 400 })
+  if (!signalType || !['gps', 'ip'].includes(signalType)) {
+    return NextResponse.json({ error: 'signal_type must be gps or ip', code: 'INVALID_SIGNAL_TYPE' }, { status: 400 })
   }
 
   let signalParams: Parameters<typeof addSignalConfig>[0] = {
@@ -65,16 +61,6 @@ export async function POST(request: NextRequest, { params }: Props) {
     }
   }
 
-  if (signalType === 'wifi') {
-    if (!body.wifi_ssid?.trim()) {
-      return NextResponse.json({ error: 'wifi_ssid required for WiFi signal', code: 'MISSING_SSID' }, { status: 400 })
-    }
-    const ssid = body.wifi_ssid.trim()
-    const wifiSsidHash = await bcrypt.hash(ssid, 10)
-    const wifiSsidDisplay = ssid.slice(0, 3) + '***'
-    signalParams = { ...signalParams, wifiSsidHash, wifiSsidDisplay }
-  }
-
   if (signalType === 'ip') {
     const ip = extractIp(request)
     const geo = await getIpGeo(ip)
@@ -85,7 +71,6 @@ export async function POST(request: NextRequest, { params }: Props) {
   }
 
   const signal = await addSignalConfig(signalParams)
-  const { wifi_ssid_hash: _h, ...safeSignal } = signal
 
-  return NextResponse.json({ signal: safeSignal })
+  return NextResponse.json({ signal })
 }

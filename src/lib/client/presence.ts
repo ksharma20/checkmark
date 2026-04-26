@@ -13,13 +13,11 @@ export function resolvePresenceTag(
   eventType?: string | null
 ): PresenceTag {
   if (presenceStatus === 'notIn') return 'not_in'
-  // Location verified by a signal → always office
-  if (matchedBy === 'wifi' || matchedBy === 'gps' || matchedBy === 'ip' || matchedBy === 'override') return 'in_office'
-  // Signals configured but location didn't match → remote regardless of what user clicked
-  if (matchedBy === 'unverified') return 'remote'
-  // Config-light (matched_by='none'): trust event_type
-  if (eventType != null) return eventType === 'remote_checkin' ? 'remote' : 'in_office'
-  // Legacy fallback
+  // All configured signals matched → in office
+  if (matchedBy === 'verified' || matchedBy === 'override') return 'in_office'
+  // Signals configured but not all matched → remote
+  if (matchedBy === 'partial') return 'remote'
+  // No signal matched (matched_by='none') → remote regardless of event_type
   return 'remote'
 }
 

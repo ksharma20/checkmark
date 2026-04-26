@@ -8,7 +8,7 @@ export default function FAQ() {
   const faqs = [
     {
       q: 'How does CheckMark verify I am actually at the office?',
-      a: 'When you tap check-in, CheckMark captures WiFi SSID, IP address, and GPS coordinates and validates all three against office profile data.',
+      a: 'When you tap check-in, CheckMark captures IP address and GPS coordinates and validates them against office profile data.',
     },
     {
       q: 'Do I need to install an app?',

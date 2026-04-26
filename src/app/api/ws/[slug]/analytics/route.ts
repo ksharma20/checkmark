@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { queryWorkspaceEvents } from '@/lib/signals'
+import { getWorkspaceSignals } from '@/lib/db/queries/signals'
 import { haversineMetres } from '@/lib/geo'
 
 interface Props { params: Promise<{ slug: string }> }
@@ -102,12 +103,15 @@ export async function GET(request: NextRequest, { params }: Props) {
   const endDate = url.searchParams.get('end') ?? defaultEnd
 
   // Fetch all events in range (signal-matched)
-  const allEvents = await queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, {
-    startDate,
-    endDate: endDate + 'T23:59:59Z',
-  })
+  const [allEvents, workspaceSignals] = await Promise.all([
+    queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, {
+      startDate,
+      endDate: endDate + 'T23:59:59Z',
+    }),
+    getWorkspaceSignals(ctx.workspace.id),
+  ])
 
-  const signals_configured = allEvents.some((e) => e.matched_by !== 'none')
+  const signals_configured = workspaceSignals.length > 0
 
   // Group events by userId → by day
   const byUser = new Map<string, typeof allEvents>()

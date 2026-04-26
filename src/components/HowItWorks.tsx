@@ -17,14 +17,14 @@ export default function HowItWorks() {
     },
     {
       num: '02',
-      title: 'Three signals captured silently',
-      description: 'WiFi SSID, IP address, and GPS coordinates are captured in the background and cross-validated for accuracy.',
+      title: 'Two signals captured silently',
+      description: 'GPS coordinates and IP address are captured in the background and cross-validated for accuracy.',
       icon: 'wifi',
     },
     {
       num: '03',
       title: 'Presence verified instantly',
-      description: 'All three signals must match the registered office profile. No match, no credit. Tamper-proof by design.',
+      description: 'Both signals must match the registered office profile. No match, no credit. Tamper-proof by design.',
       icon: 'check',
     },
     {
@@ -56,7 +56,7 @@ export default function HowItWorks() {
       </div>
 
       <h2 className="section-title reveal mb-5 font-dm-sans text-4xl font-black leading-tight tracking-tight md:text-5xl">
-        One tap. Three <em className="font-syne italic text-checkmark-brand">signals</em>. Zero chaos.
+        One tap. Two <em className="font-syne italic text-checkmark-brand">signals</em>. Zero chaos.
       </h2>
 
       <p className="section-desc reveal mb-14 max-w-[540px] text-base leading-relaxed text-checkmark-text-muted md:text-lg">

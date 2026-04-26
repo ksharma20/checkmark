@@ -100,19 +100,6 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
   return bcrypt.compare(password, hash)
 }
 
-export async function hashWifiSsid(ssid: string): Promise<string> {
-  return bcrypt.hash(ssid, BCRYPT_ROUNDS)
-}
-
-export async function verifyWifiSsid(ssid: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(ssid, hash)
-}
-
-export function wifiSsidDisplay(ssid: string): string {
-  if (ssid.length <= 3) return ssid + '***'
-  return ssid.slice(0, 3) + '***'
-}
-
 // ─── OTP ─────────────────────────────────────────────────────────────────────
 
 export function generateOtp(): string {

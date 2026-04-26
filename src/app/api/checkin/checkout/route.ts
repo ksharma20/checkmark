@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
     gps_lat?: number
     gps_lng?: number
     gps_accuracy_m?: number
-    wifi_ssid?: string
     reason?: string
   } = {}
   try {
@@ -62,7 +61,6 @@ export async function POST(request: NextRequest) {
     checkoutGpsLat: body.gps_lat ?? null,
     checkoutGpsLng: body.gps_lng ?? null,
     checkoutGpsAccuracyM: body.gps_accuracy_m ?? null,
-    checkoutWifiSsid: body.wifi_ssid ?? null,
     checkoutIpAddress: ip,
     checkoutIpGeoLat: geo?.lat ?? null,
     checkoutIpGeoLng: geo?.lng ?? null,

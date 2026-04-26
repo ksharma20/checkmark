@@ -146,7 +146,7 @@ export default function DisputesClient({ slug, tz }: Props) {
           padding: '16px 20px',
         }}>
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
-            No location signals configured. Disputes only apply when WiFi, GPS, or IP signals are set up in Settings.
+            No location signals configured. Disputes only apply when GPS or IP signals are set up in Settings.
             Without signals, all check-ins are counted automatically.
           </p>
         </div>
@@ -282,7 +282,6 @@ function EventRow({
             </span>
           )}
           {ev.has_gps && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>GPS</span>}
-          {ev.has_wifi && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>WiFi</span>}
           {mismatchMetres !== null && mismatchMetres > 0 && (
             <span title="Checked out from a different location" style={{
               display: 'inline-flex', alignItems: 'center', height: '18px', padding: '0 6px',

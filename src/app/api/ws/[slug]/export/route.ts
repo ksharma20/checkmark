@@ -88,7 +88,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       durationHours = Math.round(diff * 100) / 100 + ''
     }
 
-    const isRemote = ev.event_type === 'remote_checkin' || ev.matched_by === 'unverified'
+    const isRemote = ev.event_type === 'remote_checkin' || ev.matched_by === 'partial'
     const displayLabel = isRemote ? 'Remote' : 'Office'
 
     rows.push([

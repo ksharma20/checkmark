@@ -214,12 +214,6 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
               {geoLabel ?? `${event.gps_lat.toFixed(4)}, ${event.gps_lng.toFixed(4)}`}
             </a>
           )}
-
-          {event.wifi_ssid && (
-            <span style={{ fontSize: '11px', fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-muted)' }}>
-              ⌬ {event.wifi_ssid}
-            </span>
-          )}
         </div>
 
         {/* Checkout location */}

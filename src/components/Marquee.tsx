@@ -1,7 +1,7 @@
 export default function Marquee() {
   const items = [
     'No app install required',
-    'WiFi + GPS + IP verification',
+    'GPS + IP verification',
     'Works in coworking spaces',
     '7-year immutable history',
     'Self-serve under 10 minutes',

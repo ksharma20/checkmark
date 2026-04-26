@@ -22,7 +22,6 @@ const dataCollected = [
   { field: 'Check-in timestamp (UTC)', why: 'Core presence record. When you tapped "I\'m here".' },
   { field: 'Check-out timestamp (UTC)', why: 'When you tapped "I\'m leaving". Null if not checked out.' },
   { field: 'GPS coordinates (lat, lng, accuracy)', why: 'Captured only when you grant browser GPS permission at check-in.' },
-  { field: 'WiFi SSID', why: 'Captured only when provided by your device at check-in. Not read in the background.' },
   { field: 'IP address', why: 'Captured server-side at check-in. Used for IP-geofence signal matching.' },
   { field: 'Timezone', why: 'Detected from your browser and stored so timestamps display correctly in your local time.' },
   { field: 'Location label', why: 'Human-readable name derived from GPS coordinates (e.g. "Thapar University, Patiala"). Generated once at check-in, never updated.' },

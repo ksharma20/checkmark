@@ -5,8 +5,6 @@ export interface WorkspaceSignalConfig {
   workspace_id: string
   signal_type: string
   location_name: string | null
-  wifi_ssid_hash: string | null
-  wifi_ssid_display: string | null
   gps_lat: number | null
   gps_lng: number | null
   gps_radius_m: number | null
@@ -28,10 +26,8 @@ export async function getWorkspaceSignals(workspaceId: string): Promise<Workspac
 
 export async function createSignal(params: {
   workspaceId: string
-  signalType: 'wifi' | 'gps' | 'ip'
+  signalType: 'gps' | 'ip'
   locationName?: string | null
-  wifiSsidHash?: string | null
-  wifiSsidDisplay?: string | null
   gpsLat?: number | null
   gpsLng?: number | null
   gpsRadiusM?: number | null
@@ -43,17 +39,14 @@ export async function createSignal(params: {
   await db.execute(
     `INSERT INTO workspace_signal_config
        (id, workspace_id, signal_type, location_name,
-        wifi_ssid_hash, wifi_ssid_display,
         gps_lat, gps_lng, gps_radius_m,
         ip_geo_lat, ip_geo_lng, ip_proximity_m)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
       params.workspaceId,
       params.signalType,
       params.locationName ?? null,
-      params.wifiSsidHash ?? null,
-      params.wifiSsidDisplay ?? null,
       params.gpsLat ?? null,
       params.gpsLng ?? null,
       params.gpsRadiusM ?? 300,

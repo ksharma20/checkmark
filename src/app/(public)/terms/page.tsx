@@ -113,9 +113,9 @@ export default function TermsPage() {
 
         <h2 style={S.h2}>5. Data accuracy and no warranty on signals</h2>
         <p style={S.body}>
-          GPS, WiFi, and IP-based presence verification are probabilistic
+          GPS and IP-based presence verification are probabilistic
           signals, not absolute proof. GPS can be imprecise by tens to hundreds
-          of metres. WiFi SSIDs can be spoofed. IP geolocation is approximate.
+          of metres. IP geolocation is approximate.
         </p>
         <p style={S.body}>
           checkmark provides presence data on an{" "}

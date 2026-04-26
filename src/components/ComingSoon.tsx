@@ -2,7 +2,6 @@
 
 const signals = [
   { label: 'GPS', active: true },
-  { label: 'WiFi', active: true },
   { label: 'IP', active: true },
   { label: 'Device', active: true },
   { label: 'Face ✦', active: false },
@@ -13,8 +12,8 @@ const bullets = [
     icon: (
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
     ),
-    title: 'Fifth signal — biometric',
-    desc: 'Joins GPS, WiFi, IP, and device. All five must match for verified office presence.',
+    title: 'Next signal — biometric',
+    desc: 'Joins GPS, IP, and device. All must match for verified office presence.',
   },
   {
     icon: (
@@ -194,7 +193,7 @@ export default function ComingSoon() {
         <div className="border-t border-checkmark-border px-8 py-4 md:px-12">
           <p className="text-xs leading-relaxed text-checkmark-text-muted">
             <span className="font-semibold text-checkmark-text">Built on the same foundation.</span>
-            {' '}AI verification will be an optional fifth signal — existing GPS + WiFi + IP + device setups are unaffected. Orgs opt in when ready.
+            {' '}AI verification will be an optional additional signal — existing GPS + IP + device setups are unaffected. Orgs opt in when ready.
           </p>
         </div>
       </div>

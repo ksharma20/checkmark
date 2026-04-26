@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import { queryWorkspaceEvents } from '@/lib/signals'
+import { getWorkspaceSignals } from '@/lib/db/queries/signals'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { getPlanLimits } from '@/lib/plans'
 import type { MatchedBy } from '@/lib/signals'
@@ -88,14 +89,13 @@ export async function GET(request: NextRequest, { params }: Props) {
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
   const endDate = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}T23:59:59Z`
 
-  const [allEvents, memberDetails] = await Promise.all([
+  const [allEvents, memberDetails, workspaceSignals] = await Promise.all([
     queryWorkspaceEvents(workspace.id, workspace.plan, { startDate, endDate }),
     getActiveMembersWithDetails(workspace.id),
+    getWorkspaceSignals(workspace.id),
   ])
 
-  const signals_configured = allEvents.some(
-    (e) => e.matched_by !== 'none' && e.matched_by !== undefined
-  )
+  const signals_configured = workspaceSignals.length > 0
 
   // Group events by userId → day
   const byUserDay = new Map<string, Map<string, MatchedBy[]>>()

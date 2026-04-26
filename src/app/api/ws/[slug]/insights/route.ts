@@ -226,7 +226,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   // Only count events that are truly "in office" — same logic as the dashboard tile:
   // exclude remote_checkin and any office_checkin that failed signal matching (unverified)
   const events = allEvents.filter(
-    (ev) => ev.event_type !== 'remote_checkin' && ev.matched_by !== 'unverified'
+    (ev) => ev.event_type !== 'remote_checkin' && (ev.matched_by === 'verified' || ev.matched_by === 'override')
   )
 
   const tz = ctx.workspace.display_timezone || 'UTC'

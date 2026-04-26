@@ -132,7 +132,7 @@ export async function GET(
     let totalHours = 0
 
     for (const [dayKey, dayEvs] of eventsByDay) {
-      const hasOffice = dayEvs.some((ev) => ev.event_type !== 'remote_checkin' && ev.matched_by !== 'unverified')
+      const hasOffice = dayEvs.some((ev) => ev.event_type !== 'remote_checkin' && (ev.matched_by === 'verified' || ev.matched_by === 'override'))
       if (hasOffice) {
         officeDaySet.add(dayKey)
       } else {

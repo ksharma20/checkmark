@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import { queryWorkspaceEvents } from '@/lib/signals'
+import { getWorkspaceSignals } from '@/lib/db/queries/signals'
 import { getActiveMembersWithDetails, createAdminOverride, getWorkspaceOverrides, setEffectiveCheckout } from '@/lib/db/queries/workspaces'
 
 interface Props { params: Promise<{ slug: string }> }
@@ -16,7 +17,6 @@ export interface DisputeEvent {
   note: string | null
   source: string
   has_gps: boolean
-  has_wifi: boolean
   overridden: boolean
   checkout_location_mismatch: number | null
 }
@@ -50,21 +50,20 @@ export async function GET(request: NextRequest, { params }: Props) {
   const startDate = url.searchParams.get('start') ?? defaultStart
   const endDate = url.searchParams.get('end') ?? defaultEnd
 
-  const [allEvents, memberDetails, overrides] = await Promise.all([
+  const [allEvents, memberDetails, overrides, workspaceSignals] = await Promise.all([
     queryWorkspaceEvents(workspace.id, workspace.plan, {
       startDate,
       endDate: endDate + 'T23:59:59Z',
     }),
     getActiveMembersWithDetails(workspace.id),
     getWorkspaceOverrides(workspace.id),
+    getWorkspaceSignals(workspace.id),
   ])
 
   const memberMap = new Map(memberDetails.map((m) => [m.user_id, m]))
   const overriddenEventIds = new Set(overrides.map((o) => o.presence_event_id))
 
-  const signals_configured = allEvents.some(
-    (e) => e.matched_by !== 'none' && e.matched_by !== undefined
-  )
+  const signals_configured = workspaceSignals.length > 0
 
   // Return events that are either unmatched ('none') OR already overridden
   const disputeEvents = allEvents.filter(
@@ -84,7 +83,6 @@ export async function GET(request: NextRequest, { params }: Props) {
     note: e.note,
     source: e.source,
     has_gps: e.gps_lat !== null,
-    has_wifi: e.wifi_ssid !== null,
     overridden: overriddenEventIds.has(e.id),
     checkout_location_mismatch: e.checkout_location_mismatch ?? null,
   }))

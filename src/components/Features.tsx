@@ -10,7 +10,7 @@ export default function Features() {
   const features: Feature[] = [
     {
       title: 'Hybrid Office Mode',
-      description: 'Register your WiFi, GPS, and IP. CheckMark auto-filters presence events to verified office check-ins.',
+      description: 'Register your GPS and IP. CheckMark auto-filters presence events to verified office check-ins.',
       icon: 'grid',
     },
     {
@@ -25,7 +25,7 @@ export default function Features() {
     },
     {
       title: 'Zero Hardware',
-      description: 'No biometric devices. No IT setup. If you have a phone and WiFi, setup is quick.',
+      description: 'No biometric devices. No IT setup. If you have a phone, setup is quick.',
       icon: 'phone',
     },
     {

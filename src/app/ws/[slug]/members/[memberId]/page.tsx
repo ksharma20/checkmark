@@ -7,12 +7,10 @@ import type { MatchedBy } from "@/lib/signals";
 // MatchedBy is kept for the EventWithMatch type below
 
 const SIGNAL_BADGE: Record<MatchedBy, { label: string; color: string }> = {
-  wifi: { label: "WiFi", color: "var(--teal)" },
-  gps: { label: "GPS", color: "var(--brand)" },
-  ip: { label: "IP", color: "var(--amber)" },
+  verified: { label: "Verified", color: "var(--teal)" },
+  partial:  { label: "Partial",  color: "var(--amber)" },
   override: { label: "Override", color: "#8B5CF6" },
-  none: { label: "—", color: "var(--text-muted)" },
-  unverified: { label: "No match", color: "var(--text-muted)" },
+  none:     { label: "—",        color: "var(--text-muted)" },
 };
 
 const TRUST_LABELS: Record<string, string> = {
@@ -129,6 +127,28 @@ function TrustPopover({ flags }: { flags: string[] }) {
   );
 }
 
+function SignalBadge({ matchedBy, matchedSignals }: { matchedBy: MatchedBy; matchedSignals: string[] }) {
+  const badge = SIGNAL_BADGE[matchedBy]
+  const signalLabels: Record<string, string> = { gps: 'GPS', ip: 'IP' }
+  const signals = matchedSignals.map((s) => signalLabels[s] ?? s).join(' + ')
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+      <span style={{
+        fontSize: '11px',
+        fontFamily: 'DM Sans, sans-serif',
+        fontWeight: 600,
+        color: badge.color,
+        background: `color-mix(in srgb,${badge.color} 12%,transparent)`,
+        border: `1px solid color-mix(in srgb,${badge.color} 40%,transparent)`,
+        borderRadius: '4px',
+        padding: '2px 6px',
+      }}>
+        {badge.label}{signals ? ` (${signals})` : ''}
+      </span>
+    </span>
+  )
+}
+
 function EventRow({ ev }: { ev: EventWithMatch }) {
   const flags = (() => {
     try {
@@ -179,29 +199,77 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
           </span>
         )}
         <span style={{ marginLeft: "auto" }}>
-          <SignalBadge matchedBy={ev.matched_by} matchedSignals={ev.matched_signals} />
+          <SignalBadge
+            matchedBy={ev.matched_by}
+            matchedSignals={ev.matched_signals}
+          />
         </span>
         {flags && flags.length > 0 && <TrustPopover flags={flags} />}
-        {ev.checkout_location_mismatch != null && (
+        {(ev.matched_by === "verified" || ev.matched_by === "override") &&
+          ev.checkout_location_mismatch != null && (
+            <span
+              style={{
+                fontSize: "11px",
+                fontFamily: "DM Sans, sans-serif",
+                color: flags?.includes("checkout_outside_radius")
+                  ? "var(--danger)"
+                  : "var(--text-muted)",
+                background: flags?.includes("checkout_outside_radius")
+                  ? "color-mix(in srgb,var(--danger) 10%,transparent)"
+                  : "var(--surface-1)",
+                padding: "2px 7px",
+                borderRadius: "4px",
+                border: flags?.includes("checkout_outside_radius")
+                  ? "1px solid var(--danger)"
+                  : "1px solid var(--border)",
+                fontWeight: flags?.includes("checkout_outside_radius")
+                  ? 600
+                  : 400,
+              }}
+            >
+              {flags?.includes("checkout_outside_radius")
+                ? "⚠ Outside office"
+                : "✓ Near office"}{" "}
+              ({ev.checkout_location_mismatch}m away)
+            </span>
+          )}
+        {(ev.matched_by === "partial" || ev.matched_by === "none") && (
           <span
             style={{
               fontSize: "11px",
               fontFamily: "DM Sans, sans-serif",
-              color: flags?.includes('checkout_outside_radius') ? "var(--danger)" : "var(--text-muted)",
-              background: flags?.includes('checkout_outside_radius') ? "color-mix(in srgb,var(--danger) 10%,transparent)" : "var(--surface-1)",
+              color: "var(--text-muted)",
+              background: "var(--surface-1)",
               padding: "2px 7px",
               borderRadius: "4px",
-              border: flags?.includes('checkout_outside_radius') ? "1px solid var(--danger)" : "1px solid var(--border)",
-              fontWeight: flags?.includes('checkout_outside_radius') ? 600 : 400,
+              border: "1px solid var(--border)",
             }}
           >
-            {flags?.includes('checkout_outside_radius') ? '⚠ Outside office' : '✓ Near office'} ({ev.checkout_location_mismatch}m away)
+            🌐 Remote
           </span>
         )}
       </div>
-      <div style={{ display: "flex", flexDirection: "row", gap: "16px", flexWrap: "wrap", alignItems: "center" }}>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "row",
+          gap: "16px",
+          flexWrap: "wrap",
+          alignItems: "center",
+        }}
+      >
         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-          <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Check-in</span>
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              color: "var(--text-muted)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+            }}
+          >
+            Check-in
+          </span>
           {ev.gps_lat != null && ev.gps_lng != null && (
             <a
               href={`https://www.openstreetmap.org/?mlat=${ev.gps_lat}&mlon=${ev.gps_lng}&zoom=16`}
@@ -214,24 +282,13 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
                 fontFamily: "DM Sans, sans-serif",
                 display: "flex",
                 alignItems: "center",
-                gap: "4px"
+                gap: "4px",
               }}
             >
-              <span style={{ color: 'var(--teal)' }}>◉</span>{" "}
+              <span style={{ color: "var(--teal)" }}>◉</span>{" "}
               {ev.location_label ??
                 `${ev.gps_lat.toFixed(4)}, ${ev.gps_lng.toFixed(4)}`}
             </a>
-          )}
-          {ev.wifi_ssid && (
-            <span
-              style={{
-                fontSize: "11px",
-                fontFamily: "JetBrains Mono, monospace",
-                color: "var(--text-muted)",
-              }}
-            >
-              ⌬ {ev.wifi_ssid}
-            </span>
           )}
           {ev.ip_address && (
             <span
@@ -248,7 +305,17 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
 
         {ev.checkout_at && (
           <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Checkout</span>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 700,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.05em",
+              }}
+            >
+              Checkout
+            </span>
             {ev.checkout_gps_lat != null && ev.checkout_gps_lng != null ? (
               <a
                 href={`https://www.openstreetmap.org/?mlat=${ev.checkout_gps_lat}&mlon=${ev.checkout_gps_lng}&zoom=16`}
@@ -261,17 +328,41 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
                   fontFamily: "DM Sans, sans-serif",
                   display: "flex",
                   alignItems: "center",
-                  gap: "4px"
+                  gap: "4px",
                 }}
               >
-                <span style={{ color: flags?.includes('checkout_outside_radius') ? 'var(--danger)' : 'var(--teal)' }}>◉</span>{" "}
-                {ev.checkout_location_label ?? ev.location_label ?? `${ev.checkout_gps_lat.toFixed(4)}, ${ev.checkout_gps_lng.toFixed(4)}`}
+                <span
+                  style={{
+                    color: flags?.includes("checkout_outside_radius")
+                      ? "var(--danger)"
+                      : "var(--teal)",
+                  }}
+                >
+                  ◉
+                </span>{" "}
+                {ev.checkout_location_label ??
+                  ev.location_label ??
+                  `${ev.checkout_gps_lat.toFixed(4)}, ${ev.checkout_gps_lng.toFixed(4)}`}
               </a>
             ) : (
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: "DM Sans, sans-serif" }}>Location not captured</span>
+              <span
+                style={{
+                  fontSize: "11px",
+                  color: "var(--text-muted)",
+                  fontFamily: "DM Sans, sans-serif",
+                }}
+              >
+                Location not captured
+              </span>
             )}
             {ev.checkout_ip_address && (
-              <span style={{ fontSize: '11px', fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-muted)' }}>
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "JetBrains Mono, monospace",
+                  color: "var(--text-muted)",
+                }}
+              >
                 {ev.checkout_ip_address}
               </span>
             )}

@@ -36,7 +36,6 @@ export async function POST(request: NextRequest) {
     gps_lat?: number
     gps_lng?: number
     gps_accuracy_m?: number
-    wifi_ssid?: string
     note?: string
     event_type?: string
     device_info?: string | null
@@ -54,7 +53,6 @@ export async function POST(request: NextRequest) {
   const event = await createEvent({
     userId,
     eventType: body.event_type ?? 'office_checkin',
-    wifiSsid: body.wifi_ssid ?? null,
     ipAddress: ip,
     ipGeoLat: geo?.lat ?? null,
     ipGeoLng: geo?.lng ?? null,
