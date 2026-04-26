@@ -3,6 +3,8 @@ import { requireWsAdmin } from '@/lib/ws-admin'
 import { getActiveMemberIds } from '@/lib/db/queries/workspaces'
 import { queryWorkspaceEvents } from '@/lib/signals'
 
+export const dynamic = 'force-dynamic'
+
 interface Props { params: Promise<{ slug: string }> }
 
 export type InsightInterval = 'today' | 'week' | 'month' | '3month' | '6month' | 'year'
@@ -21,6 +23,8 @@ export interface InsightsResponse {
   total_members: number
   peak_bucket: string | null   // key of the highest unique_users bucket
   avg_daily_users: number
+  total_checkins: number
+  total_hours: number
 }
 
 /** Zero-pad to 2 digits */
@@ -69,7 +73,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     // When set, use presence-based counting (session spans the bucket window)
     matchPresence?: (cinDt: Date, coutDt: Date | null) => boolean
   }
-  let bucketDefs: BucketDef[] = []
+  const bucketDefs: BucketDef[] = []
 
   if (interval === 'today') {
     const tz = ctx.workspace.display_timezone || 'UTC'
@@ -112,10 +116,13 @@ export async function GET(request: NextRequest, { params }: Props) {
           // Checked in after this bucket — not present yet
           if (cinDate > localToday || (cinDate === localToday && cinH > bucketH)) return false
 
-          // Still active (no checkout) — present in all hours from check-in through now
+          // Current hour: only count people still checked in right now
+          if (bucketH === nowLocalH) return !coutDt
+
+          // Past hours: still active (no checkout) — present through now
           if (!coutDt) return true
 
-          // Checked out — present only if checkout is in this hour or later
+          // Past hours: checked out — present only if checkout was in this hour or later
           const coutDate = localDateStr(coutDt)
           const coutH = localHour(coutDt)
           return coutDate > localToday || (coutDate === localToday && coutH >= bucketH)
@@ -211,10 +218,31 @@ export async function GET(request: NextRequest, { params }: Props) {
   }
 
   // Fetch events using queryWorkspaceEvents (applies plan + signal matching)
-  const events = await queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, {
+  const allEvents = await queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, {
     startDate,
     endDate,
   })
+
+  // Only count events that are truly "in office" — same logic as the dashboard tile:
+  // exclude remote_checkin and any office_checkin that failed signal matching (unverified)
+  const events = allEvents.filter(
+    (ev) => ev.event_type !== 'remote_checkin' && ev.matched_by !== 'unverified'
+  )
+
+  const tz = ctx.workspace.display_timezone || 'UTC'
+  const localToday = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+
+  // Calculate true period totals (not summed from buckets)
+  // For 'today', we only count events that started today in workspace TZ
+  const periodEvents = interval === 'today'
+    ? events.filter(ev => {
+        const cinDt = new Date(ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z')
+        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(cinDt) === localToday
+      })
+    : events
+
+  const total_checkins_period = periodEvents.length
+  const total_hours_period = sessionHours(periodEvents)
 
   const total_members = (await getActiveMemberIds(ctx.workspace.id)).length
 
@@ -233,8 +261,11 @@ export async function GET(request: NextRequest, { params }: Props) {
         label: def.label,
         key: def.key,
         unique_users: new Set(present.map((e) => e.user_id)).size,
-        total_checkins: present.length,
-        total_hours: sessionHours(present),
+        // For hourly buckets, only count check-ins that actually HAPPENED in this hour
+        // and hours from sessions that STARTED in this hour.
+        // This avoids double-counting when summing buckets (though we now pass totals separately).
+        total_checkins: events.filter(ev => def.match(new Date(ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z'))).length,
+        total_hours: sessionHours(events.filter(ev => def.match(new Date(ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z')))),
       }
     }
 
@@ -267,7 +298,11 @@ export async function GET(request: NextRequest, { params }: Props) {
     total_members,
     peak_bucket: maxBucket?.unique_users ? maxBucket.key : null,
     avg_daily_users,
+    total_checkins: total_checkins_period,
+    total_hours: total_hours_period,
   }
 
-  return NextResponse.json(response)
+  return NextResponse.json(response, {
+    headers: { 'Cache-Control': 'no-store' },
+  })
 }

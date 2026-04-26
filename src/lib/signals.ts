@@ -8,7 +8,7 @@ import { historyStartDate, getPlanLimits } from './plans'
 
 export { haversineMetres }
 
-export type MatchedBy = 'verified' | 'partial' | 'none' | 'override'
+export type MatchedBy = 'wifi' | 'gps' | 'ip' | 'none' | 'unverified' | 'override'
 
 export interface PresenceEventWithMatch extends PresenceEvent {
   matched_by: MatchedBy
@@ -111,10 +111,10 @@ export async function queryWorkspaceEvents(
       continue
     }
 
-    const matched = new Set<string>()
+    let matchedBy: MatchedBy = 'unverified'
 
-    // GPS: check if event GPS coords match any configured GPS signal within radius
-    if (configuredTypes.has('gps') && event.gps_lat !== null && event.gps_lng !== null) {
+    // Check GPS signals
+    if (matchedBy === 'unverified' && event.gps_lat !== null && event.gps_lng !== null) {
       for (const signal of gpsSignals) {
         const radius = options.overrideGpsRadius ?? signal.gps_radius_m ?? 300
         if (haversineMetres(event.gps_lat, event.gps_lng, signal.gps_lat, signal.gps_lng) <= radius) {
@@ -124,8 +124,8 @@ export async function queryWorkspaceEvents(
       }
     }
 
-    // IP: check if event IP geo coords match any configured IP signal within proximity
-    if (configuredTypes.has('ip') && event.ip_geo_lat !== null && event.ip_geo_lng !== null) {
+    // Check IP signals
+    if (matchedBy === 'unverified' && event.ip_geo_lat !== null && event.ip_geo_lng !== null) {
       for (const signal of ipSignals) {
         if (haversineMetres(event.ip_geo_lat, event.ip_geo_lng, signal.ip_geo_lat, signal.ip_geo_lng) <= (signal.ip_proximity_m ?? 500)) {
           matched.add('ip')
@@ -134,10 +134,8 @@ export async function queryWorkspaceEvents(
       }
     }
 
-    // WiFi: async bcrypt comparison — O(events × wifi_configs), cost 12 per compare (~300ms each).
-    // Bounded by plan.maxLocations (free/starter=1, growth=5). Acceptable at current scale.
-    // Future: replace bcrypt with HMAC for O(1) comparison at query time.
-    if (configuredTypes.has('wifi') && event.wifi_ssid && wifiSignals.length > 0) {
+    // Check WiFi signals (async bcrypt)
+    if (matchedBy === 'unverified' && event.wifi_ssid && wifiSignals.length > 0) {
       for (const signal of wifiSignals) {
         if (await verifyWifiSsid(event.wifi_ssid, signal.wifi_ssid_hash!)) {
           matched.add('wifi')

@@ -10,10 +10,11 @@ export interface AnalyticsMember {
   user_id: string
   name: string
   email: string
+  joined_at: string          // workspace join date (YYYY-MM-DD)
   office_days: number
   wfh_days: number
   absent_days: number
-  working_days: number
+  working_days: number       // effective working days for this member (from join date)
   total_office_hours: number
   total_wfh_hours: number
   total_hours: number
@@ -106,7 +107,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     endDate: endDate + 'T23:59:59Z',
   })
 
-  const signals_configured = allEvents.some((e) => e.matched_by !== 'none' && e.matched_by !== undefined)
+  const signals_configured = allEvents.some((e) => e.matched_by !== 'none')
 
   // Group events by userId → by day
   const byUser = new Map<string, typeof allEvents>()
@@ -119,13 +120,18 @@ export async function GET(request: NextRequest, { params }: Props) {
   const memberDetails = await getActiveMembersWithDetails(ctx.workspace.id)
   const memberMap = new Map(memberDetails.map((m) => [m.user_id, m]))
 
-  const working_days = countWorkingDays(startDate, endDate)
+  const global_working_days = countWorkingDays(startDate, endDate)
 
   const members: AnalyticsMember[] = []
 
   for (const [userId, events] of byUser) {
     const memberInfo = memberMap.get(userId)
     if (!memberInfo) continue
+
+    // Per-member effective start: later of range start or workspace join date
+    const joinedDateStr = memberInfo.added_at.slice(0, 10)
+    const effectiveStart = joinedDateStr > startDate ? joinedDateStr : startDate
+    const member_working_days = countWorkingDays(effectiveStart, endDate)
 
     // Group by day (YYYY-MM-DD from checkin_at)
     const byDay = new Map<string, typeof allEvents>()
@@ -166,7 +172,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     }
 
     const attendance_days = office_days + wfh_days
-    const absent_days = Math.max(0, working_days - attendance_days)
+    const absent_days = Math.max(0, member_working_days - attendance_days)
     const total_hours = office_hours + wfh_hours
     const avg_daily_hours = attendance_days > 0 ? total_hours / attendance_days : 0
     const field_force_locations = countGpsClusters(checkinLocations)
@@ -175,10 +181,11 @@ export async function GET(request: NextRequest, { params }: Props) {
       user_id: userId,
       name: memberInfo.full_name ?? memberInfo.email,
       email: memberInfo.email,
+      joined_at: joinedDateStr,
       office_days,
       wfh_days,
       absent_days,
-      working_days,
+      working_days: member_working_days,
       total_office_hours: Math.round(office_hours * 10) / 10,
       total_wfh_hours: Math.round(wfh_hours * 10) / 10,
       total_hours: Math.round(total_hours * 10) / 10,
@@ -194,7 +201,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   const response: AnalyticsResponse = {
     start_date: startDate,
     end_date: endDate,
-    working_days,
+    working_days: global_working_days,
     signals_configured,
     members,
   }

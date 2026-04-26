@@ -8,6 +8,7 @@ import type { InsightsResponse, InsightBucket } from '@/app/api/ws/[slug]/insigh
 import type { MemberStatsResponse, StatsInterval } from '@/app/api/ws/[slug]/member-stats/route'
 import type { RealtimeResponse } from '@/app/api/ws/[slug]/realtime/route'
 import { fmtHours } from '@/lib/client/format-time'
+import { resolvePresenceTag, PRESENCE_TAG_CONFIG } from '@/lib/client/presence'
 import { Users, Monitor, Home, Activity } from 'lucide-react'
 
 interface Props {
@@ -28,17 +29,6 @@ function getInitials(s: string): string {
 
 function StatusBadge({ member }: { member: DashboardMember }) {
   const hasTrust = (member.latest_event?.trust_flags?.length ?? 0) > 0
-  if (member.presence_status === 'notIn') {
-    return (
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', height: '22px', padding: '0 9px',
-        borderRadius: '5px', fontSize: '11px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700,
-        background: 'var(--surface-2)', color: 'var(--text-muted)', letterSpacing: '0.04em',
-      }}>
-        ABSENT
-      </span>
-    )
-  }
   if (hasTrust) {
     return (
       <span style={{
@@ -52,15 +42,18 @@ function StatusBadge({ member }: { member: DashboardMember }) {
       </span>
     )
   }
+  const tag = resolvePresenceTag(member.presence_status, member.latest_event?.matched_by, member.latest_event?.event_type)
+  const { label, color } = PRESENCE_TAG_CONFIG[tag]
+  const isMuted = tag === 'not_in'
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', height: '22px', padding: '0 9px',
       borderRadius: '5px', fontSize: '11px', fontFamily: 'DM Sans, sans-serif', fontWeight: 700,
-      background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
-      color: 'var(--brand)', letterSpacing: '0.04em',
-      border: '1px solid color-mix(in srgb, var(--brand) 30%, transparent)',
+      background: isMuted ? 'var(--surface-2)' : `color-mix(in srgb, ${color} 12%, transparent)`,
+      color, letterSpacing: '0.04em',
+      border: isMuted ? 'none' : `1px solid color-mix(in srgb, ${color} 30%, transparent)`,
     }}>
-      VERIFIED
+      {label.toUpperCase()}
     </span>
   )
 }
@@ -319,15 +312,22 @@ const STATS_INTERVALS: { key: StatsInterval; label: string }[] = [
   { key: 'week',   label: 'Week' },
   { key: 'month',  label: 'Month' },
   { key: '3month', label: '3 Months' },
+  { key: 'custom', label: 'Custom' },
 ]
 
-function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange }: {
+function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange, customRange, onCustomApply }: {
   slug: string
   statsData: MemberStatsResponse | null
   loading: boolean
   interval: StatsInterval
   onIntervalChange: (iv: StatsInterval) => void
+  customRange: { start: string; end: string }
+  onCustomApply: (range: { start: string; end: string }) => void
 }) {
+  const [localStart, setLocalStart] = useState(customRange.start)
+  const [localEnd, setLocalEnd]     = useState(customRange.end)
+  const [search, setSearch] = useState('')
+
   const th: React.CSSProperties = {
     fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 700,
     color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em',
@@ -337,7 +337,13 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
     backgroundSize: '600px 100%', animation: 'shimmer 1.4s ease-in-out infinite', borderRadius: '5px',
   }
 
-  const members = statsData?.members ?? []
+  const allMembers = statsData?.members ?? []
+  const members = search.trim()
+    ? allMembers.filter((m) => {
+        const q = search.toLowerCase()
+        return (m.full_name ?? '').toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
+      })
+    : allMembers
   const totalDays = statsData?.total_working_days ?? 1
 
   return (
@@ -358,37 +364,130 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
             Attendance
           </em>
         </h2>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-          {STATS_INTERVALS.map((iv) => (
-            <button
-              key={iv.key}
-              type="button"
-              onClick={() => onIntervalChange(iv.key)}
-              style={{
-                height: '30px', padding: '0 12px',
-                background: interval === iv.key ? 'var(--brand)' : 'var(--surface-0)',
-                color: interval === iv.key ? '#fff' : 'var(--text-secondary)',
-                border: `1px solid ${interval === iv.key ? 'var(--brand)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-md)',
-                fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
-                fontWeight: interval === iv.key ? 600 : 400,
-                cursor: 'pointer', transition: 'background 0.15s',
-              }}
-            >
-              {iv.label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <input
+            type="search"
+            placeholder="Search by name or email…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              height: '30px', padding: '0 10px',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+              fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
+              background: 'var(--surface-1)', color: 'var(--text-primary)',
+              outline: 'none', width: '200px',
+            }}
+          />
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {STATS_INTERVALS.map((iv) => (
+              <button
+                key={iv.key}
+                type="button"
+                onClick={() => onIntervalChange(iv.key)}
+                style={{
+                  height: '30px', padding: '0 12px',
+                  background: interval === iv.key ? 'var(--brand)' : 'var(--surface-0)',
+                  color: interval === iv.key ? '#fff' : 'var(--text-secondary)',
+                  border: `1px solid ${interval === iv.key ? 'var(--brand)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
+                  fontWeight: interval === iv.key ? 600 : 400,
+                  cursor: 'pointer', transition: 'background 0.15s',
+                }}
+              >
+                {iv.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Custom date range row */}
+      {interval === 'custom' && (
+        <div style={{
+          padding: '12px 16px', borderBottom: '1px solid var(--border)',
+          background: 'var(--surface-0)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap',
+        }}>
+          {/* From */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{
+              fontFamily: 'DM Sans, sans-serif', fontSize: '10px', fontWeight: 700,
+              color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em',
+            }}>
+              From
+            </label>
+            <input
+              type="date"
+              value={localStart}
+              onChange={(e) => setLocalStart(e.target.value)}
+              style={{
+                height: '34px', padding: '0 10px',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                background: 'var(--surface-1)', color: 'var(--text-primary)',
+                outline: 'none', minWidth: '140px',
+              }}
+            />
+          </div>
+
+          {/* Arrow separator */}
+          <div style={{
+            height: '34px', display: 'flex', alignItems: 'center',
+            color: 'var(--text-muted)', fontSize: '16px', paddingBottom: '0',
+          }}>→</div>
+
+          {/* To */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <label style={{
+              fontFamily: 'DM Sans, sans-serif', fontSize: '10px', fontWeight: 700,
+              color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em',
+            }}>
+              To
+            </label>
+            <input
+              type="date"
+              value={localEnd}
+              onChange={(e) => setLocalEnd(e.target.value)}
+              style={{
+                height: '34px', padding: '0 10px',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                background: 'var(--surface-1)', color: 'var(--text-primary)',
+                outline: 'none', minWidth: '140px',
+              }}
+            />
+          </div>
+
+          {/* Apply */}
+          <button
+            type="button"
+            onClick={() => { if (localStart && localEnd) onCustomApply({ start: localStart, end: localEnd }) }}
+            disabled={!localStart || !localEnd}
+            style={{
+              height: '34px', padding: '0 20px',
+              background: localStart && localEnd ? 'var(--brand)' : 'var(--surface-2)',
+              color: localStart && localEnd ? '#fff' : 'var(--text-muted)',
+              border: 'none', borderRadius: 'var(--radius-md)',
+              fontSize: '12px', fontFamily: 'DM Sans, sans-serif', fontWeight: 600,
+              cursor: localStart && localEnd ? 'pointer' : 'not-allowed',
+              transition: 'background 0.15s',
+            }}
+          >
+            Apply
+          </button>
+        </div>
+      )}
 
       <div className="dash-table-scroll"><div className="dash-table-min">
       <div style={{
         display: 'grid',
-        gridTemplateColumns: '2fr 1.4fr 1.4fr 1.4fr 100px 100px',
+        gridTemplateColumns: '2fr 90px 1.4fr 1.4fr 1.4fr 100px 100px',
         gap: '12px', padding: '10px 16px',
         borderBottom: '1px solid var(--border)', background: 'var(--surface-1)',
       }}>
         <span style={th}>Member</span>
+        <span style={th}>Joined</span>
         <span style={th}>Office</span>
         <span style={th}>Remote</span>
         <span style={th}>Absent</span>
@@ -400,7 +499,7 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
         [1, 2, 3, 4, 5].map((i) => (
           <div key={i} style={{
             display: 'grid',
-            gridTemplateColumns: '2fr 1.4fr 1.4fr 1.4fr 100px 100px',
+            gridTemplateColumns: '2fr 90px 1.4fr 1.4fr 1.4fr 100px 100px',
             gap: '12px', alignItems: 'center', padding: '14px 16px',
             borderBottom: '1px solid var(--border)',
           }}>
@@ -411,6 +510,7 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
                 <div style={{ ...sk, height: '10px', width: '120px' }} />
               </div>
             </div>
+            <div style={{ ...sk, height: '12px', width: '60px' }} />
             <div style={{ ...sk, height: '8px', width: '100%' }} />
             <div style={{ ...sk, height: '8px', width: '100%' }} />
             <div style={{ ...sk, height: '8px', width: '100%' }} />
@@ -421,7 +521,7 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
       ) : members.length === 0 ? (
         <div style={{ padding: '48px 24px', textAlign: 'center' }}>
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
-            No attendance data for this period.
+            {search.trim() ? 'No members match your search.' : 'No attendance data for this period.'}
           </p>
         </div>
       ) : (
@@ -433,7 +533,7 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '2fr 1.4fr 1.4fr 1.4fr 100px 100px',
+                  gridTemplateColumns: '2fr 90px 1.4fr 1.4fr 1.4fr 100px 100px',
                   gap: '12px', alignItems: 'center',
                   padding: '12px 16px', borderBottom: '1px solid var(--border)',
                   cursor: 'pointer', transition: 'background 0.12s',
@@ -464,6 +564,16 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
                     }}>
                       {m.full_name ? m.email : m.role}
                     </div>
+                  </div>
+                </div>
+                {/* Joined date */}
+                <div>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
+                    {m.joined_at.slice(8, 10)}{' '}
+                    {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.joined_at.slice(5, 7)) - 1]}
+                  </div>
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)' }}>
+                    {m.joined_at.slice(0, 4)}
                   </div>
                 </div>
                 <div>
@@ -733,42 +843,73 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
   const [realtimeData, setRealtimeData] = useState<RealtimeResponse | null>(null)
   const [realtimeLoading, setRealtimeLoading] = useState(true)
 
+  const [dashLoading, setDashLoading] = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
   const [statsInterval, setStatsInterval] = useState<StatsInterval>('month')
   const [statsData, setStatsData] = useState<MemberStatsResponse | null>(null)
   const [statsLoading, setStatsLoading] = useState(true)
+  const [customRange, setCustomRange] = useState({ start: '', end: '' })
 
 
-  const fetchDash = useCallback(async () => {
-    const res = await fetch(`/api/ws/${slug}/dashboard?status=all&signal=all&sortBy=name&sortDir=asc&page=1&limit=500`)
-    if (res.ok) setData(await res.json())
-  }, [slug])
-
-  useEffect(() => { fetchDash() }, [fetchDash])
-
-  useEffect(() => {
-    async function fetchTodayHourly() {
-      setTodayHourlyLoading(true)
-      try {
-        const res = await fetch(`/api/ws/${slug}/insights?interval=today`)
-        if (res.ok) setTodayHourlyData(await res.json())
-      } finally {
-        setTodayHourlyLoading(false)
+  const fetchDash = useCallback(async (isSilent = false) => {
+    if (!isSilent) setDashLoading(true)
+    try {
+      const res = await fetch(`/api/ws/${slug}/dashboard?status=all&signal=all&sortBy=name&sortDir=asc&page=1&limit=500`)
+      if (res.ok) {
+        setData(await res.json())
+        setLastUpdated(new Date())
       }
+    } finally {
+      if (!isSilent) setDashLoading(false)
     }
-    fetchTodayHourly()
   }, [slug])
 
-  const fetchStats = useCallback(async (iv: StatsInterval) => {
+  const fetchTodayHourly = useCallback(async (isSilent = false) => {
+    if (!isSilent) setTodayHourlyLoading(true)
+    try {
+      const res = await fetch(`/api/ws/${slug}/insights?interval=today`, { cache: 'no-store' })
+      if (res.ok) setTodayHourlyData(await res.json())
+    } finally {
+      if (!isSilent) setTodayHourlyLoading(false)
+    }
+  }, [slug])
+
+  const refreshAll = useCallback(async () => {
+    await Promise.all([
+      fetchDash(),
+      fetchTodayHourly(),
+      // fetchStats(statsInterval), // maybe too heavy for auto-poll
+    ])
+  }, [fetchDash, fetchTodayHourly])
+
+  const fetchStats = useCallback(async (iv: StatsInterval, custom?: { start: string; end: string }) => {
     setStatsLoading(true)
     try {
-      const res = await fetch(`/api/ws/${slug}/member-stats?interval=${iv}`)
+      let url = `/api/ws/${slug}/member-stats?interval=${iv}`
+      if (iv === 'custom' && custom?.start && custom?.end) {
+        url += `&start=${custom.start}&end=${custom.end}`
+      }
+      const res = await fetch(url)
       if (res.ok) setStatsData(await res.json())
     } finally {
       setStatsLoading(false)
     }
   }, [slug])
 
-  useEffect(() => { fetchStats(statsInterval) }, [fetchStats, statsInterval])
+  useEffect(() => {
+    refreshAll()
+    const dashId = setInterval(() => fetchDash(true), 30000)
+    const graphId = setInterval(() => fetchTodayHourly(true), 10000)
+    return () => {
+      clearInterval(dashId)
+      clearInterval(graphId)
+    }
+  }, [refreshAll, fetchDash, fetchTodayHourly])
+
+  useEffect(() => {
+    if (statsInterval !== 'custom') fetchStats(statsInterval)
+  }, [fetchStats, statsInterval])
 
   useEffect(() => {
     async function fetchRealtime() {
@@ -790,7 +931,7 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
 
   return (
     <div className="dash-page" style={{ padding: '24px', minHeight: '100%' }}>
-      {/* Export button */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <div>
           <h1 style={{
@@ -801,40 +942,63 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           </h1>
           <span style={{
             fontFamily: 'DM Sans, sans-serif', fontSize: '12px',
-            color: 'var(--text-muted)', marginTop: '2px', display: 'block',
+            color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px'
           }}>
             Dashboard
+            {lastUpdated && (
+              <>
+                <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--border)' }} />
+                Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </>
+            )}
           </span>
         </div>
-        <button
-          type="button"
-          onClick={async () => {
-            const now = new Date()
-            const y = now.getFullYear()
-            const m = String(now.getMonth() + 1).padStart(2, '0')
-            const start = `${y}-${m}-01`
-            const lastDay = new Date(y, now.getMonth() + 1, 0).getDate()
-            const end = `${y}-${m}-${String(lastDay).padStart(2, '0')}`
-            const res = await fetch(`/api/ws/${slug}/export?start=${start}&end=${end}`)
-            if (!res.ok) { alert((await res.json().catch(() => ({}))).error ?? 'Export failed'); return }
-            const blob = await res.blob()
-            const url = URL.createObjectURL(blob)
-            const a = document.createElement('a')
-            a.href = url; a.download = `report-${slug}-${y}-${m}.csv`
-            document.body.appendChild(a); a.click(); document.body.removeChild(a)
-            URL.revokeObjectURL(url)
-          }}
-          style={{
-            height: '40px', padding: '0 20px',
-            background: 'var(--brand)', color: '#fff',
-            border: 'none', borderRadius: 'var(--radius-md)',
-            fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
-            cursor: 'pointer', whiteSpace: 'nowrap',
-            boxShadow: '0 2px 8px color-mix(in srgb, var(--brand) 35%, transparent)',
-          }}
-        >
-          Export Report
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            type="button"
+            onClick={refreshAll}
+            disabled={dashLoading || todayHourlyLoading}
+            style={{
+              height: '40px', padding: '0 16px',
+              background: 'var(--surface-0)', color: 'var(--text-primary)',
+              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+              fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px'
+            }}
+          >
+            <Activity size={14} className={dashLoading ? 'animate-spin' : ''} />
+            {dashLoading ? 'Refreshing...' : 'Refresh'}
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              const now = new Date()
+              const y = now.getFullYear()
+              const m = String(now.getMonth() + 1).padStart(2, '0')
+              const start = `${y}-${m}-01`
+              const lastDay = new Date(y, now.getMonth() + 1, 0).getDate()
+              const end = `${y}-${m}-${String(lastDay).padStart(2, '0')}`
+              const res = await fetch(`/api/ws/${slug}/export?start=${start}&end=${end}`)
+              if (!res.ok) { alert((await res.json().catch(() => ({}))).error ?? 'Export failed'); return }
+              const blob = await res.blob()
+              const url = URL.createObjectURL(blob)
+              const a = document.createElement('a')
+              a.href = url; a.download = `report-${slug}-${y}-${m}.csv`
+              document.body.appendChild(a); a.click(); document.body.removeChild(a)
+              URL.revokeObjectURL(url)
+            }}
+            style={{
+              height: '40px', padding: '0 20px',
+              background: 'var(--brand)', color: '#fff',
+              border: 'none', borderRadius: 'var(--radius-md)',
+              fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
+              cursor: 'pointer', whiteSpace: 'nowrap',
+              boxShadow: '0 2px 8px color-mix(in srgb, var(--brand) 35%, transparent)',
+            }}
+          >
+            Export Report
+          </button>
+        </div>
       </div>
 
       {planLimitBanner}
@@ -853,8 +1017,8 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           className="dash-stat-card"
           title="In Office"
           value={counts.office}
-          sub="via Wi-Fi or GPS"
-          onClick={() => setModal({ title: 'In Office', members: (data?.all_members ?? []).filter(m => m.presence_status !== 'notIn' && (m.latest_event?.matched_by === 'verified' || m.latest_event?.matched_by === 'override')) })}
+          sub="currently in office"
+          onClick={() => setModal({ title: 'In Office', members: (data?.all_members ?? []).filter(m => m.presence_status === 'present' && m.latest_event?.event_type !== 'remote_checkin' && m.latest_event?.matched_by !== 'unverified') })}
           icon={<Monitor size={16} />}
         />
         <StatCard
@@ -862,7 +1026,7 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           title="Remote"
           value={counts.remote}
           sub="working remotely"
-          onClick={() => setModal({ title: 'Remote', members: (data?.all_members ?? []).filter(m => m.presence_status !== 'notIn' && m.latest_event?.matched_by !== 'verified' && m.latest_event?.matched_by !== 'override') })}
+          onClick={() => setModal({ title: 'Remote', members: (data?.all_members ?? []).filter(m => m.presence_status === 'present' && (m.latest_event?.event_type === 'remote_checkin' || m.latest_event?.matched_by === 'unverified')) })}
           icon={<Home size={16} />}
         />
       </div>
@@ -936,6 +1100,11 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           loading={statsLoading}
           interval={statsInterval}
           onIntervalChange={setStatsInterval}
+          customRange={customRange}
+          onCustomApply={(range) => {
+            setCustomRange(range)
+            fetchStats('custom', range)
+          }}
         />
       </div>
 

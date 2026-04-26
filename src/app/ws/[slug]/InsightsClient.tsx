@@ -71,9 +71,11 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
   const [hovered, setHovered] = useState<number | null>(null)
   const max = Math.max(...buckets.map((b) => b[valueKey]), 1)
   const chartH = 140
+  const padT = 32  // space above bars for tooltip
   const barW = Math.max(4, Math.min(32, Math.floor(600 / buckets.length) - 3))
   const gap = Math.max(2, Math.floor(600 / buckets.length) - barW)
   const totalW = buckets.length * (barW + gap) - gap
+  const svgH = padT + chartH + 40
 
   return (
     <div>
@@ -83,17 +85,17 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
       <div style={{ overflowX: 'auto', paddingBottom: '4px' }}>
         <svg
           width={totalW + 2}
-          height={chartH + 40}
+          height={svgH}
           style={{ display: 'block', minWidth: '100%' }}
-          viewBox={`0 0 ${totalW + 2} ${chartH + 40}`}
+          viewBox={`0 0 ${totalW + 2} ${svgH}`}
           preserveAspectRatio="none"
         >
           {/* Y-axis guide lines */}
           {[0, 0.25, 0.5, 0.75, 1].map((frac) => (
             <line
               key={frac}
-              x1={0} y1={chartH - frac * chartH}
-              x2={totalW} y2={chartH - frac * chartH}
+              x1={0} y1={padT + chartH - frac * chartH}
+              x2={totalW} y2={padT + chartH - frac * chartH}
               stroke="var(--border)" strokeWidth={0.5} strokeDasharray="3,3"
             />
           ))}
@@ -102,6 +104,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
             const val = b[valueKey]
             const barH = max > 0 ? Math.max(val > 0 ? 3 : 0, Math.round((val / max) * chartH)) : 0
             const x = i * (barW + gap)
+            const barY = padT + chartH - barH
             const isHovered = hovered === i
             const fillColor = val === 0 ? 'var(--surface-2)' : isHovered ? 'var(--brand)' : color
 
@@ -109,26 +112,26 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
               <g key={b.key} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)}>
                 {/* Bar */}
                 <rect
-                  x={x} y={chartH - barH}
+                  x={x} y={barY}
                   width={barW} height={barH}
                   fill={fillColor}
                   rx={Math.min(3, barW / 4)}
                   style={{ transition: 'fill 0.15s' }}
                 />
 
-                {/* Hover tooltip */}
+                {/* Hover tooltip — always within SVG bounds */}
                 {isHovered && val > 0 && (
                   <g>
                     <rect
                       x={Math.min(x + barW / 2 - 30, totalW - 62)}
-                      y={chartH - barH - 28}
+                      y={barY - 28}
                       width={60} height={22}
                       rx={4}
                       fill="var(--navy)"
                     />
                     <text
-                      x={Math.min(x + barW / 2, totalW - 32) + 0}
-                      y={chartH - barH - 13}
+                      x={Math.min(x + barW / 2, totalW - 32)}
+                      y={barY - 13}
                       textAnchor="middle"
                       fill="#fff"
                       fontSize={10}
@@ -145,7 +148,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
                 {(buckets.length <= 14 || i % Math.ceil(buckets.length / 12) === 0) && (
                   <text
                     x={x + barW / 2}
-                    y={chartH + 16}
+                    y={padT + chartH + 16}
                     textAnchor="middle"
                     fill="var(--text-muted)"
                     fontSize={9}
@@ -209,8 +212,8 @@ export default function InsightsClient({ slug }: Props) {
   useEffect(() => { fetchData(interval) }, [fetchData, interval])
 
   // Derived stats
-  const totalCheckins = data?.buckets.reduce((s, b) => s + b.total_checkins, 0) ?? 0
-  const totalHours = data?.buckets.reduce((s, b) => s + b.total_hours, 0) ?? 0
+  const totalCheckins = data?.total_checkins ?? 0
+  const totalHours = data?.total_hours ?? 0
   const peakBucket = data?.buckets.find((b) => b.key === data.peak_bucket)
   const presentBuckets = data?.buckets.filter((b) => b.unique_users > 0).length ?? 0
 

@@ -66,18 +66,13 @@ export async function GET(request: NextRequest, { params }: Props) {
   const memberMap = new Map(memberDetails.map((m) => [m.user_id, m]))
 
   const headers = [
-    'event_id',
     'member_name',
     'member_email',
     'matched_by',
-    'checkin_at_utc',
     `checkin_at_${tz.replace(/\//g, '_')}`,
-    'checkout_at_utc',
     `checkout_at_${tz.replace(/\//g, '_')}`,
     'duration_hours',
     'location_label',
-    'source',
-    'note',
   ]
 
   const rows: string[][] = [headers]
@@ -93,19 +88,17 @@ export async function GET(request: NextRequest, { params }: Props) {
       durationHours = Math.round(diff * 100) / 100 + ''
     }
 
+    const isRemote = ev.event_type === 'remote_checkin' || ev.matched_by === 'unverified'
+    const displayLabel = isRemote ? 'Remote' : 'Office'
+
     rows.push([
-      ev.id,
       member?.full_name ?? member?.email ?? ev.user_id,
       member?.email ?? '',
       ev.matched_by,
-      checkinUtc,
       formatTz(ev.checkin_at, tz),
-      checkoutUtc ?? '',
       checkoutUtc ? formatTz(ev.checkout_at!, tz) : '',
       durationHours,
-      ev.location_label ?? '',
-      ev.source,
-      ev.note ?? '',
+      displayLabel,
     ])
   }
 

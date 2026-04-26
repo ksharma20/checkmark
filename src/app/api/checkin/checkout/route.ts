@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOpenEventToday, checkoutEvent } from '@/lib/db/queries/events'
+import { getOpenEventToday, checkoutEvent, updateCheckoutLocationLabel } from '@/lib/db/queries/events'
 import { updateUserStats } from '@/lib/stats'
 import { extractIp, getIpGeo, haversineMetres } from '@/lib/geo'
 import { getGpsSignalsForUser } from '@/lib/db/queries/workspaces'
+import { reverseGeocodeLabel } from '@/lib/geo-label'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -39,6 +40,7 @@ export async function POST(request: NextRequest) {
 
   // Compute checkout_location_mismatch using workspace-configured GPS radius
   let checkoutLocationMismatch: number | null = null
+  let outsideRadius = false
   if (body.gps_lat != null && body.gps_lng != null) {
     const gpsSignals = await getGpsSignalsForUser(userId)
     if (gpsSignals.length > 0) {
@@ -48,9 +50,13 @@ export async function POST(request: NextRequest) {
         const dist = haversineMetres(body.gps_lat, body.gps_lng, sig.gps_lat, sig.gps_lng)
         if (dist < minDist) { minDist = dist; matchedRadius = sig.gps_radius_m }
       }
-      checkoutLocationMismatch = minDist <= matchedRadius ? null : Math.round(minDist)
+      checkoutLocationMismatch = Math.round(minDist)
+      outsideRadius = minDist > matchedRadius
     }
   }
+
+  const trustFlags = openEvent.trust_flags ? (JSON.parse(openEvent.trust_flags) as string[]) : []
+  if (outsideRadius) trustFlags.push('checkout_outside_radius')
 
   const event = await checkoutEvent(openEvent.id, userId, {
     checkoutGpsLat: body.gps_lat ?? null,
@@ -62,6 +68,7 @@ export async function POST(request: NextRequest) {
     checkoutIpGeoLng: geo?.lng ?? null,
     checkoutReason: body.reason ?? null,
     checkoutLocationMismatch,
+    trustFlags,
   })
 
   if (!event) {
@@ -73,6 +80,13 @@ export async function POST(request: NextRequest) {
     : null
 
   updateUserStats(userId).catch(console.error)
+
+  // Fire-and-forget: resolve checkout GPS to human label
+  if (body.gps_lat != null && body.gps_lng != null) {
+    reverseGeocodeLabel(body.gps_lat, body.gps_lng)
+      .then((label) => { if (label) return updateCheckoutLocationLabel(event.id, label) })
+      .catch(() => {})
+  }
 
   return NextResponse.json({ event, duration_hours: durationHours })
 }

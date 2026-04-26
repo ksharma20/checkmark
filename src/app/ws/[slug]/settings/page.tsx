@@ -257,13 +257,6 @@ function SignalsSection({ slug }: { slug: string }) {
   const [savingGps, setSavingGps] = useState(false)
   const [gpsStatus, setGpsStatus] = useState<{ text: string; ok: boolean } | null>(null)
 
-  // WiFi form state
-  const [showWifiForm, setShowWifiForm] = useState(false)
-  const [wifiName, setWifiName] = useState('')
-  const [wifiSsid, setWifiSsid] = useState('')
-  const [savingWifi, setSavingWifi] = useState(false)
-  const [wifiStatus, setWifiStatus] = useState<{ text: string; ok: boolean } | null>(null)
-
   // IP form state
   const [registeringIp, setRegisteringIp] = useState(false)
   const [ipStatus, setIpStatus] = useState<{ text: string; ok: boolean } | null>(null)
@@ -377,38 +370,6 @@ function SignalsSection({ slug }: { slug: string }) {
     }
   }
 
-  async function saveWifi() {
-    if (!wifiSsid.trim()) {
-      setWifiStatus({ text: 'SSID is required', ok: false })
-      return
-    }
-    setSavingWifi(true)
-    setWifiStatus(null)
-    try {
-      const res = await fetch(`/api/ws/${slug}/signals`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          signal_type: 'wifi',
-          location_name: wifiName || undefined,
-          wifi_ssid: wifiSsid.trim(),
-        }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        await loadSignals()
-        setShowWifiForm(false)
-        setWifiName('')
-        setWifiSsid('')
-        showToast('WiFi network registered.')
-      } else {
-        setWifiStatus({ text: data.error || 'Failed to register WiFi', ok: false })
-      }
-    } finally {
-      setSavingWifi(false)
-    }
-  }
-
   async function registerIp() {
     setRegisteringIp(true)
     setIpStatus(null)
@@ -487,7 +448,7 @@ function SignalsSection({ slug }: { slug: string }) {
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif' }}>Loading…</p>
       ) : signals.length === 0 ? (
         <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif', marginBottom: '14px' }}>
-          No signals registered yet. Add a GPS location, WiFi network, or IP context below.
+          No signals registered yet. Add a GPS location or IP context below.
         </p>
       ) : (
         <div style={{ marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -557,31 +518,8 @@ function SignalsSection({ slug }: { slug: string }) {
         </div>
       ) : null}
 
-      {/* WiFi form */}
-      {showWifiForm ? (
-        <div style={{ background: 'var(--surface-1)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '16px', marginBottom: '10px' }}>
-          <p style={{ fontSize: '13px', fontWeight: 600, fontFamily: 'Syne, sans-serif', color: 'var(--navy)', marginBottom: '12px' }}>Register WiFi network</p>
-          <FieldGroup label="Location name (optional)">
-            <input type="text" value={wifiName} onChange={(e) => setWifiName(e.target.value)} placeholder="Head Office" style={{ ...inputStyle, height: '36px' }} />
-          </FieldGroup>
-          <FieldGroup label="WiFi SSID (network name)">
-            <input type="text" value={wifiSsid} onChange={(e) => setWifiSsid(e.target.value)} placeholder="AcmeCorp-WiFi" style={{ ...inputStyle, height: '36px' }} />
-          </FieldGroup>
-          <p style={{ fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-muted)', marginBottom: '10px' }}>
-            The SSID is hashed before storage and never displayed in full.
-          </p>
-          <StatusLine msg={wifiStatus} />
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <PrimaryBtn small onClick={saveWifi} loading={savingWifi}>Save WiFi</PrimaryBtn>
-            <button type="button" onClick={() => { setShowWifiForm(false); setWifiStatus(null) }} style={{ background: 'none', border: 'none', fontSize: '13px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)', cursor: 'pointer' }}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-
       {/* Action buttons */}
-      {!showGpsForm && !showWifiForm && (
+      {!showGpsForm && (
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
           <button
             type="button"
@@ -589,13 +527,6 @@ function SignalsSection({ slug }: { slug: string }) {
             style={{ height: '36px', padding: '0 14px', background: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '13px', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer' }}
           >
             + GPS location
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowWifiForm(true)}
-            style={{ height: '36px', padding: '0 14px', background: 'var(--surface-2)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '13px', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer' }}
-          >
-            + WiFi network
           </button>
           <button
             type="button"

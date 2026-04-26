@@ -1,6 +1,6 @@
+import Link from 'next/link'
 import { getServerUser } from '@/lib/auth'
 import { getOpenEventToday, getUserEvents } from '@/lib/db/queries/events'
-import { getUserStats } from '@/lib/db/queries/stats'
 import { getUserWorkspaces, getWorkspacesByIds } from '@/lib/db/queries/workspaces'
 import { getUserById } from '@/lib/db/queries/users'
 import CheckinButtons from '@/components/user/CheckinButtons'
@@ -16,11 +16,10 @@ export default async function MePage() {
   const monthStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
   const nextMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
 
-  const [activeEvent, todayResult, monthResult, stats, memberships, profile] = await Promise.all([
+  const [activeEvent, todayResult, monthResult, memberships, profile] = await Promise.all([
     getOpenEventToday(user.userId),
     getUserEvents({ userId: user.userId, start: `${todayStr}T00:00:00.000Z`, end: `${todayStr}T23:59:59.999Z` }),
     getUserEvents({ userId: user.userId, start: `${monthStr}T00:00:00.000Z`, end: nextMonthDate.toISOString(), limit: 500 }),
-    getUserStats(user.userId),
     getUserWorkspaces(user.userId),
     getUserById(user.userId),
   ])
@@ -28,28 +27,57 @@ export default async function MePage() {
   const todayEvents = todayResult.events
   const monthEvents = monthResult.events
 
-  // Normalize SQLite datetime "2026-03-17 07:54:11" to proper UTC Date
-  function parseUtcServer(s: string): Date {
-    return new Date(s.includes('T') ? s : s.replace(' ', 'T') + 'Z')
+  // Effective start: later of month start or user's account creation date
+  const monthStartDate = new Date(monthStr + 'T00:00:00.000Z')
+  const rawJoin = profile?.created_at
+  const joinDate = rawJoin
+    ? new Date(rawJoin.includes('T') ? rawJoin : rawJoin.replace(' ', 'T') + 'Z')
+    : null
+  const effectiveStart = joinDate && joinDate > monthStartDate ? joinDate : monthStartDate
+
+  function isWorkday(d: Date): boolean {
+    const dow = d.getUTCDay()
+    return dow >= 1 && dow <= 5
   }
 
-  // slice(0,10) always returns "YYYY-MM-DD" regardless of space vs T separator
-  const distinctDaysThisMonth = new Set(monthEvents.map((e) => e.checkin_at.slice(0, 10))).size
-  const hoursThisMonth = monthEvents.reduce((sum, e) => {
-    if (e.checkout_at) {
-      return sum + (parseUtcServer(e.checkout_at).getTime() - parseUtcServer(e.checkin_at).getTime()) / 3_600_000
+  function countWorkdays(start: Date, end: Date): number {
+    let count = 0
+    const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()))
+    const endDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()))
+    while (d <= endDay) {
+      if (isWorkday(d)) count++
+      d.setUTCDate(d.getUTCDate() + 1)
     }
-    return sum
-  }, 0)
-  const locationsThisMonth = stats?.distinct_locations_this_month ?? 0
-
-  function fmtHours(hours: number): string {
-    const h = Math.floor(hours)
-    const m = Math.round((hours - h) * 60)
-    if (h === 0) return `${m}min`
-    if (m === 0) return `${h}hr`
-    return `${h}hr ${m}min`
+    return count
   }
+
+  // Group month events by day
+  const eventsByDay = new Map<string, string[]>()
+  for (const e of monthEvents) {
+    const day = e.checkin_at.slice(0, 10)
+    if (!eventsByDay.has(day)) eventsByDay.set(day, [])
+    eventsByDay.get(day)!.push(e.event_type)
+  }
+
+  // Count WFO / WFH days (workdays only, from effective start)
+  const wfoDaySet = new Set<string>()
+  const wfhDaySet = new Set<string>()
+  for (const [day, types] of eventsByDay) {
+    const dayDate = new Date(day + 'T00:00:00.000Z')
+    if (dayDate < effectiveStart) continue
+    if (!isWorkday(dayDate)) continue
+    if (types.includes('office_checkin')) {
+      wfoDaySet.add(day)
+    } else {
+      wfhDaySet.add(day)
+    }
+  }
+
+  const wfoDays = wfoDaySet.size
+  const wfhDays = wfhDaySet.size
+  const todayDate = new Date(todayStr + 'T00:00:00.000Z')
+  const workdaysTotal = countWorkdays(effectiveStart, todayDate)
+  const leaveDays = Math.max(0, workdaysTotal - wfoDays - wfhDays)
 
   // Workspace names for the orgs strip
   const workspaceIds = memberships.map((m) => m.workspace_id)
@@ -70,7 +98,7 @@ export default async function MePage() {
       {/* Check-in / checkout buttons (includes status line + active indicator) */}
       <CheckinButtons activeEvent={activeEvent} name={profile?.full_name ?? user.email.split('@')[0]} />
 
-      {/* This month stat chips */}
+      {/* This month attendance summary */}
       <div
         style={{
           display: 'grid',
@@ -79,13 +107,13 @@ export default async function MePage() {
           margin: '20px 0',
         }}
       >
-        {[
-          { value: distinctDaysThisMonth, label: 'days', valueSize: '22px' },
-          { value: fmtHours(hoursThisMonth), label: 'this month', valueSize: '16px' },
-          { value: locationsThisMonth, label: 'places', valueSize: '22px' },
-        ].map((chip) => (
+        {([
+          { value: wfoDays, label: 'WFO', sub: 'this month', color: 'var(--teal)' },
+          { value: wfhDays, label: 'WFH', sub: 'this month', color: 'var(--brand)' },
+          { value: leaveDays, label: 'On Leave', sub: 'this month', color: 'var(--amber)' },
+        ] as const).map((card) => (
           <div
-            key={chip.label}
+            key={card.label}
             style={{
               background: 'var(--surface-0)',
               border: '1px solid var(--border)',
@@ -99,21 +127,32 @@ export default async function MePage() {
                 fontFamily: 'Syne, sans-serif',
                 fontSize: '22px',
                 fontWeight: 700,
-                color: 'var(--navy)',
+                color: card.color,
                 lineHeight: 1,
               }}
             >
-              {chip.value}
+              {card.value}
             </div>
             <div
               style={{
                 fontFamily: 'DM Sans, sans-serif',
-                fontSize: '12px',
-                color: 'var(--text-muted)',
-                marginTop: '2px',
+                fontSize: '11px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                marginTop: '4px',
               }}
             >
-              {chip.label}
+              {card.label}
+            </div>
+            <div
+              style={{
+                fontFamily: 'DM Sans, sans-serif',
+                fontSize: '10px',
+                color: 'var(--text-muted)',
+                marginTop: '1px',
+              }}
+            >
+              {card.sub}
             </div>
           </div>
         ))}
@@ -161,66 +200,44 @@ export default async function MePage() {
             const ws = wsMap.get(m.workspace_id)
             if (!ws) return null
             return (
-              <div
+              <Link
                 key={m.id}
+                href={`/me/ws/${ws.slug}`}
                 style={{
+                  display: 'flex',
+                  alignItems: 'center',
                   background: 'var(--surface-0)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-md)',
                   padding: '12px 14px',
                   marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
                 }}
+                className="ws-card-link"
               >
                 <div>
-                  <div
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontWeight: 500,
-                      fontSize: '14px',
-                      color: 'var(--text-primary)',
-                    }}
-                  >
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
                     {ws.name}
                   </div>
-                  <div
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontSize: '12px',
-                      color: 'var(--text-muted)',
-                    }}
-                  >
+                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
                     {m.role}
                   </div>
                 </div>
-                <div
-                  style={{
-                    marginLeft: 'auto',
-                    textAlign: 'right',
-                  }}
-                >
-                  <div
-                    style={{
-                      fontFamily: 'Syne, sans-serif',
-                      fontWeight: 700,
-                      fontSize: '18px',
-                      color: 'var(--navy)',
-                    }}
-                  >
-                    {distinctDaysThisMonth}
+                <div style={{ marginLeft: 'auto', textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--navy)' }}>
+                      {wfoDays + wfhDays}
+                    </div>
+                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
+                      days this month
+                    </div>
                   </div>
-                  <div
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontSize: '11px',
-                      color: 'var(--text-muted)',
-                    }}
-                  >
-                    days this month
-                  </div>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
                 </div>
-              </div>
+              </Link>
             )
           })}
         </section>

@@ -16,6 +16,12 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
   const [noteValue, setNoteValue] = useState(event.note ?? '')
   const [saving, setSaving] = useState(false)
 
+  const trustFlags: string[] = (() => {
+    try { return event.trust_flags ? JSON.parse(event.trust_flags) as string[] : [] }
+    catch { return [] }
+  })()
+  const isOutsideRadius = trustFlags.includes('checkout_outside_radius')
+
   const duration = durationLabel(event.checkin_at, event.checkout_at)
 
   // "1:37 PM — 2:15 PM" or just "1:37 PM"
@@ -50,8 +56,8 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
         marginBottom: '8px',
       }}
     >
-      {/* Top row: time range + type badge + duration */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+      {/* Top row: time range + distance badge + type badge + duration */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
         <span
           style={{
             fontFamily: 'JetBrains Mono, monospace',
@@ -75,20 +81,47 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
           </span>
         )}
 
-        <span
-          style={{
-            marginLeft: 'auto',
-            fontSize: '11px',
-            fontFamily: 'DM Sans, sans-serif',
-            color: 'var(--brand)',
-            background: 'color-mix(in srgb, var(--brand) 10%, transparent)',
-            padding: '2px 8px',
-            borderRadius: '20px',
-          }}
-        >
-          {geoLabel}
-        </span>
+        {geoLabel && (
+          <span
+            style={{
+              marginLeft: 'auto',
+              fontSize: '11px',
+              fontFamily: 'DM Sans, sans-serif',
+              color: 'var(--brand)',
+              background: 'color-mix(in srgb, var(--brand) 10%, transparent)',
+              padding: '2px 8px',
+              borderRadius: '20px',
+            }}
+          >
+            {geoLabel}
+          </span>
+        )}
       </div>
+
+      {/* Checkout distance badge */}
+      {event.checkout_location_mismatch != null && (
+        <div style={{ marginBottom: '8px' }}>
+          <span
+            style={{
+              fontSize: '11px',
+              fontFamily: 'DM Sans, sans-serif',
+              fontWeight: isOutsideRadius ? 600 : 400,
+              color: isOutsideRadius ? 'var(--danger, #dc2626)' : 'var(--text-muted)',
+              background: isOutsideRadius
+                ? 'color-mix(in srgb, var(--danger, #dc2626) 10%, transparent)'
+                : 'var(--surface-1)',
+              padding: '3px 8px',
+              borderRadius: '4px',
+              border: isOutsideRadius
+                ? '1px solid var(--danger, #dc2626)'
+                : '1px solid var(--border)',
+            }}
+          >
+            {isOutsideRadius ? '⚠' : '✓'} {event.checkout_location_mismatch}m away from office
+            {isOutsideRadius ? ' — outside radius' : ''}
+          </span>
+        </div>
+      )}
 
       {/* Note */}
       <div style={{ marginBottom: '8px' }}>
@@ -154,41 +187,72 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
         )}
       </div>
 
-      {/* Meta: WiFi + GPS */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          flexWrap: 'wrap',
-        }}
-      >
-        {event.wifi_ssid && (
-          <span
-            style={{
-              fontSize: '11px',
-              fontFamily: 'JetBrains Mono, monospace',
-              color: 'var(--text-muted)',
-            }}
-          >
-            ⌬ {event.wifi_ssid}
-          </span>
-        )}
+      {/* Location rows: Check-in + Checkout */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+        {/* Check-in location */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{
+            fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)',
+            textTransform: 'uppercase', letterSpacing: '0.05em', width: '60px', flexShrink: 0,
+            fontFamily: 'DM Sans, sans-serif',
+          }}>Check-in</span>
 
-        {event.gps_lat !== null && event.gps_lng !== null && (
-          <a
-            href={`https://www.openstreetmap.org/?mlat=${event.gps_lat}&mlon=${event.gps_lng}&zoom=16`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              fontSize: '11px',
-              fontFamily: geoLabel ? 'DM Sans, sans-serif' : 'JetBrains Mono, monospace',
-              color: 'var(--brand)',
-              textDecoration: 'none',
-            }}
-          >
-            ◉ {geoLabel ?? `${event.gps_lat.toFixed(4)}, ${event.gps_lng.toFixed(4)}`}
-          </a>
+          {event.gps_lat !== null && event.gps_lng !== null && (
+            <a
+              href={`https://www.openstreetmap.org/?mlat=${event.gps_lat}&mlon=${event.gps_lng}&zoom=16`}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: '11px',
+                fontFamily: 'DM Sans, sans-serif',
+                color: 'var(--brand)',
+                textDecoration: 'none',
+                display: 'flex', alignItems: 'center', gap: '4px',
+              }}
+            >
+              <span style={{ color: 'var(--teal)' }}>◉</span>
+              {geoLabel ?? `${event.gps_lat.toFixed(4)}, ${event.gps_lng.toFixed(4)}`}
+            </a>
+          )}
+
+          {event.wifi_ssid && (
+            <span style={{ fontSize: '11px', fontFamily: 'JetBrains Mono, monospace', color: 'var(--text-muted)' }}>
+              ⌬ {event.wifi_ssid}
+            </span>
+          )}
+        </div>
+
+        {/* Checkout location */}
+        {event.checkout_at && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)',
+              textTransform: 'uppercase', letterSpacing: '0.05em', width: '60px', flexShrink: 0,
+              fontFamily: 'DM Sans, sans-serif',
+            }}>Checkout</span>
+
+            {event.checkout_gps_lat !== null && event.checkout_gps_lng !== null ? (
+              <a
+                href={`https://www.openstreetmap.org/?mlat=${event.checkout_gps_lat}&mlon=${event.checkout_gps_lng}&zoom=16`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  fontSize: '11px',
+                  fontFamily: 'DM Sans, sans-serif',
+                  color: 'var(--brand)',
+                  textDecoration: 'none',
+                  display: 'flex', alignItems: 'center', gap: '4px',
+                }}
+              >
+                <span style={{ color: isOutsideRadius ? 'var(--danger, #dc2626)' : 'var(--teal)' }}>◉</span>
+                {event.checkout_location_label ?? event.location_label ?? `${event.checkout_gps_lat.toFixed(4)}, ${event.checkout_gps_lng.toFixed(4)}`}
+              </a>
+            ) : (
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif' }}>
+                Location not captured
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

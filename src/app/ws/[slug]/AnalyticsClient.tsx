@@ -117,7 +117,13 @@ const labelStyle: React.CSSProperties = {
   letterSpacing: '0.07em',
 }
 
-function MemberCard({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; workingDays: number; signalsConfigured: boolean }) {
+function fmtJoined(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-')
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `Joined ${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`
+}
+
+function MemberCard({ m, signalsConfigured }: { m: AnalyticsMember; signalsConfigured: boolean }) {
   const initials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
   return (
     <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
@@ -138,6 +144,9 @@ function MemberCard({ m, workingDays, signalsConfigured }: { m: AnalyticsMember;
           <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {m.email}
           </div>
+          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
+            {fmtJoined(m.joined_at)}
+          </div>
         </div>
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
@@ -154,22 +163,22 @@ function MemberCard({ m, workingDays, signalsConfigured }: { m: AnalyticsMember;
           <>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Office</span>
-              <DayBar value={m.office_days} max={workingDays} color="var(--teal)" />
+              <DayBar value={m.office_days} max={m.working_days} color="var(--teal)" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Remote</span>
-              <DayBar value={m.wfh_days} max={workingDays} color="var(--amber)" />
+              <DayBar value={m.wfh_days} max={m.working_days} color="var(--amber)" />
             </div>
           </>
         ) : (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Present</span>
-            <DayBar value={m.office_days + m.wfh_days} max={workingDays} color="var(--brand)" />
+            <DayBar value={m.office_days + m.wfh_days} max={m.working_days} color="var(--brand)" />
           </div>
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Absent</span>
-          <DayBar value={m.absent_days} max={workingDays} color="var(--danger)" />
+          <DayBar value={m.absent_days} max={m.working_days} color="var(--danger)" />
         </div>
       </div>
       {m.multi_location_days > 0 && (
@@ -181,20 +190,20 @@ function MemberCard({ m, workingDays, signalsConfigured }: { m: AnalyticsMember;
   )
 }
 
-function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; workingDays: number; signalsConfigured: boolean }) {
+function MemberRow({ m, signalsConfigured }: { m: AnalyticsMember; signalsConfigured: boolean }) {
   const initials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
 
   return (
     <div style={{
       display: 'grid',
       gridTemplateColumns: signalsConfigured
-        ? '200px 1fr 1fr 1fr 90px 90px'
-        : '200px 1fr 1fr 90px 90px',
+        ? '200px 100px 1fr 1fr 1fr 90px 90px'
+        : '200px 100px 1fr 1fr 90px 90px',
       gap: '16px',
       alignItems: 'center',
       padding: '14px 16px',
       borderBottom: '1px solid var(--border)',
-      minWidth: signalsConfigured ? '720px' : '620px',
+      minWidth: signalsConfigured ? '820px' : '720px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
         <div style={{
@@ -215,27 +224,38 @@ function MemberRow({ m, workingDays, signalsConfigured }: { m: AnalyticsMember; 
         </div>
       </div>
 
+      {/* Joined date column */}
+      <div>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>
+          {m.joined_at.slice(8, 10)}{' '}
+          {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.joined_at.slice(5, 7)) - 1]}
+        </p>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
+          {m.joined_at.slice(0, 4)}
+        </p>
+      </div>
+
       {signalsConfigured && (
         <div>
-          <DayBar value={m.office_days} max={workingDays} color="var(--teal)" />
+          <DayBar value={m.office_days} max={m.working_days} color="var(--teal)" />
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>office</p>
         </div>
       )}
 
       {signalsConfigured ? (
         <div>
-          <DayBar value={m.wfh_days} max={workingDays} color="var(--amber)" />
+          <DayBar value={m.wfh_days} max={m.working_days} color="var(--amber)" />
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>remote</p>
         </div>
       ) : (
         <div>
-          <DayBar value={m.office_days + m.wfh_days} max={workingDays} color="var(--brand)" />
+          <DayBar value={m.office_days + m.wfh_days} max={m.working_days} color="var(--brand)" />
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>present</p>
         </div>
       )}
 
       <div>
-        <DayBar value={m.absent_days} max={workingDays} color="var(--danger)" />
+        <DayBar value={m.absent_days} max={m.working_days} color="var(--danger)" />
         <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>absent</p>
       </div>
 
@@ -266,14 +286,15 @@ function TableHeader({ signalsConfigured }: { signalsConfigured: boolean }) {
     <div style={{
       display: 'grid',
       gridTemplateColumns: signalsConfigured
-        ? '200px 1fr 1fr 1fr 90px 90px'
-        : '200px 1fr 1fr 90px 90px',
+        ? '200px 100px 1fr 1fr 1fr 90px 90px'
+        : '200px 100px 1fr 1fr 90px 90px',
       gap: '16px',
       padding: '10px 16px',
       borderBottom: '1px solid var(--border)',
-      minWidth: signalsConfigured ? '720px' : '620px',
+      minWidth: signalsConfigured ? '820px' : '720px',
     }}>
       <p style={labelStyle}>Member</p>
+      <p style={labelStyle}>Joined</p>
       {signalsConfigured && <p style={labelStyle}>Office</p>}
       <p style={labelStyle}>{signalsConfigured ? 'Remote' : 'Present'}</p>
       <p style={labelStyle}>Absent</p>
@@ -451,7 +472,6 @@ export default function AnalyticsClient({ slug }: Props) {
               <MemberCard
                 key={m.user_id}
                 m={m}
-                workingDays={data.working_days}
                 signalsConfigured={data.signals_configured}
               />
             ))
@@ -462,7 +482,6 @@ export default function AnalyticsClient({ slug }: Props) {
                 <MemberRow
                   key={m.user_id}
                   m={m}
-                  workingDays={data.working_days}
                   signalsConfigured={data.signals_configured}
                 />
               ))}

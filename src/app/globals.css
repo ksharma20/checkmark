@@ -357,3 +357,9 @@ a[href] {
   -webkit-overflow-scrolling: touch;
 }
 .dash-table-min { min-width: 640px; }
+
+.ws-card-link { transition: border-color 0.15s, box-shadow 0.15s; }
+.ws-card-link:hover {
+  border-color: var(--brand) !important;
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--brand) 12%, transparent);
+}

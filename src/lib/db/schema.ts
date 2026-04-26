@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS presence_events (
   checkout_ip_address   TEXT,
   checkout_ip_geo_lat   REAL,
   checkout_ip_geo_lng   REAL,
+  checkout_location_label TEXT,
   source                TEXT NOT NULL DEFAULT 'user_app',
   api_token_id          TEXT REFERENCES user_api_tokens(id),
   deleted_at            TEXT,

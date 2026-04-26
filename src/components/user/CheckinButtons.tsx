@@ -210,32 +210,30 @@ export default function CheckinButtons({
       }
     }
 
-    // Warning: 15 min before scheduled checkout
-    const onWarningFired = () =>
-      showToast("Auto-checkout in 15 min — still here?", "info");
-    const warningDelay = scheduledCheckoutMs - 15 * 60 * 1000 - Date.now();
-    if (warningDelay > 0) {
-      notifTimers.current.push(
-        window.setTimeout(() => {
-          void fireMidnightWarning(onWarningFired);
-        }, warningDelay),
-      );
-    } else if (Date.now() < scheduledCheckoutMs) {
-      // Already in the warning window — fire immediately
-      void fireMidnightWarning(onWarningFired);
-    }
+    let sentSoFar = 0
+    try {
+      sentSoFar = parseInt(localStorage.getItem(STALE_NOTIF_KEY) ?? '0', 10)
+    } catch { /* ignore */ }
 
-    // Auto-checkout at scheduled time
-    const checkoutDelay = scheduledCheckoutMs - Date.now();
-    if (checkoutDelay > 0) {
-      notifTimers.current.push(
-        window.setTimeout(() => {
-          void triggerAutoCheckout();
-        }, checkoutDelay),
-      );
+    NOTIFICATION_SCHEDULE_H.slice(sentSoFar).forEach((hour, i) => {
+      const fireAt = checkinMs + hour * 60 * 60 * 1000
+      const delay = fireAt - Date.now()
+      if (delay <= 0) return
+      const notifIndex = sentSoFar + i + 1
+      const timer = setTimeout(() => {
+        try { localStorage.setItem(STALE_NOTIF_KEY, String(notifIndex)) } catch { /* ignore */ }
+        fireStaleNotification(hour)
+      }, delay)
+      notifTimers.current.push(timer)
+    })
+
+    const autoCheckoutAt = checkinMs + AUTO_CHECKOUT_H * 60 * 60 * 1000
+    const autoDelay = autoCheckoutAt - Date.now()
+    if (autoDelay > 0) {
+      const timer = setTimeout(() => { void triggerAutoCheckout() }, autoDelay)
+      notifTimers.current.push(timer)
     } else {
-      // Overdue — trigger immediately
-      void triggerAutoCheckout();
+      void triggerAutoCheckout()
     }
 
     return () => {
@@ -334,57 +332,11 @@ export default function CheckinButtons({
       const data = await res.json();
 
       if (res.ok) {
-        setState("checked_in");
-        setActiveEvent(data.event);
-        await requestNotificationPermission();
-        void subscribeToPush();
-
-        // Confirmation notification — verifies the OS popup pipeline works
-        if (Notification.permission === "granted") {
-          const midnightStr = data.event?.scheduled_checkout_at
-            ? new Date(data.event.scheduled_checkout_at).toLocaleTimeString(
-                [],
-                { hour: "2-digit", minute: "2-digit" },
-              )
-            : "midnight";
-          playChime();
-          try {
-            const reg = await navigator.serviceWorker.ready;
-            await reg.showNotification("CheckMark: Checked in!", {
-              body: `Auto-checkout scheduled for ${midnightStr}. Have a great day!`,
-              icon: "/icon-192.png",
-              tag: "checkmark-checkin-confirm",
-              requireInteraction: false,
-              data: { url: "/me" },
-            });
-          } catch {
-            new Notification("CheckMark: Checked in!", {
-              body: `Auto-checkout scheduled for ${midnightStr}`,
-              icon: "/icon-192.png",
-              tag: "checkmark-checkin-confirm",
-            });
-          }
-        }
-
-        if (gps.ok) {
-          showToast("Checked in!", "success");
-        } else if (gps.reason === "denied") {
-          showToast(
-            "Checked in without GPS. Location access was blocked — enable it in browser settings to verify your presence.",
-            "info",
-          );
-        } else if (gps.reason === "timeout") {
-          showToast(
-            "Checked in without GPS. Couldn't get your location in time.",
-            "info",
-          );
-        } else {
-          showToast(
-            "Checked in without GPS — location helps orgs verify your presence.",
-            "info",
-          );
-        }
-        router.refresh();
+        setState('checked_in')
+        setActiveEvent(data.event)
+        await requestNotificationPermission()
+        showToast('Checked in!', 'success')
+        router.refresh()
       } else if (res.status === 409) {
         setState("checked_in");
         showToast(data.error || "Already checked in.", "info");
@@ -393,7 +345,7 @@ export default function CheckinButtons({
         showToast(data.error || "Check-in failed", "error");
       }
     } catch {
-      showToast("Network error. Please try again.", "error");
+      showToast('Check-in failed. Please check your connection and try again.', 'error')
     } finally {
       stopProgress();
       setLoading(false);
@@ -530,25 +482,28 @@ export default function CheckinButtons({
 
       {/* "I'm here" — only when CHECKED_OUT */}
       {!isCheckedIn && (
-        <button
-          onClick={handleCheckin}
-          disabled={loading}
-          style={{
-            width: "100%",
-            height: "64px",
-            background: loading ? "var(--brand-hover)" : "var(--brand)",
-            color: "#fff",
-            border: "none",
-            borderRadius: "var(--radius-md)",
-            fontSize: "18px",
-            fontWeight: 700,
-            fontFamily: "Syne, sans-serif",
-            cursor: loading ? "not-allowed" : "pointer",
-            letterSpacing: "-0.2px",
-          }}
-        >
-          {loading ? "Getting location…" : "I'm here"}
-        </button>
+        <>
+          <button
+            onClick={handleCheckin}
+            disabled={loading}
+            style={{
+              width: '100%',
+              height: '64px',
+              background: loading ? 'var(--brand-hover)' : 'var(--brand)',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 'var(--radius-md)',
+              fontSize: '18px',
+              fontWeight: 700,
+              fontFamily: 'Syne, sans-serif',
+              cursor: loading ? 'not-allowed' : 'pointer',
+              letterSpacing: '-0.2px',
+            }}
+          >
+            {loading ? 'Getting location…' : "I'm here"}
+          </button>
+
+        </>
       )}
 
       {/* "I'm leaving" — only when CHECKED_IN */}

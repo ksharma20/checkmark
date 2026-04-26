@@ -81,6 +81,7 @@ export const en = {
     // ── Auth cookies ──────────────────────────────────────────────────────────
     cookieSession:        'cm_session',
     cookieOtp:            'cm_otp_ok',
+    cookieUI:             'cm_ui',
 
     // ── Domain verification ───────────────────────────────────────────────────
     // DNS TXT: _checkmark-verify.{domain}  IN TXT  "checkmark-verify={token}"

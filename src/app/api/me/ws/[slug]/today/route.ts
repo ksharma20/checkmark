@@ -1,16 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getWorkspaceBySlug } from '@/lib/db/queries/workspaces'
+import { getWorkspaceBySlug, getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { db } from '@/lib/db'
-import { todayInTz } from '@/lib/timezone'
+import { todayInTz, localMidnightToUtc } from '@/lib/timezone'
+import { queryWorkspaceEvents } from '@/lib/signals'
+import type { MatchedBy } from '@/lib/signals'
 
 export interface MemberTodaySummary {
   user_id: string
   full_name: string | null
   email: string
   presence_status: 'present' | 'visited' | 'notIn'
+  matched_by: MatchedBy | null
+  event_type: string | null
   checkin_at: string | null
   checkout_at: string | null
   duration_hours: number | null
+}
+
+function nextDay(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(Date.UTC(y, m - 1, d + 1))
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
 export async function GET(
@@ -31,31 +41,22 @@ export async function GET(
   )
   if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const today = todayInTz(ws.display_timezone)
+  const todayStr = todayInTz(ws.display_timezone)
+  const startUtc = localMidnightToUtc(todayStr, ws.display_timezone)
+  const endUtc = localMidnightToUtc(nextDay(todayStr), ws.display_timezone)
 
-  const rows = await db.query<{
-    user_id: string
-    full_name: string | null
-    email: string
-    checkin_at: string | null
-    checkout_at: string | null
-  }>(
-    `SELECT
-       wm.user_id,
-       u.full_name,
-       wm.email,
-       (SELECT pe.checkin_at FROM presence_events pe
-        WHERE pe.user_id = wm.user_id AND date(pe.checkin_at) = ? AND pe.deleted_at IS NULL
-        ORDER BY pe.checkin_at DESC LIMIT 1) as checkin_at,
-       (SELECT pe.checkout_at FROM presence_events pe
-        WHERE pe.user_id = wm.user_id AND date(pe.checkin_at) = ? AND pe.deleted_at IS NULL
-        ORDER BY pe.checkin_at DESC LIMIT 1) as checkout_at
-     FROM workspace_members wm
-     LEFT JOIN users u ON u.id = wm.user_id
-     WHERE wm.workspace_id = ? AND wm.status = 'active'
-     ORDER BY u.full_name ASC`,
-    [today, today, ws.id]
-  )
+  const [events, members] = await Promise.all([
+    queryWorkspaceEvents(ws.id, ws.plan, { startDate: startUtc, endDate: endUtc }),
+    getActiveMembersWithDetails(ws.id),
+  ])
+
+  // Group events by user_id
+  const eventsByUser = new Map<string, typeof events>()
+  for (const ev of events) {
+    const arr = eventsByUser.get(ev.user_id) ?? []
+    arr.push(ev)
+    eventsByUser.set(ev.user_id, arr)
+  }
 
   function parseUtcMs(s: string | null): number | null {
     if (!s) return null
@@ -63,17 +64,31 @@ export async function GET(
     return new Date(iso).getTime()
   }
 
-  const members: MemberTodaySummary[] = rows.map((row) => {
-    let presence_status: 'present' | 'visited' | 'notIn' = 'notIn'
-    if (row.checkin_at && !row.checkout_at) presence_status = 'present'
-    else if (row.checkin_at && row.checkout_at) presence_status = 'visited'
+  const result: MemberTodaySummary[] = members.map((m) => {
+    const userEvents = eventsByUser.get(m.user_id) ?? []
+    const openEvent = userEvents.find((e) => !e.checkout_at)
+    const latest = openEvent ?? userEvents[0] ?? null
 
-    const inMs = parseUtcMs(row.checkin_at)
-    const outMs = parseUtcMs(row.checkout_at)
+    let presence_status: 'present' | 'visited' | 'notIn' = 'notIn'
+    if (latest && openEvent) presence_status = 'present'
+    else if (latest) presence_status = 'visited'
+
+    const inMs = parseUtcMs(latest?.checkin_at ?? null)
+    const outMs = parseUtcMs(latest?.checkout_at ?? null)
     const duration_hours = inMs && outMs && outMs > inMs ? (outMs - inMs) / 3_600_000 : null
 
-    return { user_id: row.user_id, full_name: row.full_name, email: row.email, presence_status, checkin_at: row.checkin_at, checkout_at: row.checkout_at, duration_hours }
+    return {
+      user_id: m.user_id,
+      full_name: m.full_name,
+      email: m.email,
+      presence_status,
+      matched_by: latest?.matched_by ?? null,
+      event_type: latest?.event_type ?? null,
+      checkin_at: latest?.checkin_at ?? null,
+      checkout_at: latest?.checkout_at ?? null,
+      duration_hours,
+    }
   })
 
-  return NextResponse.json({ workspace: { name: ws.name, slug: ws.slug }, members })
+  return NextResponse.json({ workspace: { name: ws.name, slug: ws.slug }, members: result })
 }

@@ -419,11 +419,12 @@ export interface MemberWithUser {
   email: string
   role: string
   full_name: string | null
+  added_at: string
 }
 
 export async function getActiveMembersWithDetails(workspaceId: string): Promise<MemberWithUser[]> {
   return db.query<MemberWithUser>(
-    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name, wm.added_at
      FROM workspace_members wm
      LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
      WHERE wm.workspace_id = ? AND wm.status = 'active' AND wm.user_id IS NOT NULL

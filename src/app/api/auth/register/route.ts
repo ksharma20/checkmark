@@ -3,6 +3,7 @@ import { getUserByEmail, createUser } from '@/lib/db/queries/users'
 import {
   getVerifiedDomainsForEmail,
   addWorkspaceMember,
+  updateWorkspaceMember,
   getWorkspaceMemberByEmail,
   getAdminWorkspacesForUser,
   createWorkspace,
@@ -104,13 +105,7 @@ export async function POST(request: NextRequest) {
         status: 'active',
       })
     } else if (alreadyMember.status === 'pending_consent') {
-      await addWorkspaceMember({
-        workspaceId,
-        userId: user.id,
-        email,
-        role: alreadyMember.role,
-        status: 'active',
-      })
+      await updateWorkspaceMember(alreadyMember.id, workspaceId, { status: 'active' })
     }
   }
 

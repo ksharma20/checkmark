@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import {
   getAllMembersWithDetails,
+  getWorkspaceDomains,
   getWorkspaceMemberByEmail,
   upsertInvitedMember,
 } from '@/lib/db/queries/workspaces'
@@ -31,6 +32,16 @@ export async function POST(request: NextRequest, { params }: Props) {
   const email = (body.email ?? '').toLowerCase().trim()
   if (!email || !email.includes('@')) {
     return NextResponse.json({ error: 'Valid email is required', code: 'MISSING_EMAIL' }, { status: 400 })
+  }
+
+  const emailDomain = email.split('@')[1]
+  const workspaceDomains = await getWorkspaceDomains(ctx.workspace.id)
+  const isDomainVerified = workspaceDomains.some(d => d.domain === emailDomain && d.verified_at !== null)
+  if (isDomainVerified) {
+    return NextResponse.json({
+      error: `The domain @${emailDomain} is verified for this workspace — people with this email domain join automatically when they sign up. No invite needed.`,
+      code: 'DOMAIN_AUTO_ENROL',
+    }, { status: 409 })
   }
 
   const existing = await getWorkspaceMemberByEmail(ctx.workspace.id, email)

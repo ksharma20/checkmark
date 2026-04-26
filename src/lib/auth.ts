@@ -47,18 +47,28 @@ export async function verifyJwt(token: string): Promise<JwtPayload | null> {
 
 export async function setSessionCookie(token: string): Promise<void> {
   const cookieStore = await cookies()
+  const maxAge = 60 * 60 * 24 * 30 // 30 days
   cookieStore.set(COOKIE_NAME, token, {
     httpOnly: true,
     secure: !!process.env.TURSO_AUTH_TOKEN,
     sameSite: 'lax',
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30, // 30 days
-  });
+    path: '/',
+    maxAge,
+  })
+  // Non-httpOnly flag cookie so client components can detect auth state
+  cookieStore.set(en.constants.cookieUI, '1', {
+    httpOnly: false,
+    secure: !!process.env.TURSO_AUTH_TOKEN,
+    sameSite: 'lax',
+    path: '/',
+    maxAge,
+  })
 }
 
 export async function clearSessionCookie(): Promise<void> {
   const cookieStore = await cookies()
   cookieStore.delete(COOKIE_NAME)
+  cookieStore.delete(en.constants.cookieUI)
 }
 
 export async function getSessionFromCookies(): Promise<JwtPayload | null> {

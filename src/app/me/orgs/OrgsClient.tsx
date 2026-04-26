@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { ChevronRight } from 'lucide-react'
 import type { WorkspaceMember, Workspace } from '@/lib/db/queries/workspaces'
 
 interface Props {
@@ -180,10 +181,12 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
           </h2>
           {activeList.map((m) => {
             const ws = wsMap[m.workspace_id]
+            const href = `/me/ws/${ws?.slug ?? m.workspace_id}`
             return (
               <div
                 key={m.id}
                 style={{
+                  position: 'relative',
                   background: 'var(--surface-0)',
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--radius-md)',
@@ -191,16 +194,30 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.15s, border-color 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 2px 12px color-mix(in srgb, var(--brand) 12%, transparent)'
+                  e.currentTarget.style.borderColor = 'var(--brand)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = ''
+                  e.currentTarget.style.borderColor = 'var(--border)'
                 }}
               >
-                <div style={{ flex: 1 }}>
-                  <Link
-                    href={`/me/ws/${ws?.slug ?? m.workspace_id}`}
-                    style={{ textDecoration: 'none' }}>
+                {/* Full-card link overlay */}
+                <Link
+                  href={href}
+                  style={{ position: 'absolute', inset: 0, borderRadius: 'var(--radius-md)' }}
+                  aria-label={ws?.name ?? m.workspace_id}
+                />
+
+                <div style={{ flex: 1, position: 'relative', zIndex: 1, pointerEvents: 'none' }}>
                   <p
                     style={{
                       fontFamily: 'DM Sans, sans-serif',
-                      fontWeight: 500,
+                      fontWeight: 600,
                       fontSize: '14px',
                       color: 'var(--text-primary)',
                       marginBottom: '2px',
@@ -208,7 +225,6 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                   >
                     {ws?.name ?? m.workspace_id}
                   </p>
-                  </Link>
                   <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize', marginBottom: counts[m.workspace_id] ? '4px' : '0' }}>
                     {m.role}
                   </p>
@@ -222,11 +238,20 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                     </p>
                   )}
                 </div>
+
+                {/* Arrow hint */}
+                <ChevronRight size={22} strokeWidth={2.5} style={{ position: 'relative', zIndex: 1, color: 'var(--brand)', flexShrink: 0, pointerEvents: 'none' }} />
+
                 {m.role !== 'admin' && (
                   <button
-                    onClick={() => handleLeave(m.workspace_id, ws?.name ?? 'this workspace')}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleLeave(m.workspace_id, ws?.name ?? 'this workspace')
+                    }}
                     disabled={loadingId === m.workspace_id}
                     style={{
+                      position: 'relative',
+                      zIndex: 1,
                       background: 'none',
                       border: 'none',
                       color: 'var(--danger)',
@@ -234,6 +259,7 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                       fontFamily: 'DM Sans, sans-serif',
                       cursor: 'pointer',
                       padding: '4px 0',
+                      marginLeft: '8px',
                     }}
                   >
                     {loadingId === m.workspace_id ? 'Leaving…' : 'Leave'}

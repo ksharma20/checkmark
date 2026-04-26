@@ -26,6 +26,7 @@ export interface PresenceEvent {
   checkout_ip_address: string | null
   checkout_ip_geo_lat: number | null
   checkout_ip_geo_lng: number | null
+  checkout_location_label: string | null
   location_label: string | null
   deleted_at: string | null
   checkout_location_mismatch: number | null
@@ -92,6 +93,7 @@ export async function checkoutEvent(
     checkoutIpGeoLng?: number | null
     checkoutReason?: string | null
     checkoutLocationMismatch?: number | null
+    trustFlags?: string[] | null
   }
 ): Promise<PresenceEvent | null> {
   await db.execute(
@@ -105,7 +107,8 @@ export async function checkoutEvent(
          checkout_ip_address = ?,
          checkout_ip_geo_lat = ?,
          checkout_ip_geo_lng = ?,
-         checkout_location_mismatch = ?
+         checkout_location_mismatch = ?,
+         trust_flags = ?
      WHERE id = ? AND user_id = ? AND checkout_at IS NULL`,
     [
       signals?.checkoutReason ?? null,
@@ -117,6 +120,7 @@ export async function checkoutEvent(
       signals?.checkoutIpGeoLat ?? null,
       signals?.checkoutIpGeoLng ?? null,
       signals?.checkoutLocationMismatch ?? null,
+      signals?.trustFlags ? JSON.stringify(signals.trustFlags) : null,
       eventId,
       userId,
     ]
@@ -221,6 +225,13 @@ export async function deleteEvent(eventId: string, userId: string): Promise<bool
 export async function updateEventLocationLabel(eventId: string, label: string): Promise<void> {
   await db.execute(
     'UPDATE presence_events SET location_label = ? WHERE id = ?',
+    [label, eventId]
+  )
+}
+
+export async function updateCheckoutLocationLabel(eventId: string, label: string): Promise<void> {
+  await db.execute(
+    'UPDATE presence_events SET checkout_location_label = ? WHERE id = ?',
     [label, eventId]
   )
 }
