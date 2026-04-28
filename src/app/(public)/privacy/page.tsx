@@ -3,8 +3,16 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - checkmark",
-  description: "How checkmark collects, uses, and protects your presence data.",
+  title: "Privacy Policy",
+  description: "How CheckMark collects, uses, and protects your presence data.",
+  alternates: {
+    canonical: "/privacy",
+  },
+  openGraph: {
+    title: "CheckMark Privacy Policy",
+    description: "How CheckMark collects, uses, and protects your presence data.",
+    url: "/privacy",
+  },
 };
 
 const S = {

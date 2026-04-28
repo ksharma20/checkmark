@@ -41,6 +41,7 @@ AI agent coordination guide for working on this codebase.
 
 ### Safe to parallelize (no shared state)
 - Marketing page changes (`src/app/(public)/`)
+- SEO metadata and sitemap changes (`src/app/layout.tsx`, `src/app/robots.ts`, `src/app/sitemap.ts`)
 - Different API route domains (checkin vs workspace vs me)
 - Different query files (`users.ts` vs `events.ts`)
 - UI components that don't share state
@@ -78,6 +79,11 @@ queryWorkspaceEvents() → compares event signals against workspace config
 
 ## DB Query Conventions
 
+Local DB sync from Turso:
+- Use `npm run db:sync` to replace local SQLite data from Turso.
+- The script reads `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` from `.env.local` or the shell.
+- It writes `checkmark.db` by default, or `LOCAL_DATABASE_PATH` when set, and keeps a timestamped backup of the previous local DB.
+
 ```ts
 // lib/db/queries/example.ts
 import { db } from '../index'
@@ -100,6 +106,18 @@ export async function getActiveUser(userId: string) {
 ```
 
 Never inline SQL in route handlers. Never skip `AND workspace_id = ?`.
+
+---
+
+## SEO Conventions
+
+- Root SEO metadata and structured data live in `src/app/layout.tsx`.
+- Search crawler rules live in `src/app/robots.ts`.
+- The public sitemap lives in `src/app/sitemap.ts`.
+- Keep marketing pages indexable: `/`, `/for-teams`, `/for-you`, `/pricing`, `/open-source`, `/privacy`, `/terms`.
+- Keep private/app pages non-indexable: `/login`, `/consent/*`, `/me/*`, `/ws/*`, `/api/*`.
+- When adding a public marketing page, add route metadata with `alternates.canonical` and include it in the sitemap.
+- Production `NEXT_PUBLIC_APP_URL` must be the canonical domain (`https://checkmark.kabirinnovations.com`) so sitemap, robots, Open Graph URLs, and canonical tags do not point to localhost.
 
 ---
 

@@ -4,9 +4,18 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "checkmark for You - Your presence record, forever",
+  title: "CheckMark for You - Your presence record, forever",
   description:
-    "checkmark is free for individuals, forever. Own your work history. No employer required.",
+    "CheckMark is free for individuals, forever. Own your work history and consent to which organisations can see your presence data.",
+  alternates: {
+    canonical: "/for-you",
+  },
+  openGraph: {
+    title: "CheckMark for You - Your presence record, forever",
+    description:
+      "Own your work history with CheckMark. Free for individuals, forever.",
+    url: "/for-you",
+  },
 };
 
 const S = {

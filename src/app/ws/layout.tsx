@@ -1,4 +1,13 @@
+import type { Metadata } from 'next';
 import PageTransition from '@/components/PageTransition';
+
+export const metadata: Metadata = {
+  title: 'Workspace',
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default function WsLayout({ children }: { children: React.ReactNode }) {
   return (

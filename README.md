@@ -104,6 +104,8 @@ src/
 │           ├── route.ts                # GET list · POST create (returns plain token once)
 │           └── [id]/route.ts           # DELETE - revoke
 ├── app/manifest.ts             # PWA manifest
+├── app/robots.ts               # Search crawler rules
+├── app/sitemap.ts              # Public marketing sitemap
 ├── lib/
 │   ├── db/
 │   │   ├── index.ts       # DB abstraction (SQLite ↔ Postgres)
@@ -190,7 +192,23 @@ Expected output:
 ✓ Migration complete - ran 13 statement(s) against /path/to/checkmark.db
 ```
 
-### 5. Start the dev server
+### 5. Optional: sync local data from Turso
+
+To replace your local SQLite database with a snapshot of Turso production data:
+
+```bash
+npm run db:sync
+```
+
+The script reads `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` from `.env.local` or the shell, writes a fresh `checkmark.db`, and keeps a timestamped backup of the previous local file.
+
+Use a custom local path when needed:
+
+```bash
+LOCAL_DATABASE_PATH=./temp/checkmark-prod.db npm run db:sync
+```
+
+### 6. Start the dev server
 
 ```bash
 npm run dev
@@ -507,6 +525,15 @@ All pages are fully static Server Components - no JavaScript required. All share
 | Open Source | `/open-source` | What's open source (4 items), what we run as a service (5 items), 4-step self-host guide with code blocks, GitHub CTA                                   |
 | Privacy     | `/privacy`     | Full policy: data table, who can see data, retention (7 years), consent model, your rights (6 items), security, contact                                 |
 | Terms       | `/terms`       | Full terms: acceptable use, org admin responsibilities, no warranty on signal accuracy, limitation of liability, governing law                          |
+
+### SEO
+
+CheckMark exposes search metadata from `src/app/layout.tsx`, crawler rules from `src/app/robots.ts`, and a public marketing sitemap from `src/app/sitemap.ts`.
+
+- Production `NEXT_PUBLIC_APP_URL` must be the canonical origin, normally `https://checkmark.kabirinnovations.com`.
+- Indexable pages: `/`, `/for-teams`, `/for-you`, `/pricing`, `/open-source`, `/privacy`, `/terms`.
+- Non-indexable pages: `/login`, `/consent/*`, `/me/*`, `/ws/*`, and `/api/*`.
+- Public marketing pages should define route-specific metadata with a canonical URL when added.
 
 ---
 
@@ -934,6 +961,7 @@ Design rules:
 | --------------------- | ----------- | ------------------------------------------------------- |
 | `TURSO_DATABASE_URL`  | No (dev)    | Turso URL for production. Empty → uses SQLite.          |
 | `TURSO_AUTH_TOKEN`    | No (dev)    | Turso Auth Token for production. Empty → dev env        |
+| `LOCAL_DATABASE_PATH` | No          | Optional local SQLite path for `npm run db:sync`. Defaults to `./checkmark.db`. |
 | `JWT_SECRET`          | **Yes**     | Random 32+ char string for JWT signing                  |
 | `RESEND_API_KEY`      | Recommended | From resend.com. OTPs log to console if missing.        |
 | `NEXT_PUBLIC_APP_URL` | Yes         | Full app URL (`http://localhost:3000` in dev)           |

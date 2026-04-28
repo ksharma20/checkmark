@@ -127,6 +127,13 @@ WiFi SSID: bcryptjs hash - same library, raw SSID never persisted.
 - `src/app/me/layout.tsx` - user PWA shell (header + bottom nav)
 - `src/app/ws/[slug]/layout.tsx` - org PWA shell (header + tab nav)
 
+### SEO and indexing
+- Root metadata lives in `src/app/layout.tsx`.
+- Public crawl rules live in `src/app/robots.ts`; the sitemap lives in `src/app/sitemap.ts`.
+- Keep `/`, `/for-teams`, `/for-you`, `/pricing`, `/open-source`, `/privacy`, and `/terms` indexable.
+- Keep `/login`, `/consent/*`, `/me/*`, `/ws/*`, and `/api/*` non-indexable.
+- Set `NEXT_PUBLIC_APP_URL` to the production canonical origin (`https://checkmark.kabirinnovations.com`) before deployment so canonical links, Open Graph URLs, robots, and sitemap point at the live domain.
+
 ---
 
 ## Design System
@@ -201,9 +208,10 @@ Enforce in `queryWorkspaceEvents()` - plan gate applied before signal matching.
 |----------|----------|-------------|
 | `TURSO_DATABASE_URL` | No (dev) | Turso URL. Empty → SQLite at ./checkmark.db |
 | `TURSO_AUTH_TOKEN` | No (dev) | Turso auth token |
+| `LOCAL_DATABASE_PATH` | No | Optional SQLite path for `npm run db:sync`; defaults to ./checkmark.db |
 | `JWT_SECRET` | **Yes** | 32+ char random string |
 | `RESEND_API_KEY` | Recommended | OTPs go to console if missing |
-| `NEXT_PUBLIC_APP_URL` | Yes | `http://localhost:3000` in dev |
+| `NEXT_PUBLIC_APP_URL` | Yes | Canonical app URL. Use `http://localhost:3000` in dev and `https://checkmark.kabirinnovations.com` in production |
 
 ---
 

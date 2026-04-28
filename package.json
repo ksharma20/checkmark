@@ -7,7 +7,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "migrate": "node ./scripts/migrate.js"
+    "migrate": "node ./scripts/migrate.js",
+    "db:sync": "node ./scripts/sync-local-db.js"
   },
   "dependencies": {
     "@libsql/client": "^0.14.0",

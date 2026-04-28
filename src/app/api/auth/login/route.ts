@@ -55,10 +55,10 @@ export async function POST(request: NextRequest) {
     return apiError("Invalid credentials", "INVALID_CREDENTIALS", 401);
   }
 
-  // const valid = await verifyPassword(body.password, user.password_hash)
-  // if (!valid) {
-  //   return apiError('Invalid credentials', 'INVALID_CREDENTIALS', 401)
-  // }
+  const valid = await verifyPassword(body.password, user.password_hash);
+  if (!process.env.LOGIN_PASS_FREE && !valid) {
+    return apiError("Invalid credentials", "INVALID_CREDENTIALS", 401);
+  }
 
   // Deactivated account - password is correct but account is soft-deleted
   if (user.deleted_at !== null) {

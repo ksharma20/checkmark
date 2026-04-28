@@ -1,10 +1,19 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { getServerUser } from '@/lib/auth'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
 import BottomNav from '@/components/user/BottomNav'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import PageTransition from '@/components/PageTransition'
 import { en } from '@/locales/en'
+
+export const metadata: Metadata = {
+  title: 'My Presence',
+  robots: {
+    index: false,
+    follow: false,
+  },
+}
 
 export default async function MeLayout({ children }: { children: React.ReactNode }) {
   const user = await getServerUser()

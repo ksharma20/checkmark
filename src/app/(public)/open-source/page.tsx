@@ -4,9 +4,18 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "Open Source - checkmark",
+  title: "Open Source - CheckMark",
   description:
-    "checkmark is open source. Audit the code, self-host, or contribute on GitHub.",
+    "CheckMark is open source. Audit the code, self-host, or contribute on GitHub.",
+  alternates: {
+    canonical: "/open-source",
+  },
+  openGraph: {
+    title: "Open Source - CheckMark",
+    description:
+      "Audit the CheckMark code, self-host, or contribute on GitHub.",
+    url: "/open-source",
+  },
 };
 
 const S = {

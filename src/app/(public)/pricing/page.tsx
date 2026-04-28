@@ -1,5 +1,21 @@
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import { en } from '@/locales/en'
+
+export const metadata: Metadata = {
+  title: "Pricing",
+  description:
+    "Simple CheckMark pricing for attendance, presence intelligence, and field force visit tracking. Start free, then upgrade as your team grows.",
+  alternates: {
+    canonical: "/pricing",
+  },
+  openGraph: {
+    title: "CheckMark Pricing",
+    description:
+      "Start free with CheckMark, then upgrade for exports, longer history, and multi-site location signals.",
+    url: "/pricing",
+  },
+};
 
 const plans = [
   {
