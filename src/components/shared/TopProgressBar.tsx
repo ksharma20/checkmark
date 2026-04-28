@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 let listeners: ((active: boolean) => void)[] = []
 let activeCount = 0
@@ -17,10 +18,36 @@ export function stopProgress() {
 
 export default function TopProgressBar() {
   const [active, setActive] = useState(false)
+  const pathname = usePathname()
+  const prevPathname = useRef(pathname)
 
   useEffect(() => {
     listeners.push(setActive)
     return () => { listeners = listeners.filter((fn) => fn !== setActive) }
+  }, [])
+
+  // Stop when navigation completes (pathname changed)
+  useEffect(() => {
+    if (pathname !== prevPathname.current) {
+      prevPathname.current = pathname
+      stopProgress()
+    }
+  }, [pathname])
+
+  // Start on internal link clicks
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      const anchor = (e.target as Element).closest('a')
+      if (!anchor) return
+      const href = anchor.getAttribute('href')
+      if (!href) return
+      // Only internal same-origin navigation (not hash-only, not external)
+      if (href.startsWith('/') && !href.startsWith('//') && !anchor.hasAttribute('download') && anchor.target !== '_blank') {
+        startProgress()
+      }
+    }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
   }, [])
 
   if (!active) return null

@@ -32,6 +32,15 @@ export interface PresenceEvent {
   trust_flags: string | null
   device_timezone: string | null
   scheduled_checkout_at: string | null
+  push_reminders_sent: string | null
+}
+
+export interface CronEvent {
+  id: string
+  user_id: string
+  checkin_at: string
+  scheduled_checkout_at: string | null
+  push_reminders_sent: string | null
 }
 
 export async function createEvent(params: {
@@ -266,5 +275,30 @@ export async function getOpenEvent(userId: string): Promise<PresenceEvent | null
      WHERE user_id = ? AND checkout_at IS NULL AND deleted_at IS NULL
      ORDER BY checkin_at DESC LIMIT 1`,
     [userId]
+  )
+}
+
+export async function getOpenEventsForCron(): Promise<CronEvent[]> {
+  return db.query<CronEvent>(
+    `SELECT id, user_id, checkin_at, scheduled_checkout_at, push_reminders_sent
+     FROM presence_events
+     WHERE checkout_at IS NULL AND deleted_at IS NULL`,
+    []
+  )
+}
+
+export async function updatePushRemindersSent(eventId: string, reminders: string[]): Promise<void> {
+  await db.execute(
+    'UPDATE presence_events SET push_reminders_sent = ? WHERE id = ?',
+    [JSON.stringify(reminders), eventId]
+  )
+}
+
+export async function autoCheckoutEvent(eventId: string, checkoutAt: string): Promise<void> {
+  await db.execute(
+    `UPDATE presence_events
+     SET checkout_at = ?, checkout_reason = 'auto_checkout'
+     WHERE id = ? AND checkout_at IS NULL`,
+    [checkoutAt, eventId]
   )
 }

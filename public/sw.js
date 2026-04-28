@@ -60,7 +60,7 @@ self.addEventListener('notificationclick', function (event) {
       fetch('/api/checkin/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'midnight_auto_checkout' }),
+        body: JSON.stringify({ reason: 'push_action_checkout' }),
         credentials: 'include',
       })
         .then(() => clients.openWindow('/me'))

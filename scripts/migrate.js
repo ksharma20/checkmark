@@ -220,6 +220,9 @@ const ADDITIVE_MIGRATIONS = [
   // presence_events - scheduled midnight auto-checkout
   `ALTER TABLE presence_events ADD COLUMN scheduled_checkout_at TEXT`,
 
+  // presence_events - push reminder tracking
+  `ALTER TABLE presence_events ADD COLUMN push_reminders_sent TEXT`,
+
   // workspaces - remote work toggle
   `ALTER TABLE workspaces ADD COLUMN allow_remote INTEGER NOT NULL DEFAULT 0`,
 

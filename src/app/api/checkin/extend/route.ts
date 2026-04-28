@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenEvent, setScheduledCheckout } from '@/lib/db/queries/events'
-import { nextMidnightUtc } from '@/lib/midnight'
-import { getUserById } from '@/lib/db/queries/users'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -12,15 +10,26 @@ export async function POST(request: NextRequest) {
   if (!openEvent)
     return NextResponse.json({ error: 'Not checked in', code: 'NOT_CHECKED_IN' }, { status: 409 })
 
-  const user = await getUserById(userId)
-  const timezone = user?.timezone ?? 'UTC'
+  const checkinMs = new Date(
+    openEvent.checkin_at.includes('T')
+      ? openEvent.checkin_at
+      : openEvent.checkin_at.replace(' ', 'T') + 'Z'
+  ).getTime()
+  const hardLimitMs = checkinMs + 24 * 60 * 60 * 1000
 
-  // Extend by 8 hours from now, capped at next midnight
-  const extendedAt = new Date(Date.now() + 8 * 60 * 60 * 1000)
-  const nextMidnight = new Date(nextMidnightUtc(timezone))
-  const scheduledCheckoutAt = extendedAt < nextMidnight
-    ? extendedAt.toISOString()
-    : nextMidnight.toISOString()
+  const currentScheduledMs = openEvent.scheduled_checkout_at
+    ? new Date(openEvent.scheduled_checkout_at).getTime()
+    : Date.now()
+
+  if (currentScheduledMs >= hardLimitMs) {
+    return NextResponse.json(
+      { error: 'Cannot extend past 24 hours', code: 'MAX_DURATION_REACHED' },
+      { status: 409 }
+    )
+  }
+
+  const extendedMs = currentScheduledMs + 4 * 60 * 60 * 1000
+  const scheduledCheckoutAt = new Date(Math.min(extendedMs, hardLimitMs)).toISOString()
 
   await setScheduledCheckout(openEvent.id, scheduledCheckoutAt)
 

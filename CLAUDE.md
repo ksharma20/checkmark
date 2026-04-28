@@ -212,6 +212,10 @@ Enforce in `queryWorkspaceEvents()` - plan gate applied before signal matching.
 | `JWT_SECRET` | **Yes** | 32+ char random string |
 | `RESEND_API_KEY` | Recommended | OTPs go to console if missing |
 | `NEXT_PUBLIC_APP_URL` | Yes | Canonical app URL. Use `http://localhost:3000` in dev and `https://checkmark.kabirinnovations.com` in production |
+| `VAPID_PUBLIC_KEY` | Push | VAPID public key for web-push |
+| `VAPID_PRIVATE_KEY` | Push | VAPID private key for web-push |
+| `VAPID_EMAIL` | Push | Contact email for VAPID (`mailto:...`), defaults to kabir.innovate@gmail.com |
+| `CRON_SECRET` | Push | 32+ char secret for `/api/push/cron` auth; must match GitHub Actions secret |
 
 ---
 

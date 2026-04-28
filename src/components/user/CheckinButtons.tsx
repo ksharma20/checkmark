@@ -1,25 +1,16 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { MapPinOff } from "lucide-react";
 import type { PresenceEvent } from "@/lib/db/queries/events";
 import { fmtTimeOnDate, fmtHours } from "@/lib/client/format-time";
-import { en } from "@/locales/en";
-const STALE_NOTIF_KEY = en.constants.staleNotifKey;
-const STALE_NOTIF_EVENT_KEY = en.constants.staleNotifEventKey;
-const NOTIF_TAG_AUTO_CHECKOUT = en.constants.notifTagAutoCheckout;
 import {
   startProgress,
   stopProgress,
 } from "@/components/shared/TopProgressBar";
 import { collectDeviceInfo } from "@/lib/client/device-info";
-
-const NOTIFICATION_SCHEDULE_H = [4, 8, 12, 16, 18, 20, 22];
-const NOTIFICATION_MESSAGES = en.notifications.stale;
-const NOTIF_TAG_STALE = en.constants.notifTagStale;
-const AUTO_CHECKOUT_H = 12;
 
 /** Play a short chime via Web Audio API — works regardless of OS notification mode. */
 function playChime(): void {
@@ -39,103 +30,6 @@ function playChime(): void {
     osc.stop(ctx.currentTime + 0.7);
   } catch {
     /* audio context not available */
-  }
-}
-
-async function subscribeToPush(): Promise<void> {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
-  try {
-    const reg = await navigator.serviceWorker.ready;
-    let sub = await reg.pushManager.getSubscription();
-    if (!sub) {
-      const keyRes = await fetch("/api/push/vapid-public-key");
-      if (!keyRes.ok) return;
-      const { publicKey } = (await keyRes.json()) as { publicKey: string };
-      const rawKey = Uint8Array.from(
-        atob(publicKey.replace(/-/g, "+").replace(/_/g, "/")),
-        (c) => c.charCodeAt(0),
-      );
-      sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: rawKey,
-      });
-    }
-    const p256dhBuffer = sub.getKey("p256dh");
-    const authBuffer = sub.getKey("auth");
-    if (!p256dhBuffer || !authBuffer) return;
-    await fetch("/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        endpoint: sub.endpoint,
-        keys: {
-          p256dh: btoa(String.fromCharCode(...new Uint8Array(p256dhBuffer))),
-          auth: btoa(String.fromCharCode(...new Uint8Array(authBuffer))),
-        },
-      }),
-    });
-  } catch {
-    // push not available — silent
-  }
-}
-
-async function fireStaleNotification(
-  hour: number,
-  onFired?: () => void,
-): Promise<void> {
-  playChime();
-  onFired?.();
-  if (typeof window === "undefined" || !("Notification" in window)) return;
-  if (Notification.permission !== "granted") return;
-  const msg = NOTIFICATION_MESSAGES[hour] ?? {
-    title: en.notifications.staleFallback.title,
-    body: en.notifications.staleFallback.body(hour),
-  };
-  const opts: NotificationOptions = {
-    body: msg.body,
-    icon: "/icon-192.png",
-    tag: NOTIF_TAG_STALE,
-    requireInteraction: true,
-    data: { url: "/me" },
-  };
-  if ("serviceWorker" in navigator) {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification(msg.title, opts);
-      return;
-    } catch {
-      /* fall through */
-    }
-  }
-  new Notification(msg.title, opts);
-}
-
-async function fireMidnightWarning(onFired?: () => void): Promise<void> {
-  playChime();
-  onFired?.();
-  if (typeof window === "undefined") return;
-  const opts = {
-    body: "You'll be automatically checked out in 15 minutes. Still at work?",
-    icon: "/icon-192.png",
-    tag: "checkmark-midnight-warning",
-    requireInteraction: true,
-    actions: [
-      { action: "extend", title: "Still here (+8h)" },
-      { action: "checkout", title: "Check out now" },
-    ],
-    data: { url: "/me" },
-  };
-  if ("serviceWorker" in navigator) {
-    try {
-      const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification("CheckMark: Auto-checkout soon", opts);
-      return;
-    } catch {
-      // fall through to basic Notification
-    }
-  }
-  if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("CheckMark: Auto-checkout soon", opts);
   }
 }
 
@@ -166,7 +60,6 @@ export default function CheckinButtons({
     title: string;
     message: string;
   } | null>(null);
-  const notifTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Listen for push messages from the service worker — show in-app toast + play chime
   useEffect(() => {
@@ -185,97 +78,6 @@ export default function CheckinButtons({
       navigator.serviceWorker.removeEventListener("message", handler);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Schedule midnight warning (15 min before scheduled checkout) and auto-checkout
-  useEffect(() => {
-    if (!activeEvent) return;
-
-    const checkinMs = new Date(
-      activeEvent.checkin_at.includes("T")
-        ? activeEvent.checkin_at
-        : activeEvent.checkin_at.replace(" ", "T") + "Z",
-    ).getTime();
-
-    const scheduledCheckoutMs = activeEvent.scheduled_checkout_at
-      ? new Date(activeEvent.scheduled_checkout_at).getTime()
-      : checkinMs + AUTO_CHECKOUT_H * 60 * 60 * 1000; // fallback: 12h from checkin
-
-    // Clear any existing timers
-    if (notifTimers.current) {
-      notifTimers.current.forEach(clearTimeout);
-      notifTimers.current = [];
-    }
-
-    // Stale reminders at 4h, 8h, 12h, 16h, 18h, 20h, 22h from check-in time
-    for (const hour of NOTIFICATION_SCHEDULE_H) {
-      const delay = checkinMs + hour * 60 * 60 * 1000 - Date.now();
-      if (delay > 0) {
-        const toastMsg =
-          NOTIFICATION_MESSAGES[hour]?.body ??
-          `${hour}h since check-in — still working?`;
-        notifTimers.current.push(
-          setTimeout(() => {
-            void fireStaleNotification(hour, () => showToast(toastMsg, "info"));
-          }, delay),
-        );
-      }
-    }
-
-    let sentSoFar = 0;
-    try {
-      sentSoFar = parseInt(localStorage.getItem(STALE_NOTIF_KEY) ?? "0", 10);
-    } catch {
-      /* ignore */
-    }
-
-    NOTIFICATION_SCHEDULE_H.slice(sentSoFar).forEach((hour, i) => {
-      const fireAt = checkinMs + hour * 60 * 60 * 1000;
-      const delay = fireAt - Date.now();
-      if (delay <= 0) return;
-      const notifIndex = sentSoFar + i + 1;
-      const timer = setTimeout(() => {
-        try {
-          localStorage.setItem(STALE_NOTIF_KEY, String(notifIndex));
-        } catch {
-          /* ignore */
-        }
-        fireStaleNotification(hour);
-      }, delay);
-      notifTimers.current.push(timer);
-    });
-
-    const autoCheckoutAt = checkinMs + AUTO_CHECKOUT_H * 60 * 60 * 1000;
-    const autoDelay = autoCheckoutAt - Date.now();
-    if (autoDelay > 0) {
-      const timer = setTimeout(() => {
-        void triggerAutoCheckout();
-      }, autoDelay);
-      notifTimers.current.push(timer);
-    } else {
-      void triggerAutoCheckout();
-    }
-
-    return () => {
-      if (notifTimers.current) {
-        notifTimers.current.forEach(clearTimeout);
-        notifTimers.current = [];
-      }
-    };
-  }, [activeEvent?.id, activeEvent?.scheduled_checkout_at]);
-
-  async function triggerAutoCheckout(): Promise<void> {
-    try {
-      await fetch("/api/checkin/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reason: "midnight_auto_checkout" }),
-      });
-      // Reload to update UI
-      window.location.reload();
-    } catch {
-      // silent
-    }
-  }
 
   async function requestNotificationPermission() {
     if (typeof window === "undefined" || !("Notification" in window)) return;
@@ -462,14 +264,6 @@ export default function CheckinButtons({
         const hrs = data.duration_hours ? fmtHours(data.duration_hours) : "";
         setState("checked_out");
         setActiveEvent(null);
-        notifTimers.current.forEach(clearTimeout);
-        notifTimers.current = [];
-        try {
-          localStorage.removeItem(STALE_NOTIF_KEY);
-          localStorage.removeItem(STALE_NOTIF_EVENT_KEY);
-        } catch {
-          /* ignore */
-        }
         showToast(`Checked out${hrs ? ` — ${hrs} logged` : ""}`, "success");
         router.refresh();
       } else if (res.status === 409) {
