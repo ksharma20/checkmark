@@ -323,7 +323,7 @@ export async function restoreWorkspace(workspaceId: string): Promise<void> {
 
 export async function getUserWorkspaces(userId: string): Promise<WorkspaceMember[]> {
   return db.query<WorkspaceMember>(
-    `SELECT * FROM workspace_members WHERE user_id = ? AND status = 'active'`,
+    `SELECT * FROM workspace_members WHERE user_id = ? AND status = 'active' ORDER BY added_at ASC`,
     [userId]
   )
 }

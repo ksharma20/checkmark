@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { queryWorkspaceEvents } from '@/lib/signals'
+import { countWorkdays, dateKeyInTimezone, nextDateKey, summarizeAttendanceDays } from '@/lib/attendance-summary'
+import { localMidnightToUtc, todayInTz } from '@/lib/timezone'
 
 export type StatsInterval = 'week' | 'month' | '3month' | 'custom'
 
@@ -29,20 +31,6 @@ export interface MemberStatsResponse {
 
 function zp(n: number) { return String(n).padStart(2, '0') }
 
-/** Count Mon–Fri days in [startUtc, endUtc] (ISO date strings) */
-function countWorkingDays(startDate: string, endDate: string): number {
-  const start = new Date(startDate.slice(0, 10) + 'T00:00:00Z')
-  const end = new Date(endDate.slice(0, 10) + 'T00:00:00Z')
-  let count = 0
-  const cur = new Date(start)
-  while (cur <= end) {
-    const dow = cur.getUTCDay()
-    if (dow !== 0 && dow !== 6) count++
-    cur.setUTCDate(cur.getUTCDate() + 1)
-  }
-  return count
-}
-
 /** Sum session hours for completed events */
 function sessionHours(checkin: string, checkout: string | null): number {
   if (!checkout) return 0
@@ -62,41 +50,43 @@ export async function GET(
   const sp = request.nextUrl.searchParams
   const interval = (sp.get('interval') ?? 'month') as StatsInterval
 
-  const now = new Date()
-  const todayStr = now.toISOString().slice(0, 10)
+  const tz = ctx.workspace.display_timezone
+  const todayStr = todayInTz(tz)
+  const [todayYear, todayMonth] = todayStr.split('-').map(Number)
 
   let startDate: string
-  let endDate: string = todayStr + 'T23:59:59Z'
+  let endDate: string = todayStr
 
   if (interval === 'week') {
-    const d = new Date(now)
-    d.setUTCDate(d.getUTCDate() - 6)
-    startDate = d.toISOString().slice(0, 10) + 'T00:00:00Z'
+    const [year, month, day] = todayStr.split('-').map(Number)
+    const d = new Date(Date.UTC(year, month - 1, day - 6))
+    startDate = d.toISOString().slice(0, 10)
   } else if (interval === 'month') {
-    const y = now.getUTCFullYear(), m = now.getUTCMonth() + 1
-    startDate = `${y}-${zp(m)}-01T00:00:00Z`
+    startDate = `${todayYear}-${zp(todayMonth)}-01`
   } else if (interval === '3month') {
-    const d = new Date(now)
+    const d = new Date(Date.UTC(todayYear, todayMonth - 1, 1))
     d.setUTCMonth(d.getUTCMonth() - 2, 1)
-    startDate = d.toISOString().slice(0, 10) + 'T00:00:00Z'
+    startDate = d.toISOString().slice(0, 10)
   } else if (interval === 'custom') {
     const s = sp.get('start')
     const e = sp.get('end')
-    startDate = s ? s + 'T00:00:00Z' : `${now.getUTCFullYear()}-${zp(now.getUTCMonth() + 1)}-01T00:00:00Z`
-    endDate = e ? e + 'T23:59:59Z' : todayStr + 'T23:59:59Z'
+    startDate = s ?? `${todayYear}-${zp(todayMonth)}-01`
+    endDate = e ?? todayStr
   } else {
     // fallback: current month
-    const y = now.getUTCFullYear(), m = now.getUTCMonth() + 1
-    startDate = `${y}-${zp(m)}-01T00:00:00Z`
+    startDate = `${todayYear}-${zp(todayMonth)}-01`
   }
 
+  const effectiveEndDate = endDate > todayStr ? todayStr : endDate
+  const startUtc = localMidnightToUtc(startDate, tz)
+  const endUtc = localMidnightToUtc(nextDateKey(endDate), tz)
+
   const [events, members] = await Promise.all([
-    queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, { startDate, endDate }),
+    queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, { startDate: startUtc, endDate: endUtc }),
     getActiveMembersWithDetails(ctx.workspace.id),
   ])
 
-  const global_working_days = countWorkingDays(startDate, endDate)
-  const rangeDateStr = startDate.slice(0, 10)
+  const global_working_days = countWorkdays(startDate, effectiveEndDate)
 
   // Group events by user
   const byUser = new Map<string, typeof events>()
@@ -110,35 +100,27 @@ export async function GET(
     const userEvents = byUser.get(m.user_id) ?? []
 
     // Per-member effective start: later of range start or workspace join date
-    const joinedDateStr = m.added_at.slice(0, 10)
-    const effectiveStart = joinedDateStr > rangeDateStr ? joinedDateStr : rangeDateStr
-    const member_working_days = joinedDateStr > rangeDateStr
-      ? countWorkingDays(effectiveStart, endDate)
-      : global_working_days
+    const joinedDateStr = dateKeyInTimezone(m.added_at, tz)
+    const effectiveStart = joinedDateStr > startDate ? joinedDateStr : startDate
+    const countedEvents = userEvents.filter((event) => {
+      const day = dateKeyInTimezone(event.checkin_at, tz)
+      return day >= effectiveStart && day <= effectiveEndDate
+    })
 
     // Group events by calendar day
-    const eventsByDay = new Map<string, typeof userEvents>()
-    for (const ev of userEvents) {
-      const dayKey = (ev.checkin_at.includes('T') ? ev.checkin_at : ev.checkin_at.replace(' ', 'T') + 'Z').slice(0, 10)
+    const eventsByDay = new Map<string, typeof countedEvents>()
+    for (const ev of countedEvents) {
+      const dayKey = dateKeyInTimezone(ev.checkin_at, tz)
       const arr = eventsByDay.get(dayKey) ?? []
       arr.push(ev)
       eventsByDay.set(dayKey, arr)
     }
 
-    // Office takes priority: if a day has any office_checkin it's an office day
-    const officeDaySet = new Set<string>()
-    const remoteDaySet = new Set<string>()
     const multiLocDaySet = new Set<string>()
     let totalHours = 0
 
     for (const [dayKey, dayEvs] of eventsByDay) {
-      const hasOffice = dayEvs.some((ev) => ev.event_type !== 'remote_checkin' && (ev.matched_by === 'verified' || ev.matched_by === 'override'))
-      if (hasOffice) {
-        officeDaySet.add(dayKey)
-      } else {
-        remoteDaySet.add(dayKey)
-      }
-      if (dayEvs.some((ev) => ev.checkout_location_mismatch === 1)) {
+      if (dayEvs.some((ev) => (ev.checkout_location_mismatch ?? 0) > 0)) {
         multiLocDaySet.add(dayKey)
       }
       for (const ev of dayEvs) {
@@ -146,10 +128,14 @@ export async function GET(
       }
     }
 
-    const office_days = officeDaySet.size
-    const remote_days = remoteDaySet.size
-    const present_days = new Set([...officeDaySet, ...remoteDaySet]).size
-    const absent_days = Math.max(0, member_working_days - present_days)
+    const summary = summarizeAttendanceDays({
+      events: countedEvents,
+      startDate: effectiveStart,
+      endDate: effectiveEndDate,
+      timezone: tz,
+      todayDate: todayStr,
+    })
+    const present_days = summary.officeDays + summary.remoteDays
     const avg_hours_per_day = present_days > 0
       ? Math.round((totalHours / present_days) * 10) / 10
       : 0
@@ -161,10 +147,10 @@ export async function GET(
       full_name: m.full_name,
       role: m.role,
       joined_at: joinedDateStr,
-      office_days,
-      remote_days,
-      absent_days,
-      total_working_days: member_working_days,
+      office_days: summary.officeDays,
+      remote_days: summary.remoteDays,
+      absent_days: summary.absentDays,
+      total_working_days: summary.workingDays,
       total_hours: Math.round(totalHours * 10) / 10,
       avg_hours_per_day,
       multi_loc_days: multiLocDaySet.size,

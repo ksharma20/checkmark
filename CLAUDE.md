@@ -51,6 +51,12 @@ Config-light mode (no signals configured):
 
 Admin overrides (`admin_overrides` table) bypass signal matching entirely. Never apply signal logic to overridden events.
 
+Attendance stats are day-level, not event-level. Use `src/lib/attendance-summary.ts` anywhere WFO/WFH/Leave or office/remote/absent days are shown:
+- WFO/office: at least one event that day has `matched_by: 'verified' | 'override'`
+- WFH/remote: events exist that day, but none are verified/overridden
+- Leave/absent: no event exists for that workspace-local workday
+- Multiple events on one day count once, with WFO taking priority over WFH
+
 ### Trust signals (collected on both check-in AND checkout)
 1. GPS (lat/lng + accuracy)
 2. WiFi SSID (bcrypt-hashed - never store raw SSID)

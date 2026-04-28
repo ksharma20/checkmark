@@ -42,10 +42,20 @@ function getThisMonthRange() {
 
 interface Props { slug: string; tz: string }
 
+type DisputeFilter = 'all' | DisputeEvent['dispute_type']
+
+const disputeLabels: Record<DisputeEvent['dispute_type'], string> = {
+  signal_mismatch: 'Signal mismatch',
+  missing_checkout: 'Missing checkout',
+  overridden: 'Overridden',
+}
+
 export default function DisputesClient({ slug, tz }: Props) {
   const defaultRange = getThisMonthRange()
   const [startDate, setStartDate] = useState(defaultRange.start)
   const [endDate, setEndDate] = useState(defaultRange.end)
+  const [search, setSearch] = useState('')
+  const [disputeFilter, setDisputeFilter] = useState<DisputeFilter>('all')
   const [data, setData] = useState<DisputesResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [overriding, setOverriding] = useState<string | null>(null)
@@ -94,8 +104,16 @@ export default function DisputesClient({ slug, tz }: Props) {
     }
   }
 
-  const unmatched = data?.events.filter((e) => !e.overridden) ?? []
-  const overridden = data?.events.filter((e) => e.overridden) ?? []
+  const filteredEvents = (data?.events ?? []).filter((event) => {
+    const query = search.trim().toLowerCase()
+    const matchesSearch = !query ||
+      event.member_name.toLowerCase().includes(query) ||
+      event.member_email.toLowerCase().includes(query)
+    const matchesType = disputeFilter === 'all' || event.dispute_type === disputeFilter
+    return matchesSearch && matchesType
+  })
+  const unmatched = filteredEvents.filter((e) => !e.overridden)
+  const overridden = filteredEvents.filter((e) => e.overridden)
 
   return (
     <div>
@@ -131,6 +149,32 @@ export default function DisputesClient({ slug, tz }: Props) {
         >
           This month
         </button>
+        <input
+          type="search"
+          placeholder="Search name or email"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          style={{
+            height: '36px', padding: '0 10px', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)', fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+            background: 'var(--surface-0)', color: 'var(--text-primary)', outline: 'none',
+            minWidth: '210px',
+          }}
+        />
+        <select
+          value={disputeFilter}
+          onChange={(e) => setDisputeFilter(e.target.value as DisputeFilter)}
+          style={{
+            height: '36px', padding: '0 10px', border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)', fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+            background: 'var(--surface-0)', color: 'var(--text-primary)', outline: 'none',
+          }}
+        >
+          <option value="all">All dispute types</option>
+          <option value="signal_mismatch">Signal mismatch</option>
+          <option value="missing_checkout">Missing checkout</option>
+          <option value="overridden">Overridden</option>
+        </select>
       </div>
 
       {loading ? (
@@ -139,15 +183,14 @@ export default function DisputesClient({ slug, tz }: Props) {
             <div key={i} style={{ ...skeletonStyle, height: '64px', borderRadius: 'var(--radius-md)' }} />
           ))}
         </div>
-      ) : !data?.signals_configured ? (
+      ) : !data?.signals_configured && filteredEvents.length === 0 ? (
         <div style={{
           background: 'color-mix(in srgb, var(--amber) 8%, transparent)',
           border: '1px solid var(--amber)', borderRadius: 'var(--radius-md)',
           padding: '16px 20px',
         }}>
           <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)', margin: 0 }}>
-            No location signals configured. Disputes only apply when GPS or IP signals are set up in Settings.
-            Without signals, all check-ins are counted automatically.
+            No location signals configured, and there are no missing-checkout events in this period.
           </p>
         </div>
       ) : (
@@ -245,6 +288,7 @@ function EventRow({
 }) {
   const ini = initials(ev.member_name)
   const mismatchMetres = ev.checkout_location_mismatch
+  const badgeColor = ev.dispute_type === 'missing_checkout' ? 'var(--amber)' : 'var(--danger)'
   return (
     <div style={{
       padding: '14px 16px',
@@ -270,6 +314,15 @@ function EventRow({
           {ev.member_email}
         </p>
         <div style={{ marginTop: '6px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', height: '18px', padding: '0 6px',
+            borderRadius: '4px', fontSize: '11px', fontFamily: 'DM Sans, sans-serif', fontWeight: 600,
+            color: badgeColor, background: `color-mix(in srgb, ${badgeColor} 10%, transparent)`,
+            border: `1px solid color-mix(in srgb, ${badgeColor} 35%, transparent)`,
+            whiteSpace: 'nowrap',
+          }}>
+            {disputeLabels[ev.dispute_type]}
+          </span>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-secondary)' }}>
             {formatUtc(ev.checkin_at, tz)}
           </span>
@@ -282,6 +335,7 @@ function EventRow({
             </span>
           )}
           {ev.has_gps && <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>GPS</span>}
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{ev.matched_by}</span>
           {mismatchMetres !== null && mismatchMetres > 0 && (
             <span title="Checked out from a different location" style={{
               display: 'inline-flex', alignItems: 'center', height: '18px', padding: '0 6px',
@@ -388,6 +442,9 @@ function OverriddenRow({
         <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 2px' }}>
           {ev.member_name}
           <span style={{ marginLeft: '8px', fontSize: '11px', color: 'var(--teal)', fontWeight: 400 }}>overridden</span>
+        </p>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', margin: '0 0 4px' }}>
+          {ev.member_email}
         </p>
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-secondary)' }}>

@@ -5,6 +5,7 @@ import { queryWorkspaceEvents } from '@/lib/signals'
 import type { PresenceEventWithMatch, MatchedBy } from '@/lib/signals'
 import type { MemberWithUser } from '@/lib/db/queries/workspaces'
 import { todayInTz, localMidnightToUtc } from '@/lib/timezone'
+import { isOfficeMatched } from '@/lib/attendance-summary'
 
 export interface DashboardMember {
   member_id: string
@@ -44,6 +45,14 @@ function nextDayStr(dateStr: string): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   const date = new Date(Date.UTC(y, m - 1, d + 1))
   return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
+function isPresentOffice(member: DashboardMember): boolean {
+  return member.presence_status === 'present' && !!member.latest_event && isOfficeMatched(member.latest_event.matched_by)
+}
+
+function isPresentRemote(member: DashboardMember): boolean {
+  return member.presence_status === 'present' && !!member.latest_event && !isOfficeMatched(member.latest_event.matched_by)
 }
 
 export async function GET(
@@ -132,8 +141,8 @@ export async function GET(
     visited: allMembers.filter((m) => m.presence_status === 'visited').length,
     notIn: allMembers.filter((m) => m.presence_status === 'notIn').length,
     total: allMembers.length,
-    office: allMembers.filter((m) => m.presence_status === 'present' && m.latest_event?.event_type !== 'remote_checkin' && (m.latest_event?.matched_by === 'verified' || m.latest_event?.matched_by === 'override')).length,
-    remote: allMembers.filter((m) => m.presence_status === 'present' && (m.latest_event?.event_type === 'remote_checkin' || m.latest_event?.matched_by === 'partial')).length,
+    office: allMembers.filter(isPresentOffice).length,
+    remote: allMembers.filter(isPresentRemote).length,
   }
 
   // Apply filters
@@ -186,7 +195,7 @@ export async function GET(
   const locationMap = new Map<string, number>()
   for (const m of allMembers) {
     if (m.presence_status === 'notIn') continue
-    const isRemote = m.latest_event?.event_type === 'remote_checkin'
+    const isRemote = !!m.latest_event && !isOfficeMatched(m.latest_event.matched_by)
     const label = m.latest_event?.location_label
       ?? (isRemote ? 'Remote' : (m.latest_event?.matched_signals?.includes('wifi') ? 'Office (Wi-Fi)' : m.latest_event?.matched_signals?.includes('gps') ? 'Office (GPS)' : 'Office'))
     locationMap.set(label, (locationMap.get(label) ?? 0) + 1)

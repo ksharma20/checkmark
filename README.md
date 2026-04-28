@@ -204,20 +204,20 @@ App runs at `http://localhost:3000`.
 
 ### Schema (13 tables + 5 column additions)
 
-| Table                     | Purpose                                                             |
-| ------------------------- | ------------------------------------------------------------------- |
-| `users`                   | User accounts - email, password hash, name                          |
-| `otp_codes`               | 6-digit OTPs for signup and verification                            |
-| `user_api_tokens`         | Personal API tokens for programmatic check-ins                      |
-| `presence_events`         | Core table - every check-in/check-out, GPS, IP                      |
-| `workspaces`              | Organisations - slug, name, plan, org_type, timezone, `archived_at` |
-| `workspace_domains`       | Email domains for auto-enrolment                                    |
-| `workspace_members`       | User ↔ workspace membership, role, consent status                   |
-| `workspace_signal_config` | GPS / IP signal configs for presence matching                       |
-| `admin_overrides`         | Additive admin overrides - audit log, never modifies events         |
-| `user_stats`              | Pre-computed streaks, totals - upserted after every check-in        |
-| `revoked_tokens`          | Invalidated JWT IDs (jti) - checked on every authenticated request  |
-| `push_subscriptions`      | Web Push endpoint + VAPID keys per user/device                      |
+| Table                     | Purpose                                                                    |
+| ------------------------- | -------------------------------------------------------------------------- |
+| `users`                   | User accounts - email, password hash, name                                 |
+| `otp_codes`               | 6-digit OTPs for signup and verification                                   |
+| `user_api_tokens`         | Personal API tokens for programmatic check-ins                             |
+| `presence_events`         | Core table - every check-in/check-out, GPS, IP                             |
+| `workspaces`              | Organisations - slug, name, plan, org_type, timezone, `archived_at`        |
+| `workspace_domains`       | Email domains for auto-enrolment                                           |
+| `workspace_members`       | User ↔ workspace membership, role, consent status                          |
+| `workspace_signal_config` | GPS / IP signal configs for presence matching                              |
+| `admin_overrides`         | Additive admin overrides - audit log, never modifies events                |
+| `user_stats`              | Pre-computed streaks, totals - upserted after every check-in               |
+| `revoked_tokens`          | Invalidated JWT IDs (jti) - checked on every authenticated request         |
+| `push_subscriptions`      | Web Push endpoint + VAPID keys per user/device                             |
 | `rate_limit_log`          | Sliding-window rate limit log (IP-keyed for login, user-keyed for checkin) |
 
 The migration runner is idempotent. `ALTER TABLE` column additions are wrapped in try/catch so re-running is always safe:
@@ -439,13 +439,13 @@ Server-rendered. Shows who is present right now, who visited today, and who hasn
 
 **Signal badges:**
 
-| Badge                        | Colour     | Meaning                                                     |
-| ---------------------------- | ---------- | ----------------------------------------------------------- |
-| ✓ GPS+IP (all signals)       | Teal       | `verified` - all configured signals matched                 |
-| ~ GPS (some signals)         | Amber      | `partial` - some configured signals matched                 |
-| Unverified                   | Muted grey | `none` - no signals matched                                 |
-| Override                     | Purple     | Admin override applied                                      |
-| -                            | Muted      | Config-light mode (no signals configured)                   |
+| Badge                  | Colour     | Meaning                                     |
+| ---------------------- | ---------- | ------------------------------------------- |
+| ✓ GPS+IP (all signals) | Teal       | `verified` - all configured signals matched |
+| ~ GPS (some signals)   | Amber      | `partial` - some configured signals matched |
+| Unverified             | Muted grey | `none` - no signals matched                 |
+| Override               | Purple     | Admin override applied                      |
+| -                      | Muted      | Config-light mode (no signals configured)   |
 
 ---
 
@@ -514,16 +514,16 @@ All pages are fully static Server Components - no JavaScript required. All share
 
 Single entry point for all authentication. An 8-state client state machine:
 
-| State           | Description                                                                                |
-| --------------- | ------------------------------------------------------------------------------------------ |
-| `email`         | Enter email - checks existence via `/api/auth/check-email`                                 |
-| `password`      | Existing user - enter password                                                             |
-| `otp`           | New user - enter 6-digit code sent to email                                                |
-| `accountType`   | OTP verified - choose Personal or Organisation                                             |
-| `personal`      | Enter name + password                                                                      |
-| `org`           | Enter org name, URL handle (live `/ws/check-slug` check), optional domain, name + password |
-| `forgotPassword`| Enter email for reset code                                                                 |
-| `resetPassword` | Enter new password (OTP-gated)                                                             |
+| State            | Description                                                                                |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `email`          | Enter email - checks existence via `/api/auth/check-email`                                 |
+| `password`       | Existing user - enter password                                                             |
+| `otp`            | New user - enter 6-digit code sent to email                                                |
+| `accountType`    | OTP verified - choose Personal or Organisation                                             |
+| `personal`       | Enter name + password                                                                      |
+| `org`            | Enter org name, URL handle (live `/ws/check-slug` check), optional domain, name + password |
+| `forgotPassword` | Enter email for reset code                                                                 |
+| `resetPassword`  | Enter new password (OTP-gated)                                                             |
 
 **OTP security:** After verify, a 15-minute signed `cm_otp_ok` httpOnly cookie is set server-side. The register route validates this cookie - the client never sends `otpVerified: true`.
 
@@ -631,10 +631,10 @@ Navigate to `/login`. A single 6-state machine handles everything:
 
 Your presence dashboard. Everything here belongs to you:
 
-- Status line: "Checked in at 10:15 AM" or "Not checked in yet" - always your browser's local timezone
-- **"I'm here"** - visible only when checked out. Collects GPS from the browser, sends `POST /api/checkin` with lat/lng. The server creates a `presence_events` row, fires a Nominatim reverse-geocode in the background (stored as `location_label`), and updates your streak + monthly stats.
-- **"I'm leaving"** - visible only when checked in. Sends `POST /api/checkin/checkout` with GPS. Stamps `checkout_at` on the open event.
-- 3 stat chips: days this month / hours logged / distinct locations
+- Status line: "Checked in at 10:15 AM" or "Not checked in yet" — always your browser's local timezone
+- **"I'm here"** — visible only when checked out. Collects GPS from the browser, sends `POST /api/checkin` with lat/lng. The server creates a `presence_events` row, fires a Nominatim reverse-geocode in the background (stored as `location_label`), and updates your streak + monthly stats.
+- **"I'm leaving"** — visible only when checked in. Sends `POST /api/checkin/checkout` with GPS. Stamps `checkout_at` on the open event.
+- 3 stat chips: WFO / WFH / On Leave for the current month, calculated in the active workspace timezone from the member's workspace join date
 - Today's event list: each card shows check-in time, check-out time, location label, and an inline note editor
 
 **Timeline - `/me/timeline`**
@@ -682,7 +682,11 @@ What the dashboard query does:
 4. Groups members: **In office now** (open event) · **Visited today** (closed events) · **Not in** (no events today)
 5. Supports filter by status/signal type, name/email search (debounced 300ms), sort by time/name/duration, and pagination
 
-**People tab - `/ws/:slug/people`**
+**Attendance day classification:** `/me`, analytics, monthly, and member stats use `src/lib/attendance-summary.ts`. For each workspace-local workday: any `verified` or `override` event makes the day WFO; if events exist but none are `verified`/`override`, the day is WFH; if no event exists, the day is Leave/Absent. Multiple events on the same day never double-count.
+
+**Disputes / Alerts:** `/ws/:slug/disputes` lists unmatched signal events, missing-checkout events, and already-overridden events. Admins can search by member name/email, filter by dispute type, add a note, and optionally set an effective checkout time when counting an event.
+
+**People tab — `/ws/:slug/people`**
 
 All members: active, invited, declined. Invite by email → consent email sent. The consent link is validated for: correct status, not expired, and logged-in email must match the invited email (prevents token hijacking).
 
@@ -716,11 +720,11 @@ All members: active, invited, declined. Invite by email → consent email sent. 
 
 | Concern                     | Mechanism                                                                                                                                                                                                                                                                                              |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Session auth**            | JWT (HS256, 30-day expiry), unique `jti` per token, stored in `httpOnly; SameSite=Lax` cookie                                                                                                                                                                                                         |
+| **Session auth**            | JWT (HS256, 30-day expiry), unique `jti` per token, stored in `httpOnly; SameSite=Lax` cookie                                                                                                                                                                                                          |
 | **Logout invalidation**     | `jti` inserted into `revoked_tokens` on logout; `getSessionFromCookies()` checks revocation on every server-component/route-handler request                                                                                                                                                            |
-| **CSRF**                    | `SameSite=Lax` on `cm_session` - `Strict` was causing session loss on PWA cold-opens on Android and iOS (PWA-to-browser cross-origin navigation). `Lax` still blocks cross-site POST mutations; only same-site GET navigations carry the cookie cross-origin.                                                                                                                                                                                                                             |
+| **CSRF**                    | `SameSite=Lax` on `cm_session` - `Strict` was causing session loss on PWA cold-opens on Android and iOS (PWA-to-browser cross-origin navigation). `Lax` still blocks cross-site POST mutations; only same-site GET navigations carry the cookie cross-origin.                                          |
 | **Password storage**        | bcrypt at cost 12. Minimum 8 chars enforced server-side on both registration and password change. Never stored in plaintext.                                                                                                                                                                           |
-| **OTP brute force**         | 5-attempt lockout per code; max 3 sends per 15 minutes per email                                                                                                                                                                                                                                             |
+| **OTP brute force**         | 5-attempt lockout per code; max 3 sends per 15 minutes per email                                                                                                                                                                                                                                       |
 | **Reserved slugs**          | 20+ blocked names (api, admin, me, ws, etc.) at the `check-slug` API level                                                                                                                                                                                                                             |
 | **Consent token hijacking** | Three-layer validation: status must be `pending_consent`, token must not be expired, logged-in email must match invited email                                                                                                                                                                          |
 | **Cross-workspace leakage** | All mutations scoped by `workspace_id` at the DB level. `requireWsAdmin` resolves slug → `workspace.id`, validates admin role on that ID, passes `ctx.workspace.id` to every subsequent query. `markDomainVerified` and `deleteSignalConfig` both require matching `workspace_id` in the WHERE clause. |
@@ -740,15 +744,15 @@ All routes return JSON. Errors always return:
 
 ### Auth
 
-| Method | Route                   | Auth       | Description                          |
-| ------ | ----------------------- | ---------- | ------------------------------------ |
-| POST   | `/api/auth/check-email` | None       | Check if email has an account        |
-| POST   | `/api/auth/login`       | None       | Email check or password verify       |
-| POST   | `/api/auth/otp/send`    | None       | Send 6-digit OTP to email            |
-| POST   | `/api/auth/otp/verify`  | None       | Verify OTP - sets `cm_otp_ok` cookie |
-| POST   | `/api/auth/register`       | OTP cookie | Create account (personal or org)     |
+| Method | Route                      | Auth       | Description                           |
+| ------ | -------------------------- | ---------- | ------------------------------------- |
+| POST   | `/api/auth/check-email`    | None       | Check if email has an account         |
+| POST   | `/api/auth/login`          | None       | Email check or password verify        |
+| POST   | `/api/auth/otp/send`       | None       | Send 6-digit OTP to email             |
+| POST   | `/api/auth/otp/verify`     | None       | Verify OTP - sets `cm_otp_ok` cookie  |
+| POST   | `/api/auth/register`       | OTP cookie | Create account (personal or org)      |
 | POST   | `/api/auth/reset-password` | OTP cookie | Reset password after OTP verification |
-| POST   | `/api/auth/logout`         | Cookie     | Clear session cookie                 |
+| POST   | `/api/auth/logout`         | Cookie     | Clear session cookie                  |
 
 #### `POST /api/auth/check-email`
 
@@ -926,13 +930,13 @@ Design rules:
 
 ## Environment Variables Reference
 
-| Variable              | Required    | Description                                      |
-| --------------------- | ----------- | ------------------------------------------------ |
-| `TURSO_DATABASE_URL`  | No (dev)    | Turso URL for production. Empty → uses SQLite.   |
-| `TURSO_AUTH_TOKEN`    | No (dev)    | Turso Auth Token for production. Empty → dev env |
-| `JWT_SECRET`          | **Yes**     | Random 32+ char string for JWT signing           |
-| `RESEND_API_KEY`      | Recommended | From resend.com. OTPs log to console if missing. |
-| `NEXT_PUBLIC_APP_URL` | Yes         | Full app URL (`http://localhost:3000` in dev)    |
+| Variable              | Required    | Description                                             |
+| --------------------- | ----------- | ------------------------------------------------------- |
+| `TURSO_DATABASE_URL`  | No (dev)    | Turso URL for production. Empty → uses SQLite.          |
+| `TURSO_AUTH_TOKEN`    | No (dev)    | Turso Auth Token for production. Empty → dev env        |
+| `JWT_SECRET`          | **Yes**     | Random 32+ char string for JWT signing                  |
+| `RESEND_API_KEY`      | Recommended | From resend.com. OTPs log to console if missing.        |
+| `NEXT_PUBLIC_APP_URL` | Yes         | Full app URL (`http://localhost:3000` in dev)           |
 | `VAPID_PUBLIC_KEY`    | Recommended | Web Push public key. `npx web-push generate-vapid-keys` |
-| `VAPID_PRIVATE_KEY`   | Recommended | Web Push private key (never expose to client)   |
-| `VAPID_EMAIL`         | Recommended | Contact email for VAPID `mailto:` registration  |
+| `VAPID_PRIVATE_KEY`   | Recommended | Web Push private key (never expose to client)           |
+| `VAPID_EMAIL`         | Recommended | Contact email for VAPID `mailto:` registration          |

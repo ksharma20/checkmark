@@ -1018,7 +1018,7 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           title="In Office"
           value={counts.office}
           sub="currently in office"
-          onClick={() => setModal({ title: 'In Office', members: (data?.all_members ?? []).filter(m => m.presence_status === 'present' && m.latest_event?.event_type !== 'remote_checkin' && (m.latest_event?.matched_by === 'verified' || m.latest_event?.matched_by === 'override')) })}
+          onClick={() => setModal({ title: 'In Office', members: (data?.all_members ?? []).filter(m => resolvePresenceTag(m.presence_status, m.latest_event?.matched_by, m.latest_event?.event_type) === 'in_office') })}
           icon={<Monitor size={16} />}
         />
         <StatCard
@@ -1026,7 +1026,7 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
           title="Remote"
           value={counts.remote}
           sub="working remotely"
-          onClick={() => setModal({ title: 'Remote', members: (data?.all_members ?? []).filter(m => m.presence_status === 'present' && (m.latest_event?.event_type === 'remote_checkin' || m.latest_event?.matched_by === 'partial')) })}
+          onClick={() => setModal({ title: 'Remote', members: (data?.all_members ?? []).filter(m => resolvePresenceTag(m.presence_status, m.latest_event?.matched_by, m.latest_event?.event_type) === 'remote') })}
           icon={<Home size={16} />}
         />
       </div>

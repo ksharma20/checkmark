@@ -4,6 +4,8 @@ import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import { getWorkspaceSignals } from '@/lib/db/queries/signals'
 import { haversineMetres } from '@/lib/geo'
+import { countWorkdays, dateKeyInTimezone, isOfficeMatched, nextDateKey, summarizeAttendanceDays } from '@/lib/attendance-summary'
+import { localMidnightToUtc, todayInTz } from '@/lib/timezone'
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -30,22 +32,6 @@ export interface AnalyticsResponse {
   working_days: number
   signals_configured: boolean
   members: AnalyticsMember[]
-}
-
-/** Count Mon–Fri days in [startDate, endDate] up to today inclusive. */
-function countWorkingDays(startDate: string, endDate: string): number {
-  const today = new Date().toISOString().slice(0, 10)
-  const effectiveEnd = endDate > today ? today : endDate
-  const start = new Date(startDate + 'T00:00:00Z')
-  const end = new Date(effectiveEnd + 'T00:00:00Z')
-  let count = 0
-  const cur = new Date(start)
-  while (cur <= end) {
-    const dow = cur.getUTCDay()
-    if (dow !== 0 && dow !== 6) count++
-    cur.setUTCDate(cur.getUTCDate() + 1)
-  }
-  return count
 }
 
 /** Sum duration hours for a list of events (only completed events). */
@@ -92,21 +78,25 @@ export async function GET(request: NextRequest, { params }: Props) {
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const url = new URL(request.url)
-  const now = new Date()
-  const defaultYear = now.getUTCFullYear()
-  const defaultMonth = String(now.getUTCMonth() + 1).padStart(2, '0')
+  const tz = ctx.workspace.display_timezone
+  const todayLocal = todayInTz(tz)
+  const [todayYear, todayMonth] = todayLocal.split('-').map(Number)
+  const defaultYear = todayYear
+  const defaultMonth = String(todayMonth).padStart(2, '0')
   const defaultStart = `${defaultYear}-${defaultMonth}-01`
-  const defaultEnd = new Date(defaultYear, now.getUTCMonth() + 1, 0)
-    .toISOString().slice(0, 10)
+  const defaultEnd = todayLocal
 
   const startDate = url.searchParams.get('start') ?? defaultStart
   const endDate = url.searchParams.get('end') ?? defaultEnd
+  const effectiveEndDate = endDate > todayLocal ? todayLocal : endDate
+  const startUtc = localMidnightToUtc(startDate, tz)
+  const endUtc = localMidnightToUtc(nextDateKey(endDate), tz)
 
   // Fetch all events in range (signal-matched)
   const [allEvents, workspaceSignals] = await Promise.all([
     queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, {
-      startDate,
-      endDate: endDate + 'T23:59:59Z',
+      startDate: startUtc,
+      endDate: endUtc,
     }),
     getWorkspaceSignals(ctx.workspace.id),
   ])
@@ -122,45 +112,36 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   // Get member details for names
   const memberDetails = await getActiveMembersWithDetails(ctx.workspace.id)
-  const memberMap = new Map(memberDetails.map((m) => [m.user_id, m]))
 
-  const global_working_days = countWorkingDays(startDate, endDate)
+  const global_working_days = countWorkdays(startDate, effectiveEndDate)
 
   const members: AnalyticsMember[] = []
 
-  for (const [userId, events] of byUser) {
-    const memberInfo = memberMap.get(userId)
-    if (!memberInfo) continue
+  for (const memberInfo of memberDetails) {
+    const events = byUser.get(memberInfo.user_id) ?? []
+    const joinedLocal = dateKeyInTimezone(memberInfo.added_at, tz)
+    const effectiveStart = joinedLocal > startDate ? joinedLocal : startDate
+    const countedEvents = events.filter((event) => {
+      const day = dateKeyInTimezone(event.checkin_at, tz)
+      return day >= effectiveStart && day <= effectiveEndDate
+    })
 
-    // Per-member effective start: later of range start or workspace join date
-    const joinedDateStr = memberInfo.added_at.slice(0, 10)
-    const effectiveStart = joinedDateStr > startDate ? joinedDateStr : startDate
-    const member_working_days = countWorkingDays(effectiveStart, endDate)
-
-    // Group by day (YYYY-MM-DD from checkin_at)
     const byDay = new Map<string, typeof allEvents>()
-    for (const ev of events) {
-      const day = ev.checkin_at.slice(0, 10)
+    for (const ev of countedEvents) {
+      const day = dateKeyInTimezone(ev.checkin_at, tz)
       if (!byDay.has(day)) byDay.set(day, [])
       byDay.get(day)!.push(ev)
     }
 
-    let office_days = 0
-    let wfh_days = 0
     let multi_location_days = 0
     let office_hours = 0
     let wfh_hours = 0
     const checkinLocations: [number, number][] = []
 
     for (const [, dayEvents] of byDay) {
-      const hasOffice = dayEvents.some((e) => e.matched_by === 'verified' || e.matched_by === 'override')
-      const hasAny = dayEvents.length > 0
-
-      if (hasOffice) {
-        office_days++
+      if (dayEvents.some((e) => isOfficeMatched(e.matched_by))) {
         office_hours += sumHours(dayEvents.filter((e) => e.matched_by !== 'none'))
-      } else if (hasAny) {
-        wfh_days++
+      } else {
         wfh_hours += sumHours(dayEvents)
       }
 
@@ -175,21 +156,27 @@ export async function GET(request: NextRequest, { params }: Props) {
       }
     }
 
-    const attendance_days = office_days + wfh_days
-    const absent_days = Math.max(0, member_working_days - attendance_days)
+    const summary = summarizeAttendanceDays({
+      events: countedEvents,
+      startDate: effectiveStart,
+      endDate: effectiveEndDate,
+      timezone: tz,
+      todayDate: todayLocal,
+    })
+    const attendance_days = summary.officeDays + summary.remoteDays
     const total_hours = office_hours + wfh_hours
     const avg_daily_hours = attendance_days > 0 ? total_hours / attendance_days : 0
     const field_force_locations = countGpsClusters(checkinLocations)
 
     members.push({
-      user_id: userId,
+      user_id: memberInfo.user_id,
       name: memberInfo.full_name ?? memberInfo.email,
       email: memberInfo.email,
-      joined_at: joinedDateStr,
-      office_days,
-      wfh_days,
-      absent_days,
-      working_days: member_working_days,
+      joined_at: joinedLocal,
+      office_days: summary.officeDays,
+      wfh_days: summary.remoteDays,
+      absent_days: summary.absentDays,
+      working_days: summary.workingDays,
       total_office_hours: Math.round(office_hours * 10) / 10,
       total_wfh_hours: Math.round(wfh_hours * 10) / 10,
       total_hours: Math.round(total_hours * 10) / 10,

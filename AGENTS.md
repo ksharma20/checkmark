@@ -72,6 +72,8 @@ queryWorkspaceEvents() → compares event signals against workspace config
 - `none` - no signals matched (check-in exists but not verified)
 - `override` - admin manually overrode this event
 
+**Attendance stats:** Use `src/lib/attendance-summary.ts` for all WFO/WFH/Leave or office/remote/absent counts. Count by workspace-local day, not by event. If any event on a day is `verified` or `override`, the day is WFO/office. If events exist but none are verified/overridden, the day is WFH/remote. If no event exists, the day is Leave/absent. Never count one day in both WFO and WFH.
+
 ---
 
 ## DB Query Conventions

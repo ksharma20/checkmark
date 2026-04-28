@@ -3,6 +3,9 @@ import { getServerUser } from '@/lib/auth'
 import { getOpenEventToday, getUserEvents } from '@/lib/db/queries/events'
 import { getUserWorkspaces, getWorkspacesByIds } from '@/lib/db/queries/workspaces'
 import { getUserById } from '@/lib/db/queries/users'
+import { queryWorkspaceEvents } from '@/lib/signals'
+import { dateKeyInTimezone, summarizeAttendanceDays } from '@/lib/attendance-summary'
+import { monthBoundsUtc, todayInTz } from '@/lib/timezone'
 import CheckinButtons from '@/components/user/CheckinButtons'
 import EventCard from '@/components/user/EventCard'
 import TimezoneReporter from '@/components/user/TimezoneReporter'
@@ -11,78 +14,53 @@ export default async function MePage() {
   const user = await getServerUser()
   if (!user) return null
 
-  const now = new Date()
-  const todayStr = now.toISOString().split('T')[0]
-  const monthStr = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`
-  const nextMonthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1))
+  const todayUtcStr = new Date().toISOString().split('T')[0]
 
-  const [activeEvent, todayResult, monthResult, memberships, profile] = await Promise.all([
+  const [activeEvent, todayResult, memberships, profile] = await Promise.all([
     getOpenEventToday(user.userId),
-    getUserEvents({ userId: user.userId, start: `${todayStr}T00:00:00.000Z`, end: `${todayStr}T23:59:59.999Z` }),
-    getUserEvents({ userId: user.userId, start: `${monthStr}T00:00:00.000Z`, end: nextMonthDate.toISOString(), limit: 500 }),
+    getUserEvents({ userId: user.userId, start: `${todayUtcStr}T00:00:00.000Z`, end: `${todayUtcStr}T23:59:59.999Z` }),
     getUserWorkspaces(user.userId),
     getUserById(user.userId),
   ])
 
   const todayEvents = todayResult.events
-  const monthEvents = monthResult.events
-
-  // Effective start: later of month start or user's account creation date
-  const monthStartDate = new Date(monthStr + 'T00:00:00.000Z')
-  const rawJoin = profile?.created_at
-  const joinDate = rawJoin
-    ? new Date(rawJoin.includes('T') ? rawJoin : rawJoin.replace(' ', 'T') + 'Z')
-    : null
-  const effectiveStart = joinDate && joinDate > monthStartDate ? joinDate : monthStartDate
-
-  function isWorkday(d: Date): boolean {
-    const dow = d.getUTCDay()
-    return dow >= 1 && dow <= 5
-  }
-
-  function countWorkdays(start: Date, end: Date): number {
-    let count = 0
-    const d = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), start.getUTCDate()))
-    const endDay = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), end.getUTCDate()))
-    while (d <= endDay) {
-      if (isWorkday(d)) count++
-      d.setUTCDate(d.getUTCDate() + 1)
-    }
-    return count
-  }
-
-  // Group month events by day
-  const eventsByDay = new Map<string, string[]>()
-  for (const e of monthEvents) {
-    const day = e.checkin_at.slice(0, 10)
-    if (!eventsByDay.has(day)) eventsByDay.set(day, [])
-    eventsByDay.get(day)!.push(e.event_type)
-  }
-
-  // Count WFO / WFH days (workdays only, from effective start)
-  const wfoDaySet = new Set<string>()
-  const wfhDaySet = new Set<string>()
-  for (const [day, types] of eventsByDay) {
-    const dayDate = new Date(day + 'T00:00:00.000Z')
-    if (dayDate < effectiveStart) continue
-    if (!isWorkday(dayDate)) continue
-    if (types.includes('office_checkin')) {
-      wfoDaySet.add(day)
-    } else {
-      wfhDaySet.add(day)
-    }
-  }
-
-  const wfoDays = wfoDaySet.size
-  const wfhDays = wfhDaySet.size
-  const todayDate = new Date(todayStr + 'T00:00:00.000Z')
-  const workdaysTotal = countWorkdays(effectiveStart, todayDate)
-  const leaveDays = Math.max(0, workdaysTotal - wfoDays - wfhDays)
 
   // Workspace names for the orgs strip
   const workspaceIds = memberships.map((m) => m.workspace_id)
   const workspaces = await getWorkspacesByIds(workspaceIds)
   const wsMap = new Map(workspaces.map((w) => [w.id, w]))
+  const primaryMembership = memberships[0] ?? null
+  const primaryWorkspace = primaryMembership ? wsMap.get(primaryMembership.workspace_id) : null
+
+  let wfoDays = 0
+  let wfhDays = 0
+  let leaveDays = 0
+
+  if (primaryMembership && primaryWorkspace) {
+    const timezone = primaryWorkspace.display_timezone
+    const todayLocal = todayInTz(timezone)
+    const [year, month] = todayLocal.split('-').map(Number)
+    const monthStartLocal = `${year}-${String(month).padStart(2, '0')}-01`
+    const joinedLocal = dateKeyInTimezone(primaryMembership.added_at, timezone)
+    const summaryStart = joinedLocal > monthStartLocal ? joinedLocal : monthStartLocal
+    const bounds = monthBoundsUtc(year, month, timezone)
+    const monthEvents = await queryWorkspaceEvents(primaryWorkspace.id, primaryWorkspace.plan, {
+      startDate: bounds.start,
+      endDate: bounds.end,
+      userId: user.userId,
+    })
+    const summary = summarizeAttendanceDays({
+      events: monthEvents,
+      startDate: summaryStart,
+      endDate: todayLocal,
+      timezone,
+      todayDate: todayLocal,
+    })
+
+    wfoDays = summary.officeDays
+    wfhDays = summary.remoteDays
+    leaveDays = summary.absentDays
+  }
 
   return (
     <div
