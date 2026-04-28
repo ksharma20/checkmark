@@ -1,20 +1,23 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
-import { MapPinOff } from 'lucide-react'
-import type { PresenceEvent } from '@/lib/db/queries/events'
-import { fmtTimeOnDate, fmtHours } from '@/lib/client/format-time'
-import { en } from '@/locales/en'
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
+import { MapPinOff } from "lucide-react";
+import type { PresenceEvent } from "@/lib/db/queries/events";
+import { fmtTimeOnDate, fmtHours } from "@/lib/client/format-time";
+import { en } from "@/locales/en";
 const STALE_NOTIF_KEY = en.constants.staleNotifKey;
 const STALE_NOTIF_EVENT_KEY = en.constants.staleNotifEventKey;
-const NOTIF_TAG_AUTO_CHECKOUT = en.constants.notifTagAutoCheckout
-import { startProgress, stopProgress } from '@/components/shared/TopProgressBar'
-import { collectDeviceInfo } from '@/lib/client/device-info'
+const NOTIF_TAG_AUTO_CHECKOUT = en.constants.notifTagAutoCheckout;
+import {
+  startProgress,
+  stopProgress,
+} from "@/components/shared/TopProgressBar";
+import { collectDeviceInfo } from "@/lib/client/device-info";
 
 const NOTIFICATION_SCHEDULE_H = [4, 8, 12, 16, 18, 20, 22];
-const NOTIFICATION_MESSAGES = en.notifications.stale
+const NOTIFICATION_MESSAGES = en.notifications.stale;
 const NOTIF_TAG_STALE = en.constants.notifTagStale;
 const AUTO_CHECKOUT_H = 12;
 
@@ -40,29 +43,29 @@ function playChime(): void {
 }
 
 async function subscribeToPush(): Promise<void> {
-  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
   try {
-    const reg = await navigator.serviceWorker.ready
-    let sub = await reg.pushManager.getSubscription()
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
     if (!sub) {
-      const keyRes = await fetch('/api/push/vapid-public-key')
-      if (!keyRes.ok) return
-      const { publicKey } = await keyRes.json() as { publicKey: string }
+      const keyRes = await fetch("/api/push/vapid-public-key");
+      if (!keyRes.ok) return;
+      const { publicKey } = (await keyRes.json()) as { publicKey: string };
       const rawKey = Uint8Array.from(
-        atob(publicKey.replace(/-/g, '+').replace(/_/g, '/')),
-        (c) => c.charCodeAt(0)
-      )
+        atob(publicKey.replace(/-/g, "+").replace(/_/g, "/")),
+        (c) => c.charCodeAt(0),
+      );
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: rawKey,
-      })
+      });
     }
-    const p256dhBuffer = sub.getKey('p256dh')
-    const authBuffer = sub.getKey('auth')
-    if (!p256dhBuffer || !authBuffer) return
-    await fetch('/api/push/subscribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const p256dhBuffer = sub.getKey("p256dh");
+    const authBuffer = sub.getKey("auth");
+    if (!p256dhBuffer || !authBuffer) return;
+    await fetch("/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         endpoint: sub.endpoint,
         keys: {
@@ -70,7 +73,7 @@ async function subscribeToPush(): Promise<void> {
           auth: btoa(String.fromCharCode(...new Uint8Array(authBuffer))),
         },
       }),
-    })
+    });
   } catch {
     // push not available — silent
   }
@@ -137,15 +140,17 @@ async function fireMidnightWarning(onFired?: () => void): Promise<void> {
 }
 
 interface CheckinButtonsProps {
-  activeEvent: PresenceEvent | null
-  name: string
+  activeEvent: PresenceEvent | null;
+  name: string;
+  allowRemote?: boolean;
 }
 
-type ToastType = 'success' | 'info' | 'error'
+type ToastType = "success" | "info" | "error";
 
 export default function CheckinButtons({
   activeEvent: initialActiveEvent,
   name,
+  allowRemote = false,
 }: CheckinButtonsProps) {
   const router = useRouter();
   const [state, setState] = useState<"checked_in" | "checked_out">(
@@ -157,7 +162,10 @@ export default function CheckinButtons({
     message: string;
     type: ToastType;
   } | null>(null);
-  const [locationAlert, setLocationAlert] = useState<{ title: string; message: string } | null>(null);
+  const [locationAlert, setLocationAlert] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const notifTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Listen for push messages from the service worker — show in-app toast + play chime
@@ -213,30 +221,38 @@ export default function CheckinButtons({
       }
     }
 
-    let sentSoFar = 0
+    let sentSoFar = 0;
     try {
-      sentSoFar = parseInt(localStorage.getItem(STALE_NOTIF_KEY) ?? '0', 10)
-    } catch { /* ignore */ }
+      sentSoFar = parseInt(localStorage.getItem(STALE_NOTIF_KEY) ?? "0", 10);
+    } catch {
+      /* ignore */
+    }
 
     NOTIFICATION_SCHEDULE_H.slice(sentSoFar).forEach((hour, i) => {
-      const fireAt = checkinMs + hour * 60 * 60 * 1000
-      const delay = fireAt - Date.now()
-      if (delay <= 0) return
-      const notifIndex = sentSoFar + i + 1
+      const fireAt = checkinMs + hour * 60 * 60 * 1000;
+      const delay = fireAt - Date.now();
+      if (delay <= 0) return;
+      const notifIndex = sentSoFar + i + 1;
       const timer = setTimeout(() => {
-        try { localStorage.setItem(STALE_NOTIF_KEY, String(notifIndex)) } catch { /* ignore */ }
-        fireStaleNotification(hour)
-      }, delay)
-      notifTimers.current.push(timer)
-    })
+        try {
+          localStorage.setItem(STALE_NOTIF_KEY, String(notifIndex));
+        } catch {
+          /* ignore */
+        }
+        fireStaleNotification(hour);
+      }, delay);
+      notifTimers.current.push(timer);
+    });
 
-    const autoCheckoutAt = checkinMs + AUTO_CHECKOUT_H * 60 * 60 * 1000
-    const autoDelay = autoCheckoutAt - Date.now()
+    const autoCheckoutAt = checkinMs + AUTO_CHECKOUT_H * 60 * 60 * 1000;
+    const autoDelay = autoCheckoutAt - Date.now();
     if (autoDelay > 0) {
-      const timer = setTimeout(() => { void triggerAutoCheckout() }, autoDelay)
-      notifTimers.current.push(timer)
+      const timer = setTimeout(() => {
+        void triggerAutoCheckout();
+      }, autoDelay);
+      notifTimers.current.push(timer);
     } else {
-      void triggerAutoCheckout()
+      void triggerAutoCheckout();
     }
 
     return () => {
@@ -351,11 +367,11 @@ export default function CheckinButtons({
       const data = await res.json();
 
       if (res.ok) {
-        setState('checked_in')
-        setActiveEvent(data.event)
-        await requestNotificationPermission()
-        showToast('Checked in!', 'success')
-        router.refresh()
+        setState("checked_in");
+        setActiveEvent(data.event);
+        await requestNotificationPermission();
+        showToast("Checked in!", "success");
+        router.refresh();
       } else if (res.status === 409) {
         setState("checked_in");
         showToast(data.error || "Already checked in.", "info");
@@ -364,7 +380,56 @@ export default function CheckinButtons({
         showToast(data.error || "Check-in failed", "error");
       }
     } catch {
-      showToast('Check-in failed. Please check your connection and try again.', 'error')
+      showToast(
+        "Check-in failed. Please check your connection and try again.",
+        "error",
+      );
+    } finally {
+      stopProgress();
+      setLoading(false);
+    }
+  }
+
+  async function handleRemoteCheckin() {
+    if (state !== "checked_out" || loading) return;
+    setLoading(true);
+    startProgress();
+    try {
+      const deviceInfo = await collectDeviceInfo().catch(() => null);
+
+      const res = await fetch("/api/checkin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gps_lat: null,
+          gps_lng: null,
+          gps_accuracy_m: null,
+          device_info: deviceInfo ? JSON.stringify(deviceInfo) : null,
+          device_timezone: deviceInfo?.timezone ?? null,
+          is_remote: true,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setState("checked_in");
+        setActiveEvent(data.event);
+        await requestNotificationPermission();
+        showToast("Checked in remotely!", "success");
+        router.refresh();
+      } else if (res.status === 409) {
+        setState("checked_in");
+        showToast(data.error || "Already checked in.", "info");
+        router.refresh();
+      } else {
+        showToast(data.error || "Check-in failed", "error");
+      }
+    } catch {
+      showToast(
+        "Check-in failed. Please check your connection and try again.",
+        "error",
+      );
     } finally {
       stopProgress();
       setLoading(false);
@@ -499,28 +564,48 @@ export default function CheckinButtons({
 
       {/* "I'm here" — only when CHECKED_OUT */}
       {!isCheckedIn && (
-        <>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "5px" }}>
           <button
             onClick={handleCheckin}
             disabled={loading}
             style={{
-              width: '100%',
-              height: '64px',
-              background: loading ? 'var(--brand-hover)' : 'var(--brand)',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '18px',
+              width: allowRemote ? "60%" : "100%",
+              height: "64px",
+              background: loading ? "var(--brand-hover)" : "var(--brand)",
+              color: "#fff",
+              border: "none",
+              borderRadius: "var(--radius-md)",
+              fontSize: "18px",
               fontWeight: 700,
-              fontFamily: 'Syne, sans-serif',
-              cursor: loading ? 'not-allowed' : 'pointer',
-              letterSpacing: '-0.2px',
+              fontFamily: "Syne, sans-serif",
+              cursor: loading ? "not-allowed" : "pointer",
+              letterSpacing: "-0.2px",
             }}
           >
-            {loading ? 'Getting location…' : "I'm here"}
+            {loading ? "Getting location…" : "I'm here"}
           </button>
-
-        </>
+          {allowRemote && (
+            <button
+              onClick={handleRemoteCheckin}
+              disabled={loading}
+              style={{
+                width: "40%",
+                height: "64px",
+                background: "var(--amber)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "var(--radius-md)",
+                fontSize: "18px",
+                fontWeight: 700,
+                fontFamily: "Syne, sans-serif",
+                cursor: loading ? "not-allowed" : "pointer",
+                letterSpacing: "-0.2px",
+              }}
+            >
+              Remote
+            </button>
+          )}
+        </div>
       )}
 
       {/* "I'm leaving" — only when CHECKED_IN */}
@@ -546,93 +631,102 @@ export default function CheckinButtons({
       )}
 
       {/* Location error alert */}
-      {locationAlert && createPortal(
-        <div
-          onClick={() => setLocationAlert(null)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            zIndex: 9999,
-            background: "rgba(13,27,42,0.55)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "20px",
-          }}
-        >
+      {locationAlert &&
+        createPortal(
           <div
-            onClick={(e) => e.stopPropagation()}
+            onClick={() => setLocationAlert(null)}
             style={{
-              background: "var(--surface-0)",
-              border: "1px solid var(--border)",
-              borderRadius: "20px",
-              padding: "28px 24px 24px",
-              width: "100%",
-              maxWidth: "420px",
-              margin: "0 16px",
-            }}
-          >
-            {/* Icon */}
-            <div style={{
-              width: "52px",
-              height: "52px",
-              borderRadius: "14px",
-              background: "color-mix(in srgb, var(--danger) 10%, transparent)",
-              border: "1px solid color-mix(in srgb, var(--danger) 20%, transparent)",
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              background: "rgba(13,27,42,0.55)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              marginBottom: "16px",
-            }}>
-              <MapPinOff size={24} stroke="var(--danger)" strokeWidth={2} />
-            </div>
-
-            {/* Title */}
-            <p style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "17px",
-              fontWeight: 700,
-              color: "var(--navy)",
-              marginBottom: "8px",
-              lineHeight: 1.3,
-            }}>
-              {locationAlert.title}
-            </p>
-
-            {/* Message */}
-            <p style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "14px",
-              color: "var(--text-secondary)",
-              lineHeight: 1.6,
-              marginBottom: "24px",
-            }}>
-              {locationAlert.message}
-            </p>
-
-            {/* Close button */}
-            <button
-              onClick={() => setLocationAlert(null)}
+              padding: "20px",
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
               style={{
+                background: "var(--surface-0)",
+                border: "1px solid var(--border)",
+                borderRadius: "20px",
+                padding: "28px 24px 24px",
                 width: "100%",
-                height: "48px",
-                background: "var(--navy)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "var(--radius-md)",
-                fontSize: "15px",
-                fontWeight: 600,
-                fontFamily: "DM Sans, sans-serif",
-                cursor: "pointer",
-                letterSpacing: "-0.1px",
+                maxWidth: "420px",
+                margin: "0 16px",
               }}
             >
-              Got it
-            </button>
-          </div>
-        </div>,
-        document.body
-      )}
+              {/* Icon */}
+              <div
+                style={{
+                  width: "52px",
+                  height: "52px",
+                  borderRadius: "14px",
+                  background:
+                    "color-mix(in srgb, var(--danger) 10%, transparent)",
+                  border:
+                    "1px solid color-mix(in srgb, var(--danger) 20%, transparent)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: "16px",
+                }}
+              >
+                <MapPinOff size={24} stroke="var(--danger)" strokeWidth={2} />
+              </div>
+
+              {/* Title */}
+              <p
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "17px",
+                  fontWeight: 700,
+                  color: "var(--navy)",
+                  marginBottom: "8px",
+                  lineHeight: 1.3,
+                }}
+              >
+                {locationAlert.title}
+              </p>
+
+              {/* Message */}
+              <p
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "14px",
+                  color: "var(--text-secondary)",
+                  lineHeight: 1.6,
+                  marginBottom: "24px",
+                }}
+              >
+                {locationAlert.message}
+              </p>
+
+              {/* Close button */}
+              <button
+                onClick={() => setLocationAlert(null)}
+                style={{
+                  width: "100%",
+                  height: "48px",
+                  background: "var(--navy)",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "15px",
+                  fontWeight: 600,
+                  fontFamily: "DM Sans, sans-serif",
+                  cursor: "pointer",
+                  letterSpacing: "-0.1px",
+                }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

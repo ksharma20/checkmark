@@ -74,7 +74,11 @@ export default async function MePage() {
       <TimezoneReporter />
 
       {/* Check-in / checkout buttons (includes status line + active indicator) */}
-      <CheckinButtons activeEvent={activeEvent} name={profile?.full_name ?? user.email.split('@')[0]} />
+      <CheckinButtons
+        activeEvent={activeEvent}
+        name={profile?.full_name ?? user.email.split('@')[0]}
+        allowRemote={!!primaryWorkspace?.allow_remote}
+      />
 
       {/* This month attendance summary */}
       <div

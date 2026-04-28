@@ -220,6 +220,9 @@ const ADDITIVE_MIGRATIONS = [
   // presence_events - scheduled midnight auto-checkout
   `ALTER TABLE presence_events ADD COLUMN scheduled_checkout_at TEXT`,
 
+  // workspaces - remote work toggle
+  `ALTER TABLE workspaces ADD COLUMN allow_remote INTEGER NOT NULL DEFAULT 0`,
+
   // push_subscriptions - Web Push
   `CREATE TABLE IF NOT EXISTS push_subscriptions (
   id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),

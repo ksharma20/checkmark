@@ -155,6 +155,7 @@ interface SignalRow {
 function WorkspaceSection({ slug }: { slug: string }) {
   const [name, setName] = useState('')
   const [tz, setTz] = useState('UTC')
+  const [allowRemote, setAllowRemote] = useState(false)
   const [fetching, setFetching] = useState(true)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
@@ -165,13 +166,12 @@ function WorkspaceSection({ slug }: { slug: string }) {
       .then((data) => {
         if (!data) return
         setName(data.name ?? '')
-        // Use stored timezone if it's in our list; otherwise keep UTC
         if (data.display_timezone && TIMEZONES.includes(data.display_timezone)) {
           setTz(data.display_timezone)
         } else if (data.display_timezone) {
-          // Add it dynamically so it's selectable even if not in the static list
           setTz(data.display_timezone)
         }
+        setAllowRemote(!!data.allow_remote)
       })
       .finally(() => setFetching(false))
   }, [slug])
@@ -183,7 +183,7 @@ function WorkspaceSection({ slug }: { slug: string }) {
       const res = await fetch(`/api/ws/${slug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || undefined, displayTimezone: tz }),
+        body: JSON.stringify({ name: name.trim() || undefined, displayTimezone: tz, allowRemote }),
       })
       setStatus(res.ok ? { text: 'Settings saved', ok: true } : { text: 'Save failed', ok: false })
     } finally {
@@ -230,6 +230,57 @@ function WorkspaceSection({ slug }: { slug: string }) {
       >
         The Today dashboard uses this timezone to determine the current day.
       </p>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '12px 14px',
+          border: '1px solid var(--border)',
+          borderRadius: 'var(--radius-md)',
+          background: 'var(--surface-1)',
+          marginBottom: '14px',
+        }}
+      >
+        <div>
+          <p style={{ fontSize: '14px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-primary)', fontWeight: 500, margin: 0 }}>
+            Allow remote check-ins
+          </p>
+          <p style={{ fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+            Count WFH days in attendance reports
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={allowRemote}
+          onClick={() => setAllowRemote((v) => !v)}
+          style={{
+            width: '44px',
+            height: '24px',
+            borderRadius: '12px',
+            border: 'none',
+            background: allowRemote ? 'var(--brand)' : 'var(--border)',
+            cursor: 'pointer',
+            position: 'relative',
+            flexShrink: 0,
+            transition: 'background 0.15s',
+          }}
+        >
+          <span
+            style={{
+              position: 'absolute',
+              top: '3px',
+              left: allowRemote ? '23px' : '3px',
+              width: '18px',
+              height: '18px',
+              borderRadius: '50%',
+              background: '#fff',
+              transition: 'left 0.15s',
+            }}
+          />
+        </button>
+      </div>
       <PrimaryBtn onClick={save} loading={loading}>Save settings</PrimaryBtn>
       <StatusLine msg={status} />
         </>

@@ -10,6 +10,7 @@ export interface Workspace {
   verification_token: string | null
   verification_token_expires_at: string | null
   archived_at: string | null
+  allow_remote: number
   created_at: string
   updated_at: string
 }
@@ -91,7 +92,7 @@ export async function getWorkspaceById(id: string): Promise<Workspace | null> {
 
 export async function updateWorkspace(
   workspaceId: string,
-  updates: Partial<Pick<Workspace, 'name' | 'display_timezone'>>
+  updates: Partial<Pick<Workspace, 'name' | 'display_timezone' | 'allow_remote'>>
 ): Promise<void> {
   const fields = Object.keys(updates).map((k) => `${k} = ?`)
   const values = Object.values(updates)

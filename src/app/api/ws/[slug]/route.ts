@@ -13,6 +13,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     name: ctx.workspace.name,
     display_timezone: ctx.workspace.display_timezone,
     archived_at: ctx.workspace.archived_at,
+    allow_remote: !!ctx.workspace.allow_remote,
   })
 }
 
@@ -21,14 +22,15 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   const ctx = await requireWsAdmin(request, slug)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
-  let body: { name?: string; displayTimezone?: string }
+  let body: { name?: string; displayTimezone?: string; allowRemote?: boolean }
   try { body = await request.json() } catch {
     return NextResponse.json({ error: 'Invalid body', code: 'INVALID_BODY' }, { status: 400 })
   }
 
-  const updates: { name?: string; display_timezone?: string } = {}
+  const updates: { name?: string; display_timezone?: string; allow_remote?: number } = {}
   if (body.name?.trim()) updates.name = body.name.trim()
   if (body.displayTimezone?.trim()) updates.display_timezone = body.displayTimezone.trim()
+  if (body.allowRemote !== undefined) updates.allow_remote = body.allowRemote ? 1 : 0
 
   if (Object.keys(updates).length > 0) {
     await updateWorkspace(ctx.workspace.id, updates)
