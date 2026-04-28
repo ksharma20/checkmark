@@ -9,7 +9,7 @@ function getResend(): Resend | null {
   return resend
 }
 
-// Allow RESEND_FROM_EMAIL env override — needed when using Resend's shared
+// Allow RESEND_FROM_EMAIL env override - needed when using Resend's shared
 // domain (onboarding@resend.dev) before a custom domain is verified.
 const FROM = process.env.RESEND_FROM_EMAIL
   ? `${en.brand.name} <${process.env.RESEND_FROM_EMAIL}>`
@@ -19,7 +19,7 @@ export async function sendOtpEmail(email: string, code: string): Promise<void> {
   const client = getResend()
 
   if (!client) {
-    // Dev fallback — print to console so the flow still works without Resend
+    // Dev fallback - print to console so the flow still works without Resend
     console.log(`\n[DEV] OTP for ${email}: ${code}\n`)
     return
   }

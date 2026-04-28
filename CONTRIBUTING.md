@@ -76,7 +76,7 @@ git push origin fix/issue-name
 
 ## After your PR is merged
 
-We use **squash merge** — your commits are squashed into one commit on `main`. This means your branch history will diverge from `main` after merge. That's expected.
+We use **squash merge** - your commits are squashed into one commit on `main`. This means your branch history will diverge from `main` after merge. That's expected.
 
 Sync your fork before starting the next contribution:
 
@@ -89,7 +89,7 @@ git push origin main
 
 Then create a fresh branch for the next issue.
 
-> `git reset --hard upstream/main` is safe here because `main` should only ever be used as your sync target — all work goes in feature branches.
+> `git reset --hard upstream/main` is safe here because `main` should only ever be used as your sync target - all work goes in feature branches.
 
 ---
 
@@ -98,4 +98,4 @@ Then create a fresh branch for the next issue.
 - Start with `good first issue`
 - Keep PRs small and focused on one issue
 - Ask questions in the issue thread if stuck
-- Never commit directly to `main` — always use a feature branch
+- Never commit directly to `main` - always use a feature branch

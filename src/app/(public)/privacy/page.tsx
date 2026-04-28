@@ -3,7 +3,7 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — checkmark",
+  title: "Privacy Policy - checkmark",
   description: "How checkmark collects, uses, and protects your presence data.",
 };
 
@@ -49,7 +49,7 @@ export default function PrivacyPage() {
         >
           checkmark is a presence intelligence platform. This policy explains what
           data we collect, why we collect it, who can see it, and your rights
-          over it. We have written it in plain language — not legal boilerplate.
+          over it. We have written it in plain language - not legal boilerplate.
         </p>
 
         <h2 style={S.h2}>1. What data we collect</h2>
@@ -149,7 +149,7 @@ export default function PrivacyPage() {
 
         <h2 style={S.h2}>2. Who can see your data</h2>
         <p style={S.body}>
-          <strong style={{ color: "var(--navy)" }}>You</strong> — always. Your
+          <strong style={{ color: "var(--navy)" }}>You</strong> - always. Your
           full presence history is visible only to you at{" "}
           <code
             style={{
@@ -181,12 +181,12 @@ export default function PrivacyPage() {
           page.
         </p>
         <p style={S.body}>
-          <strong style={{ color: "var(--navy)" }}>checkmark staff</strong> — we do
+          <strong style={{ color: "var(--navy)" }}>checkmark staff</strong> - we do
           not access individual user data unless you explicitly ask us for
           support, and only for the purpose of resolving your issue.
         </p>
         <p style={S.body}>
-          <strong style={{ color: "var(--navy)" }}>No one else</strong> — we do
+          <strong style={{ color: "var(--navy)" }}>No one else</strong> - we do
           not share, sell, or rent your data to any third party. We do not use
           it for advertising.
         </p>

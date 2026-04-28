@@ -1,7 +1,7 @@
 /**
  * Server-only: reverse geocodes GPS coordinates to a human-readable location label.
  * Called once at check-in time and stored in presence_events.location_label.
- * Never called from client components — avoids 429s from repeated browser-side requests.
+ * Never called from client components - avoids 429s from repeated browser-side requests.
  */
 import { en } from '@/locales/en'
 
@@ -23,17 +23,17 @@ export async function reverseGeocodeLabel(lat: number, lng: number): Promise<str
 
     const a = data.address
 
-    // Tier 1 — named place (university, park, mall, hospital, etc.)
+    // Tier 1 - named place (university, park, mall, hospital, etc.)
     const place = a.amenity ?? a.leisure ?? a.tourism ?? a.shop ?? a.office ?? a.building ?? null
 
-    // Tier 2 — street-level
+    // Tier 2 - street-level
     const street = a.road ?? a.pedestrian ?? a.footway ?? null
     const houseNum = a.house_number ?? null
 
-    // Tier 3 — area / locality
+    // Tier 3 - area / locality
     const locality = a.suburb ?? a.neighbourhood ?? a.quarter ?? a.village ?? a.town ?? a.city_district ?? null
 
-    // Tier 4 — city
+    // Tier 4 - city
     const city = a.city ?? a.county ?? a.state_district ?? a.state ?? null
 
     let primary: string

@@ -1,10 +1,10 @@
-# CheckMark — CLAUDE.md
+# CheckMark - CLAUDE.md
 
 ## Product Overview
 
 CheckMark is a **presence intelligence platform**. Two PWA surfaces:
-- `/me/*` — mobile-first, individuals record their own presence
-- `/ws/:slug/*` — desktop-first, org admins query presence data
+- `/me/*` - mobile-first, individuals record their own presence
+- `/ws/:slug/*` - desktop-first, org admins query presence data
 
 **Core USP:** Multi-signal presence verification (AND, not OR). When a workspace has GPS + WiFi + IP signals configured, ALL must match for a check-in to count as verified. This makes faking presence extremely difficult.
 
@@ -13,7 +13,7 @@ CheckMark is a **presence intelligence platform**. Two PWA surfaces:
 ## Non-Negotiable Principles
 
 ### 1. No raw SQL in routes
-All DB access goes through `lib/db/queries/`. Route handlers call query functions — never `db.query()` directly.
+All DB access goes through `lib/db/queries/`. Route handlers call query functions - never `db.query()` directly.
 
 ### 2. Server validates everything
 The client sends data. The server decides truth. Never trust:
@@ -32,7 +32,7 @@ Every query that touches workspace data must include `AND workspace_id = ?`. No 
 
 ---
 
-## Signal Matching — Core Logic
+## Signal Matching - Core Logic
 
 **AND semantics, not OR.** If a workspace has configured multiple signal types, an event is considered "verified" only if it matches ALL configured signal types.
 
@@ -53,7 +53,7 @@ Admin overrides (`admin_overrides` table) bypass signal matching entirely. Never
 
 ### Trust signals (collected on both check-in AND checkout)
 1. GPS (lat/lng + accuracy)
-2. WiFi SSID (bcrypt-hashed — never store raw SSID)
+2. WiFi SSID (bcrypt-hashed - never store raw SSID)
 3. IP geolocation (ip-api.com)
 4. Device info + timezone
 
@@ -62,7 +62,7 @@ Admin overrides (`admin_overrides` table) bypass signal matching entirely. Never
 ## Database Patterns
 
 ### DB abstraction
-Always use `lib/db/index.ts` — never import `better-sqlite3` or `@libsql/client` directly.
+Always use `lib/db/index.ts` - never import `better-sqlite3` or `@libsql/client` directly.
 
 ```ts
 import { db } from '@/lib/db'
@@ -70,17 +70,17 @@ import { db } from '@/lib/db'
 ```
 
 ### Query file location
-`lib/db/queries/<domain>.ts` — one file per domain:
-- `users.ts` — user accounts
-- `events.ts` — presence events
-- `workspaces.ts` — workspaces + members + overrides
-- `signals.ts` — workspace signal configs
-- `stats.ts` — user stats
-- `tokens.ts` — API tokens (separate from users.ts)
-- `push.ts` — push subscriptions
+`lib/db/queries/<domain>.ts` - one file per domain:
+- `users.ts` - user accounts
+- `events.ts` - presence events
+- `workspaces.ts` - workspaces + members + overrides
+- `signals.ts` - workspace signal configs
+- `stats.ts` - user stats
+- `tokens.ts` - API tokens (separate from users.ts)
+- `push.ts` - push subscriptions
 
 ### Migration
-`scripts/migrate.js` — idempotent. `ALTER TABLE` wrapped in try/catch. Run: `node scripts/migrate.js`.
+`scripts/migrate.js` - idempotent. `ALTER TABLE` wrapped in try/catch. Run: `node scripts/migrate.js`.
 
 ---
 
@@ -91,15 +91,15 @@ import { db } from '@/lib/db'
 | `cm_session` | JWT session (httpOnly, SameSite=Lax, secure in prod) | 30 days |
 | `cm_otp_ok` | OTP verified proof (httpOnly) | 15 min |
 
-> **SameSite=Lax** is intentional — `Strict` causes PWA session loss on iOS/Android cold-open (the PWA→browser navigation is treated as cross-origin). `Lax` preserves sessions while still blocking cross-site POST requests.
+> **SameSite=Lax** is intentional - `Strict` causes PWA session loss on iOS/Android cold-open (the PWA→browser navigation is treated as cross-origin). `Lax` preserves sessions while still blocking cross-site POST requests.
 
-- JWT carries `jti` (UUID) for revocation — checked on every server-side request via `getSessionFromCookies()`
-- Edge middleware (`proxy.ts`) does signature-only verification — fast, no DB hit
+- JWT carries `jti` (UUID) for revocation - checked on every server-side request via `getSessionFromCookies()`
+- Edge middleware (`proxy.ts`) does signature-only verification - fast, no DB hit
 - Node.js route handlers call `getSessionFromCookies()` which checks `revoked_tokens` table
 - `getServerUser()` reads `x-user-id` / `x-user-email` headers set by proxy
 
 Password: bcryptjs cost 12, minimum 8 chars. Never store plaintext.
-WiFi SSID: bcryptjs hash — same library, raw SSID never persisted.
+WiFi SSID: bcryptjs hash - same library, raw SSID never persisted.
 
 ---
 
@@ -114,12 +114,12 @@ WiFi SSID: bcryptjs hash — same library, raw SSID never persisted.
 ### Server vs Client components
 - Default: Server Components
 - Client only when: interactive state, browser APIs (GPS, Notification), usePathname/useParams
-- Never put business logic in Client Components — fetch from API routes instead
+- Never put business logic in Client Components - fetch from API routes instead
 
 ### Layouts
-- `src/app/(public)/layout.tsx` — passthrough, public pages
-- `src/app/me/layout.tsx` — user PWA shell (header + bottom nav)
-- `src/app/ws/[slug]/layout.tsx` — org PWA shell (header + tab nav)
+- `src/app/(public)/layout.tsx` - passthrough, public pages
+- `src/app/me/layout.tsx` - user PWA shell (header + bottom nav)
+- `src/app/ws/[slug]/layout.tsx` - org PWA shell (header + tab nav)
 
 ---
 
@@ -142,11 +142,11 @@ CSS variables in `src/app/globals.css`:
 Fonts: Syne (headings), DM Sans (body), JetBrains Mono (code/timestamps).
 
 Rules:
-- No drop shadows — borders only
-- No gradients — flat fills
+- No drop shadows - borders only
+- No gradients - flat fills
 - Minimum touch target: 44px height
 - Skeleton loaders for async, never spinners
-- Tailwind CSS v4, utility-only — no component libraries
+- Tailwind CSS v4, utility-only - no component libraries
 
 ---
 
@@ -158,21 +158,21 @@ Rules:
 | `starter` | unlimited | 12 months | 1 | Yes |
 | `growth` | unlimited | 7 years | 5 | Yes |
 
-Enforce in `queryWorkspaceEvents()` — plan gate applied before signal matching.
+Enforce in `queryWorkspaceEvents()` - plan gate applied before signal matching.
 
 ---
 
 ## Key Invariants
 
-1. **User ID never from client** — always from `x-user-id` header (proxy-set from JWT)
-2. **Workspace scoping** — slug → workspace.id via `requireWsAdmin()`, then all queries use workspace.id
-3. **OTP registration** — `cm_otp_ok` cookie must be present + valid before account creation
-4. **Consent validation** — 3 checks: status=pending_consent, token not expired, logged-in email matches invited email
-5. **Location labels** — set asynchronously post-check-in via Nominatim. May be NULL — that's acceptable, not a bug
-6. **Checkout signals** — GPS/WiFi/IP collected at checkout too. Both check-in AND checkout signals stored
-7. **Admin overrides** — stored in `admin_overrides` table, never modify original `presence_events` row
-8. **Rate limiting** — `rate_limit_log` table: IP-keyed for login (10 attempts per 15 min), user-keyed for checkin (10 per hr). Use `getRateLimitCount` + `recordRateLimitHit` from `lib/db/queries/users.ts`.
-9. **API token O(1) lookup** — `token_prefix` column stores first 8 chars of the raw token. Always use prefix lookup in `POST /api/v1/checkin`. Never skip it.
+1. **User ID never from client** - always from `x-user-id` header (proxy-set from JWT)
+2. **Workspace scoping** - slug → workspace.id via `requireWsAdmin()`, then all queries use workspace.id
+3. **OTP registration** - `cm_otp_ok` cookie must be present + valid before account creation
+4. **Consent validation** - 3 checks: status=pending_consent, token not expired, logged-in email matches invited email
+5. **Location labels** - set asynchronously post-check-in via Nominatim. May be NULL - that's acceptable, not a bug
+6. **Checkout signals** - GPS/WiFi/IP collected at checkout too. Both check-in AND checkout signals stored
+7. **Admin overrides** - stored in `admin_overrides` table, never modify original `presence_events` row
+8. **Rate limiting** - `rate_limit_log` table: IP-keyed for login (10 attempts per 15 min), user-keyed for checkin (10 per hr). Use `getRateLimitCount` + `recordRateLimitHit` from `lib/db/queries/users.ts`.
+9. **API token O(1) lookup** - `token_prefix` column stores first 8 chars of the raw token. Always use prefix lookup in `POST /api/v1/checkin`. Never skip it.
 
 ---
 
@@ -185,7 +185,7 @@ Enforce in `queryWorkspaceEvents()` — plan gate applied before signal matching
 - Never skip `requireWsAdmin()` for workspace admin routes
 - Never add drop shadows or gradients to UI
 - Never trust `otpVerified: true` from client
-- Never use spinners — use skeleton loaders
+- Never use spinners - use skeleton loaders
 
 ---
 

@@ -119,7 +119,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
                   style={{ transition: 'fill 0.15s' }}
                 />
 
-                {/* Hover tooltip — always within SVG bounds */}
+                {/* Hover tooltip - always within SVG bounds */}
                 {isHovered && val > 0 && (
                   <g>
                     <rect
@@ -144,7 +144,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
                   </g>
                 )}
 
-                {/* X-axis label — skip some for dense charts */}
+                {/* X-axis label - skip some for dense charts */}
                 {(buckets.length <= 14 || i % Math.ceil(buckets.length / 12) === 0) && (
                   <text
                     x={x + barW / 2}

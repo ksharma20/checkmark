@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid credentials', code: 'INVALID_CREDENTIALS' }, { status: 401 })
   }
 
-  // Reactivate — clear deleted_at
+  // Reactivate - clear deleted_at
   await reactivateUser(user.id)
 
   const token = await createJwt(user.id, user.email)

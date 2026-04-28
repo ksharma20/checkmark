@@ -6,7 +6,7 @@ import TopProgressBar from "@/components/shared/TopProgressBar";
 import RippleProvider from "@/components/RippleProvider";
 
 export const metadata: Metadata = {
-  title: `${en.brand.name} — ${en.brand.tagline}`,
+  title: `${en.brand.name} - ${en.brand.tagline}`,
   description: en.brand.taglineLong,
   manifest: "/manifest.webmanifest",
   appleWebApp: {

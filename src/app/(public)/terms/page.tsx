@@ -3,7 +3,7 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "Terms of Service — checkmark",
+  title: "Terms of Service - checkmark",
   description:
     "Terms governing your use of checkmark, the presence intelligence platform.",
 };
@@ -46,7 +46,7 @@ export default function TermsPage() {
 
         <h2 style={S.h2}>1. Who these terms apply to</h2>
         <p style={S.body}>
-          These terms apply to all users of checkmark — individuals using the
+          These terms apply to all users of checkmark - individuals using the
           personal timeline feature and organisation admins using workspace
           features. &quot;You&quot; refers to the person or entity using checkmark.
         </p>
@@ -61,7 +61,7 @@ export default function TermsPage() {
         <p style={S.body}>
           You must provide accurate information when registering. Using a work
           email address for a personal account, or a personal email for an
-          organisation account, does not violate these terms — but may affect
+          organisation account, does not violate these terms - but may affect
           how your data interacts with workspace domain verification.
         </p>
 

@@ -443,7 +443,7 @@ function DeactivatedStep({
         color: 'var(--text-secondary)',
         lineHeight: 1.5,
       }}>
-        This account was deactivated. Your data is intact — enter your password to reactivate and sign in.
+        This account was deactivated. Your data is intact - enter your password to reactivate and sign in.
       </div>
       <FieldGroup label="Password">
         <Input
@@ -1316,7 +1316,7 @@ function LoginFlow() {
         overflow: 'hidden',
       }}
     >
-      {/* Subtle radial glow — matches landing page */}
+      {/* Subtle radial glow - matches landing page */}
       <div style={{
         pointerEvents: 'none',
         position: 'absolute',
@@ -1328,7 +1328,7 @@ function LoginFlow() {
         background: 'radial-gradient(ellipse at center, rgba(27,77,255,0.09) 0%, transparent 70%)',
         zIndex: 0,
       }} />
-      {/* Grid pattern — matches landing page */}
+      {/* Grid pattern - matches landing page */}
       <div style={{
         pointerEvents: 'none',
         position: 'absolute',

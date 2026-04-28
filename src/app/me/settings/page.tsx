@@ -420,7 +420,7 @@ function TokensSection() {
               marginBottom: '6px',
             }}
           >
-            Copy this token now — it won&apos;t be shown again.
+            Copy this token now - it won&apos;t be shown again.
           </p>
           <code
             style={{
@@ -520,10 +520,10 @@ function OrgSection() {
       .catch(() => setActiveWs([]))
   }, [])
 
-  // Still loading — render nothing to avoid flash
+  // Still loading - render nothing to avoid flash
   if (activeWs === null) return null
 
-  // Has active workspace — don't show "Switch" prompt
+  // Has active workspace - don't show "Switch" prompt
   if (activeWs.length > 0) return null
 
   return (
@@ -641,7 +641,7 @@ function DeactivateCard() {
           margin: "0 0 12px",
         }}
       >
-        Your check-ins and data are preserved — your account becomes invisible
+        Your check-ins and data are preserved - your account becomes invisible
         to all workspaces. You can reactivate anytime by logging back in.
       </p>
 
@@ -700,7 +700,7 @@ function DeactivateCard() {
                     textDecoration: "none",
                   }}
                 >
-                  {ws.name} — promote admin
+                  {ws.name} - promote admin
                 </a>
                 <span
                   style={{
@@ -809,7 +809,7 @@ function DangerSection() {
 
   return (
     <div style={{ marginBottom: "16px" }}>
-      {/* Accordion trigger — intentionally quiet */}
+      {/* Accordion trigger - intentionally quiet */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

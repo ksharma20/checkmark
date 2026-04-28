@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { MapPinOff } from 'lucide-react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
 import { fmtTimeOnDate, fmtHours } from '@/lib/client/format-time'
 import { en } from '@/locales/en'
@@ -155,6 +157,7 @@ export default function CheckinButtons({
     message: string;
     type: ToastType;
   } | null>(null);
+  const [locationAlert, setLocationAlert] = useState<{ title: string; message: string } | null>(null);
   const notifTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   // Listen for push messages from the service worker — show in-app toast + play chime
@@ -304,7 +307,31 @@ export default function CheckinButtons({
     startProgress();
     try {
       const gps = await collectGps();
-      const gpsCoords = gps.ok ? gps : null;
+      if (!gps.ok) {
+        setLocationAlert(
+          gps.reason === "denied"
+            ? {
+                title: "Location access denied",
+                message:
+                  "CheckMark needs your location to verify check-in. Please enable location permission in your browser settings and try again.",
+              }
+            : gps.reason === "timeout"
+              ? {
+                  title: "Location request timed out",
+                  message:
+                    "Could not get your location in time. Make sure you're not in airplane mode, then try again.",
+                }
+              : {
+                  title: "Location unavailable",
+                  message:
+                    "Your device could not determine your location. Check that location services are enabled and try again.",
+                },
+        );
+        setLoading(false);
+        stopProgress();
+        return;
+      }
+      const gpsCoords = gps;
       const deviceInfo = await collectDeviceInfo().catch(() => null);
 
       const res = await fetch("/api/checkin", {
@@ -516,6 +543,95 @@ export default function CheckinButtons({
         >
           {loading ? "Getting location…" : "I'm leaving"}
         </button>
+      )}
+
+      {/* Location error alert */}
+      {locationAlert && createPortal(
+        <div
+          onClick={() => setLocationAlert(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            background: "rgba(13,27,42,0.55)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--surface-0)",
+              border: "1px solid var(--border)",
+              borderRadius: "20px",
+              padding: "28px 24px 24px",
+              width: "100%",
+              maxWidth: "420px",
+              margin: "0 16px",
+            }}
+          >
+            {/* Icon */}
+            <div style={{
+              width: "52px",
+              height: "52px",
+              borderRadius: "14px",
+              background: "color-mix(in srgb, var(--danger) 10%, transparent)",
+              border: "1px solid color-mix(in srgb, var(--danger) 20%, transparent)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: "16px",
+            }}>
+              <MapPinOff size={24} stroke="var(--danger)" strokeWidth={2} />
+            </div>
+
+            {/* Title */}
+            <p style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "17px",
+              fontWeight: 700,
+              color: "var(--navy)",
+              marginBottom: "8px",
+              lineHeight: 1.3,
+            }}>
+              {locationAlert.title}
+            </p>
+
+            {/* Message */}
+            <p style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "14px",
+              color: "var(--text-secondary)",
+              lineHeight: 1.6,
+              marginBottom: "24px",
+            }}>
+              {locationAlert.message}
+            </p>
+
+            {/* Close button */}
+            <button
+              onClick={() => setLocationAlert(null)}
+              style={{
+                width: "100%",
+                height: "48px",
+                background: "var(--navy)",
+                color: "#fff",
+                border: "none",
+                borderRadius: "var(--radius-md)",
+                fontSize: "15px",
+                fontWeight: 600,
+                fontFamily: "DM Sans, sans-serif",
+                cursor: "pointer",
+                letterSpacing: "-0.1px",
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

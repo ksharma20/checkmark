@@ -21,11 +21,11 @@ interface Props { params: Promise<{ slug: string }> }
 /**
  * POST /api/ws/[slug]/transfer-ownership
  *
- * Step 1 — { action: 'request', targetMemberId }
+ * Step 1 - { action: 'request', targetMemberId }
  *   targetMemberId is the workspace_members.id (record ID, not user_id).
  *   Sends OTP to the current admin's email.
  *
- * Step 2 — { action: 'confirm', targetMemberId, code }
+ * Step 2 - { action: 'confirm', targetMemberId, code }
  *   Validates OTP, swaps roles (admin → member, target → admin).
  */
 export async function POST(request: NextRequest, { params }: Props) {

@@ -92,7 +92,7 @@ export default async function MePage() {
         padding: '20px 16px',
       }}
     >
-      {/* Silent timezone reporter — keeps DB in sync with browser timezone */}
+      {/* Silent timezone reporter - keeps DB in sync with browser timezone */}
       <TimezoneReporter />
 
       {/* Check-in / checkout buttons (includes status line + active indicator) */}
@@ -243,7 +243,7 @@ export default async function MePage() {
         </section>
       )}
 
-      {/* Empty state — no activity yet */}
+      {/* Empty state - no activity yet */}
       {todayEvents.length === 0 && memberships.length === 0 && (
         <div
           style={{

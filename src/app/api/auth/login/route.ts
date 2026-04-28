@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     return apiError('Invalid credentials', 'INVALID_CREDENTIALS', 401)
   }
 
-  // Deactivated account — password is correct but account is soft-deleted
+  // Deactivated account - password is correct but account is soft-deleted
   if (user.deleted_at !== null) {
     return NextResponse.json(
       { error: 'Account deactivated', code: 'ACCOUNT_DEACTIVATED', email },

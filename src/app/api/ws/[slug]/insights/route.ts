@@ -97,7 +97,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     startDate = new Date(Date.UTC(ly, lm - 1, ld - 1)).toISOString().slice(0, 10) + 'T00:00:00Z'
     endDate   = new Date(Date.UTC(ly, lm - 1, ld + 1)).toISOString().slice(0, 10) + 'T23:59:59Z'
 
-    // Only generate buckets up to current local hour — no future zero-count buckets
+    // Only generate buckets up to current local hour - no future zero-count buckets
     // so the graph stops at now instead of dropping to zero for hours that haven't happened
     for (let h = 0; h <= nowLocalH; h++) {
       const label = h === 0 ? '12 AM' : h < 12 ? `${h} AM` : h === 12 ? '12 PM' : `${h - 12} PM`
@@ -113,16 +113,16 @@ export async function GET(request: NextRequest, { params }: Props) {
           const cinDate = localDateStr(cinDt)
           const cinH = localHour(cinDt)
 
-          // Checked in after this bucket — not present yet
+          // Checked in after this bucket - not present yet
           if (cinDate > localToday || (cinDate === localToday && cinH > bucketH)) return false
 
           // Current hour: only count people still checked in right now
           if (bucketH === nowLocalH) return !coutDt
 
-          // Past hours: still active (no checkout) — present through now
+          // Past hours: still active (no checkout) - present through now
           if (!coutDt) return true
 
-          // Past hours: checked out — present only if checkout was in this hour or later
+          // Past hours: checked out - present only if checkout was in this hour or later
           const coutDate = localDateStr(coutDt)
           const coutH = localHour(coutDt)
           return coutDate > localToday || (coutDate === localToday && coutH >= bucketH)
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       cur.setUTCMonth(cur.getUTCMonth() + 1)
     }
   } else {
-    // year — 12 monthly buckets
+    // year - 12 monthly buckets
     const year = now.getUTCFullYear()
     startDate = `${year}-01-01T00:00:00Z`
     endDate = `${year}-12-31T23:59:59Z`
@@ -223,7 +223,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     endDate,
   })
 
-  // Only count events that are truly "in office" — same logic as the dashboard tile:
+  // Only count events that are truly "in office" - same logic as the dashboard tile:
   // exclude remote_checkin and any office_checkin that failed signal matching (unverified)
   const events = allEvents.filter(
     (ev) => ev.event_type !== 'remote_checkin' && (ev.matched_by === 'verified' || ev.matched_by === 'override')

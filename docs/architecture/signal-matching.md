@@ -1,4 +1,4 @@
-# Signal Matching — The Core USP
+# Signal Matching - The Core USP
 
 > This is the heart of CheckMark. Read this before touching `lib/signals.ts`, any dashboard route, or analytics.
 
@@ -22,13 +22,13 @@ CheckMark's answer: **require ALL configured signals to match simultaneously**.
 | **GPS** | `navigator.geolocation` on check-in + checkout | Haversine distance ≤ configured radius (default 300m) |
 | **WiFi** | `navigator.connection?.ssid` (Chrome/Android) | bcrypt.compare(event.wifi_ssid, config.wifi_ssid_hash) |
 | **IP** | Server-side from request headers | Haversine distance ≤ configured proximity (default 500m) |
-| **Device** | User-agent, timezone | Trust score only — not a signal type for AND matching |
+| **Device** | User-agent, timezone | Trust score only - not a signal type for AND matching |
 
 Signals are collected on **both check-in AND checkout**.
 
 ---
 
-## 3. AND Semantics — The Rule
+## 3. AND Semantics - The Rule
 
 ```mermaid
 flowchart TD
@@ -75,13 +75,13 @@ flowchart TD
 | `verified` | All configured signal types matched | ✅ Yes |
 | `partial` | Some but not all configured types matched | ❌ No |
 | `none` | No signals matched (or config-light mode) | ❌ No (config-light: ✅) |
-| `override` | Admin override applied — bypass matching | ✅ Yes |
+| `override` | Admin override applied - bypass matching | ✅ Yes |
 
-**Important:** `partial` is NOT the same as `none`. It means the event happened — the signals just didn't all align. This is surfaced to admins so they can investigate (e.g. user checked in from home and happened to be on office VPN → IP matched but GPS didn't).
+**Important:** `partial` is NOT the same as `none`. It means the event happened - the signals just didn't all align. This is surfaced to admins so they can investigate (e.g. user checked in from home and happened to be on office VPN → IP matched but GPS didn't).
 
 ---
 
-## 5. queryWorkspaceEvents() — The Core Function
+## 5. queryWorkspaceEvents() - The Core Function
 
 File: `src/lib/signals.ts`
 
@@ -153,7 +153,7 @@ export function eventCountsAsOfficePresence(event: PresenceEventWithMatch): bool
 }
 ```
 
-This prevents a scenario where someone checks in at the office but physically leaves (checkout GPS far from check-in GPS) — those hours don't count as verified office time.
+This prevents a scenario where someone checks in at the office but physically leaves (checkout GPS far from check-in GPS) - those hours don't count as verified office time.
 
 ---
 
@@ -201,17 +201,17 @@ Admin adds WiFi: "OfficeNetwork"
 User checks in with SSID: "OfficeNetwork"
   → bcrypt.compare("OfficeNetwork", stored_hash) → true/false
   → event.wifi_ssid stored as-is in presence_events (the raw SSID from user device)
-  → but this is the user's own data — they already know their own SSID
+  → but this is the user's own data - they already know their own SSID
 ```
 
-The workspace config never reveals what SSID the admin configured — only that the check-in matched it.
+The workspace config never reveals what SSID the admin configured - only that the check-in matched it.
 
 ---
 
 ## 10. Performance Notes
 
-- **GPS + IP:** O(signals × events) Haversine — pure math, fast
-- **WiFi:** O(wifi_configs × events) bcrypt comparisons — ~300ms each at cost 12
+- **GPS + IP:** O(signals × events) Haversine - pure math, fast
+- **WiFi:** O(wifi_configs × events) bcrypt comparisons - ~300ms each at cost 12
   - Bounded by `plan.maxLocations`: free/starter=1, growth=5
   - Acceptable at current scale
   - Future optimisation: replace bcrypt with HMAC-SHA256 for O(1) comparison at query time

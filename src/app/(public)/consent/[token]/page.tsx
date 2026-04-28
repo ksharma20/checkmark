@@ -88,7 +88,7 @@ export default async function ConsentPage({ params, searchParams }: Props) {
     )
   }
 
-  // Decline — no login required, but only if still pending
+  // Decline - no login required, but only if still pending
   if (action === 'decline') {
     if (member.status === 'pending_consent') {
       await declineConsent(member.id)
@@ -102,7 +102,7 @@ export default async function ConsentPage({ params, searchParams }: Props) {
     )
   }
 
-  // Accept — requires login and email must match the invited address
+  // Accept - requires login and email must match the invited address
   if (action === 'accept') {
     // Reject already-used tokens
     if (member.status !== 'pending_consent') {
@@ -129,7 +129,7 @@ export default async function ConsentPage({ params, searchParams }: Props) {
 
     const session = await getSessionFromCookies()
     if (session) {
-      // Email must match — prevent token-hijacking
+      // Email must match - prevent token-hijacking
       if (session.email.toLowerCase() !== member.email.toLowerCase()) {
         return (
           <ResultCard
@@ -142,7 +142,7 @@ export default async function ConsentPage({ params, searchParams }: Props) {
       await acceptConsent(member.id, session.sub)
       redirect('/me')
     }
-    // Not logged in — redirect to login with invite param
+    // Not logged in - redirect to login with invite param
     const workspace = await getWorkspaceById(member.workspace_id)
     const inviteSlug = workspace?.slug ?? ''
     redirect(`/login?invite=${inviteSlug}`)

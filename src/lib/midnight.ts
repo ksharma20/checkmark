@@ -12,7 +12,7 @@ export function nextMidnightUtc(timezone: string): string {
   // Use a noon reference to avoid DST ambiguity, then measure the offset.
   const refDate = new Date(`${tomorrowDateStr}T12:00:00Z`)
   const localStr = refDate.toLocaleString('en-CA', { timeZone: timezone, hour12: false })
-  // en-CA format: "YYYY-MM-DD, HH:MM:SS" — parse both hours and minutes for sub-hour timezones (e.g. IST +05:30)
+  // en-CA format: "YYYY-MM-DD, HH:MM:SS" - parse both hours and minutes for sub-hour timezones (e.g. IST +05:30)
   const parts = localStr.split(', ')[1]?.split(':') ?? ['12', '0']
   const hour = parseInt(parts[0] ?? '12', 10)
   const minute = parseInt(parts[1] ?? '0', 10)

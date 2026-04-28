@@ -86,7 +86,7 @@ export default async function MeLayout({ children }: { children: React.ReactNode
         </div>
       </header>
 
-      {/* Main content — padded bottom for fixed nav */}
+      {/* Main content - padded bottom for fixed nav */}
       <main style={{ flex: 1, paddingBottom: '72px' }}><PageTransition>{children}</PageTransition></main>
 
       <BottomNav />

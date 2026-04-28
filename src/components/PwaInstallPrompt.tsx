@@ -15,9 +15,9 @@ export default function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
   useEffect(() => {
-    // Already installed as PWA — skip
+    // Already installed as PWA - skip
     if (window.matchMedia('(display-mode: standalone)').matches) return
-    // User dismissed before — skip
+    // User dismissed before - skip
     if (localStorage.getItem(DISMISSED_KEY)) return
 
     const ua = navigator.userAgent

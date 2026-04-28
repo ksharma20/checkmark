@@ -36,7 +36,7 @@ stateDiagram-v2
 
 ---
 
-## 2. New User Registration — Full Sequence
+## 2. New User Registration - Full Sequence
 
 ```mermaid
 sequenceDiagram
@@ -58,22 +58,22 @@ sequenceDiagram
   Note over U: User enters 6-digit code
 
   U->>A: POST /api/auth/otp/verify { email, code }
-  A->>DB: verifyOtp(email, code) — checks hash + expiry + attempts
-  A->>A: setOtpVerifiedCookie(email) — 15-min httpOnly JWT
+  A->>DB: verifyOtp(email, code) - checks hash + expiry + attempts
+  A->>A: setOtpVerifiedCookie(email) - 15-min httpOnly JWT
   A-->>U: { verified: true } + Set-Cookie: cm_otp_ok
 
   Note over U: Chooses Personal or Organisation
 
   U->>A: POST /api/auth/register { email, fullName, password, accountType, ... }
-  A->>A: verifyOtpCookie(email) — validates cm_otp_ok server-side
-  A->>A: hashPassword(password) — bcrypt cost 12
+  A->>A: verifyOtpCookie(email) - validates cm_otp_ok server-side
+  A->>A: hashPassword(password) - bcrypt cost 12
   A->>DB: createUser(email, hash, name)
   alt accountType === 'org'
     A->>DB: createWorkspace(name, slug, plan='free')
     A->>DB: createWorkspaceMember(userId, workspaceId, role='admin')
   end
-  A->>A: createJwt(userId, email) — 30-day, unique jti
-  A->>A: setSessionCookie(token) — httpOnly; SameSite=Lax; Secure
+  A->>A: createJwt(userId, email) - 30-day, unique jti
+  A->>A: setSessionCookie(token) - httpOnly; SameSite=Lax; Secure
   A->>A: clearOtpCookie()
   A-->>U: { user, redirect } + Set-Cookie: cm_session
 ```
@@ -131,20 +131,20 @@ sequenceDiagram
 
   U->>A: POST /api/auth/otp/verify { email, code }
   A->>DB: verifyOtp(email, code)
-  A->>A: setOtpVerifiedCookie(email) — 15-min
+  A->>A: setOtpVerifiedCookie(email) - 15-min
   A-->>U: { verified: true } + Set-Cookie: cm_otp_ok
 
   Note over U: State machine → resetPassword step
 
   U->>A: POST /api/auth/reset-password { email, newPassword }
-  A->>A: verifyOtpCookie(email) — server-side, not client trust
-  A->>A: validatePassword(newPassword) — min 8 chars
+  A->>A: verifyOtpCookie(email) - server-side, not client trust
+  A->>A: validatePassword(newPassword) - min 8 chars
   A->>DB: getUserByEmail(email)
-  A->>A: hashPassword(newPassword) — bcrypt cost 12
+  A->>A: hashPassword(newPassword) - bcrypt cost 12
   A->>DB: updateUserPassword(userId, newHash)
-  A->>A: createJwt(userId, email) — new session
+  A->>A: createJwt(userId, email) - new session
   A->>A: setSessionCookie(token)
-  A->>DB: getAdminWorkspacesForUser(userId) — for redirect
+  A->>DB: getAdminWorkspacesForUser(userId) - for redirect
   A-->>U: { success: true, redirect } + Set-Cookie: cm_session
 ```
 
@@ -176,7 +176,7 @@ cm_session: httpOnly; SameSite=Lax; Secure (prod); Path=/; Max-Age=2592000 (30 d
 cm_otp_ok:  httpOnly; SameSite=Lax; Secure (prod); Path=/; Max-Age=900 (15 min)
 ```
 
-**Why SameSite=Lax (not Strict):** `Strict` caused session loss when users opened the PWA from the home screen on iOS/Android — the OS treats the home-screen-to-browser navigation as cross-origin. `Lax` still blocks cross-site POST mutations; only top-level GET navigations carry the cookie.
+**Why SameSite=Lax (not Strict):** `Strict` caused session loss when users opened the PWA from the home screen on iOS/Android - the OS treats the home-screen-to-browser navigation as cross-origin. `Lax` still blocks cross-site POST mutations; only top-level GET navigations carry the cookie.
 
 ---
 
@@ -208,7 +208,7 @@ sequenceDiagram
   R-->>C: { event }
 ```
 
-**O(1) prefix lookup:** The `token_prefix` column is indexed (`idx_api_tokens_prefix`). The prefix query returns a tiny candidate set. bcrypt runs only on those candidates — not over all active tokens.
+**O(1) prefix lookup:** The `token_prefix` column is indexed (`idx_api_tokens_prefix`). The prefix query returns a tiny candidate set. bcrypt runs only on those candidates - not over all active tokens.
 
 ---
 
@@ -220,5 +220,5 @@ sequenceDiagram
 | Expiry | 10 minutes |
 | Max attempts | 5 per code (then locked) |
 | Rate limit | 3 sends per 15 minutes per email |
-| Storage | bcrypt hash of code — never stored in plaintext |
-| Cookie proof | `cm_otp_ok` is a 15-min signed JWT — server never trusts `otpVerified: true` from client |
+| Storage | bcrypt hash of code - never stored in plaintext |
+| Cookie proof | `cm_otp_ok` is a 15-min signed JWT - server never trusts `otpVerified: true` from client |

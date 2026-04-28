@@ -40,8 +40,8 @@ sequenceDiagram
 
   A->>API: POST /api/ws/:slug/members\n{ email: 'colleague@company.com' }
   API->>API: requireWsAdmin(req, slug)
-  API->>DB: getActiveMember(workspaceId, email) — 409 if already active
-  API->>DB: getMemberByEmail(workspaceId, email) — 409 if already pending_consent
+  API->>DB: getActiveMember(workspaceId, email) - 409 if already active
+  API->>DB: getMemberByEmail(workspaceId, email) - 409 if already pending_consent
   API->>DB: upsertWorkspaceMember({\n  status: 'pending_consent',\n  consent_token: uuid(),\n  consent_token_expires_at: +7days\n})
   API->>Email: sendConsentEmail(email, workspaceName, acceptUrl, declineUrl)
   API-->>A: { success: true }
@@ -95,10 +95,10 @@ sequenceDiagram
 
   A->>API: POST /api/ws/:slug/domain/:id/verify
   API->>API: requireWsAdmin
-  API->>API: Recompute token (deterministic — no DB column needed)
+  API->>API: Recompute token (deterministic - no DB column needed)
   API->>DNS: resolveTxt('_checkmark-verify.acme.com')
   DNS-->>API: [["checkmark-verify=abc123..."]]
-  API->>DB: markDomainVerified(domainId, workspaceId) — scoped by workspace_id!
+  API->>DB: markDomainVerified(domainId, workspaceId) - scoped by workspace_id!
   API->>DB: Auto-enroll existing users whose email @acme.com\n→ set status='active' for pending members
   API-->>A: { verified: true }
 ```
@@ -112,7 +112,7 @@ flowchart TD
   A[Admin opens Settings tab] --> B{Signal type to add?}
 
   B -->|GPS| C[/ws/:slug/signals POST\n{ signal_type: 'gps',\n  gps_lat, gps_lng, gps_radius_m }]
-  C --> D[Stored in workspace_signal_config\nbcrypt NOT used — GPS is plain coords]
+  C --> D[Stored in workspace_signal_config\nbcrypt NOT used - GPS is plain coords]
 
   B -->|WiFi| E[/ws/:slug/signals POST\n{ signal_type: 'wifi', wifi_ssid: 'OfficeNetwork' }]
   E --> F[bcrypt.hash ssid, 12 → wifi_ssid_hash\nRaw SSID NEVER stored]
@@ -180,9 +180,9 @@ sequenceDiagram
   loop per user per day
     API->>API: hasOffice = any event with matched_by 'verified'|'override'
     API->>API: hasAny = any event (for WFH count)
-    API->>API: sumHours() — only completed events with checkout_at
-    API->>API: isDifferentLocation() — checkout GPS > 1km from checkin GPS
-    API->>API: countGpsClusters() — 500m clustering for field-force metric
+    API->>API: sumHours() - only completed events with checkout_at
+    API->>API: isDifferentLocation() - checkout GPS > 1km from checkin GPS
+    API->>API: countGpsClusters() - 500m clustering for field-force metric
   end
 
   API-->>A: AnalyticsResponse {\n  members: [{\n    office_days, wfh_days, absent_days,\n    total_office_hours, total_wfh_hours,\n    avg_daily_hours, multi_location_days,\n    field_force_locations\n  }]\n}
@@ -217,9 +217,9 @@ sequenceDiagram
   OA->>API: POST /api/ws/:slug/transfer-ownership\n{ newAdminUserId, currentPassword }
 
   API->>API: requireWsAdmin (validates original admin)
-  API->>API: verifyOtpCookie(email) — OTP required for sensitive op
-  API->>DB: getUser(originalAdminId) — verify current password via bcrypt
-  API->>DB: getMember(workspaceId, newAdminUserId) — must be active member
+  API->>API: verifyOtpCookie(email) - OTP required for sensitive op
+  API->>DB: getUser(originalAdminId) - verify current password via bcrypt
+  API->>DB: getMember(workspaceId, newAdminUserId) - must be active member
   API->>DB: updateMember(newAdminUserId, role='admin')
   API->>DB: updateMember(originalAdminId, role='member')
   API-->>OA: { success: true }
@@ -245,7 +245,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   const ctx = await requireWsAdmin(req, slug)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
-  // ctx.workspace.id is verified — use it for ALL queries
+  // ctx.workspace.id is verified - use it for ALL queries
   const data = await getSomethingForWorkspace(ctx.workspace.id)
   return NextResponse.json(data)
 }

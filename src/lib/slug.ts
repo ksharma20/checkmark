@@ -1,4 +1,4 @@
-// Shared slug validation — used by check-slug, workspace creation, and org registration.
+// Shared slug validation - used by check-slug, workspace creation, and org registration.
 // Single source of truth so all three paths enforce identical rules.
 
 export const RESERVED_SLUGS = new Set([

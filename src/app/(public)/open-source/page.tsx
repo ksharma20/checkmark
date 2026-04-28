@@ -4,7 +4,7 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "Open Source — checkmark",
+  title: "Open Source - checkmark",
   description:
     "checkmark is open source. Audit the code, self-host, or contribute on GitHub.",
 };
@@ -23,7 +23,7 @@ const openItems = [
   {
     icon: "🖥️",
     title: "Complete Next.js application",
-    body: "The full frontend and API — every page, every endpoint, every component — is in the open.",
+    body: "The full frontend and API - every page, every endpoint, every component - is in the open.",
   },
   {
     icon: "🗄️",
@@ -100,7 +100,7 @@ export default function OpenSourcePage() {
               marginBottom: "32px",
             }}
           >
-            The application code — everything you see at checkmark.kabirinnovations.com — is
+            The application code - everything you see at checkmark.kabirinnovations.com - is
             available on GitHub. Anyone can run their own instance, audit the
             code, or contribute. We believe presence data should be owned by
             individuals, not locked in proprietary systems.
@@ -209,7 +209,7 @@ export default function OpenSourcePage() {
             </h2>
             <p style={{ ...S.sub, maxWidth: "520px", marginTop: "16px" }}>
               Running a reliable data platform is different from running an app.
-              This is what we monetise — not the code itself.
+              This is what we monetise - not the code itself.
             </p>
           </div>
           <div

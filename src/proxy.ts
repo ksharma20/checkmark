@@ -4,7 +4,7 @@ import { getSessionFromRequest } from './lib/auth'
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // ─── /me/* — requires valid session ──────────────────────────────────────
+  // ─── /me/* - requires valid session ──────────────────────────────────────
   if (pathname.startsWith('/me')) {
     const session = await getSessionFromRequest(request)
     if (!session) {
@@ -17,7 +17,7 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // ─── /ws/* — requires valid session (admin check done per-route) ──────────
+  // ─── /ws/* - requires valid session (admin check done per-route) ──────────
   if (pathname.startsWith('/ws')) {
     const session = await getSessionFromRequest(request)
     if (!session) {
@@ -29,8 +29,8 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // ─── /api/* — validate JWT from cookie ────────────────────────────────────
-  // /api/v1/* uses Bearer token — handled inside those route handlers
+  // ─── /api/* - validate JWT from cookie ────────────────────────────────────
+  // /api/v1/* uses Bearer token - handled inside those route handlers
   if (pathname.startsWith('/api') && !pathname.startsWith('/api/v1') && !isPublicApiRoute(pathname)) {
     const session = await getSessionFromRequest(request)
     if (!session) {

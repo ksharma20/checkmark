@@ -57,7 +57,7 @@ export default function JoinClient({ memberId, workspaceName }: Props) {
         }}
       >
         <strong>{workspaceName}</strong> wants to include your presence events in their dashboard.
-        Your data always belongs to you — you can revoke this at any time.
+        Your data always belongs to you - you can revoke this at any time.
       </p>
 
       <div style={{ display: 'flex', gap: '10px' }}>

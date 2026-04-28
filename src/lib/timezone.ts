@@ -1,7 +1,7 @@
 /**
  * Normalize SQLite datetime "2026-03-17 07:54:11" (space, no Z) to a proper
  * UTC Date. Without this, new Date("2026-03-17 07:54:11") is implementation-
- * defined — Node.js may treat it as local time, producing a timezone offset bug.
+ * defined - Node.js may treat it as local time, producing a timezone offset bug.
  */
 function parseDbUtc(s: string): Date {
   if (!s) return new Date(NaN)

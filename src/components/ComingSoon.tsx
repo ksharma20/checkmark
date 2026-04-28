@@ -12,7 +12,7 @@ const bullets = [
     icon: (
       <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" />
     ),
-    title: 'Next signal — biometric',
+    title: 'Next signal - biometric',
     desc: 'Joins GPS, IP, and device. All must match for verified office presence.',
   },
   {
@@ -23,7 +23,7 @@ const bullets = [
       </>
     ),
     title: 'Liveness detection',
-    desc: 'A photo won\'t pass. The system detects a live face — same tech as your phone\'s face unlock.',
+    desc: 'A photo won\'t pass. The system detects a live face - same tech as your phone\'s face unlock.',
   },
   {
     icon: (
@@ -33,7 +33,7 @@ const bullets = [
       </>
     ),
     title: 'Privacy-first',
-    desc: 'No face images stored. A one-way mathematical hash is saved — the face cannot be reconstructed.',
+    desc: 'No face images stored. A one-way mathematical hash is saved - the face cannot be reconstructed.',
   },
   {
     icon: (
@@ -44,7 +44,7 @@ const bullets = [
       </>
     ),
     title: 'Proxy-proof attendance',
-    desc: 'A colleague can\'t check in for you. Your face is your signature — tied to your identity, not your device.',
+    desc: 'A colleague can\'t check in for you. Your face is your signature - tied to your identity, not your device.',
   },
 ];
 
@@ -66,7 +66,7 @@ export default function ComingSoon() {
       </h2>
 
       <p className="section-desc reveal mb-14 max-w-[600px] text-base leading-relaxed text-checkmark-text-muted md:text-lg">
-        Great platforms don&apos;t stop evolving. AI verification is coming to CheckMark — empowering
+        Great platforms don&apos;t stop evolving. AI verification is coming to CheckMark - empowering
         teams with the next frontier of presence intelligence, built on the same trusted foundation
         you rely on today.
       </p>
@@ -109,7 +109,7 @@ export default function ComingSoon() {
             </div>
 
             <p className="mb-8 max-w-[520px] text-base leading-relaxed text-checkmark-text-muted">
-              On check-in, CheckMark will capture a facial match — like unlocking your phone, but for
+              On check-in, CheckMark will capture a facial match - like unlocking your phone, but for
               your attendance record. Your face becomes the fifth signal: the one that proves it was
               really you, not a proxy or a script.
             </p>
@@ -193,7 +193,7 @@ export default function ComingSoon() {
         <div className="border-t border-checkmark-border px-8 py-4 md:px-12">
           <p className="text-xs leading-relaxed text-checkmark-text-muted">
             <span className="font-semibold text-checkmark-text">Built on the same foundation.</span>
-            {' '}AI verification will be an optional additional signal — existing GPS + IP + device setups are unaffected. Orgs opt in when ready.
+            {' '}AI verification will be an optional additional signal - existing GPS + IP + device setups are unaffected. Orgs opt in when ready.
           </p>
         </div>
       </div>

@@ -41,7 +41,7 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
 
-  // Block if this user is the sole admin of any active workspace — deactivating
+  // Block if this user is the sole admin of any active workspace - deactivating
   // would orphan it with no way to recover access.
   const soleAdminOf = await getSoleAdminWorkspaces(userId)
   if (soleAdminOf.length > 0) {
@@ -54,7 +54,7 @@ export async function DELETE(request: NextRequest) {
     )
   }
 
-  // Soft delete — data is preserved; user can reactivate by logging back in
+  // Soft delete - data is preserved; user can reactivate by logging back in
   await deactivateUser(userId)
   await clearSessionCookie()
   return NextResponse.json({ success: true })

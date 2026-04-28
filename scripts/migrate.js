@@ -1,13 +1,13 @@
 #!/usr/bin/env node
-// Consolidated database migration — single script, fully idempotent.
+// Consolidated database migration - single script, fully idempotent.
 //
 // Local SQLite:  node scripts/migrate.js
 // Turso (prod):  TURSO_DATABASE_URL=... TURSO_AUTH_TOKEN=... node scripts/migrate.js
 //
 // Behaviour:
-//   Fresh DB  — creates every table + all columns; ALTER TABLE statements silently skip.
-//   Existing  — CREATE TABLE IF NOT EXISTS skips; ALTER TABLE adds missing columns.
-//   DB rename — if checkmark.db absent but checkmark.db present, copies it automatically.
+//   Fresh DB  - creates every table + all columns; ALTER TABLE statements silently skip.
+//   Existing  - CREATE TABLE IF NOT EXISTS skips; ALTER TABLE adds missing columns.
+//   DB rename - if checkmark.db absent but checkmark.db present, copies it automatically.
 
 const path = require('path')
 const fs   = require('fs')
@@ -20,7 +20,7 @@ try {
       const [key, ...rest] = line.split('=')
       if (key && rest.length) process.env[key.trim()] = rest.join('=').trim().replace(/^["']|["']$/g, '')
     })
-} catch { /* .env.local absent — fine */ }
+} catch { /* .env.local absent - fine */ }
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -204,23 +204,23 @@ const ADDITIVE_MIGRATIONS = [
   // workspaces
   `ALTER TABLE workspaces ADD COLUMN archived_at TEXT`,
 
-  // presence_events — feedback round 1
+  // presence_events - feedback round 1
   `ALTER TABLE presence_events ADD COLUMN checkout_location_mismatch INTEGER`,
   `ALTER TABLE presence_events ADD COLUMN device_info TEXT`,
   `ALTER TABLE presence_events ADD COLUMN trust_flags TEXT`,
   `ALTER TABLE presence_events ADD COLUMN device_timezone TEXT`,
 
-  // admin_overrides — effective checkout for regularization
+  // admin_overrides - effective checkout for regularization
   `ALTER TABLE admin_overrides ADD COLUMN effective_checkout_at TEXT`,
 
-  // user_api_tokens — fast prefix lookup (O(1) instead of O(n) bcrypt scan)
+  // user_api_tokens - fast prefix lookup (O(1) instead of O(n) bcrypt scan)
   `ALTER TABLE user_api_tokens ADD COLUMN token_prefix TEXT`,
   `CREATE INDEX IF NOT EXISTS idx_api_tokens_prefix ON user_api_tokens(token_prefix)`,
 
-  // presence_events — scheduled midnight auto-checkout
+  // presence_events - scheduled midnight auto-checkout
   `ALTER TABLE presence_events ADD COLUMN scheduled_checkout_at TEXT`,
 
-  // push_subscriptions — Web Push
+  // push_subscriptions - Web Push
   `CREATE TABLE IF NOT EXISTS push_subscriptions (
   id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -265,7 +265,7 @@ function runSQLite() {
   }
 
   db.close()
-  console.log(`✓ SQLite migration complete — ${ran} executed, ${skipped} skipped — ${dbPath}`)
+  console.log(`✓ SQLite migration complete - ${ran} executed, ${skipped} skipped - ${dbPath}`)
 }
 
 // ─── Turso runner (production) ────────────────────────────────────────────────
@@ -294,7 +294,7 @@ async function runTurso() {
   }
 
   await client.close()
-  console.log(`✓ Turso migration complete — ${ran} executed, ${skipped} skipped — ${process.env.TURSO_DATABASE_URL}`)
+  console.log(`✓ Turso migration complete - ${ran} executed, ${skipped} skipped - ${process.env.TURSO_DATABASE_URL}`)
 }
 
 // ─── Entry point ──────────────────────────────────────────────────────────────

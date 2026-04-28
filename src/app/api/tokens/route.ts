@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Token name is required', code: 'MISSING_NAME' }, { status: 400 })
   }
 
-  // Generate a secure random token — shown to user exactly once
+  // Generate a secure random token - shown to user exactly once
   const tokenBytes = new Uint8Array(32)
   crypto.getRandomValues(tokenBytes)
   const plainToken = Array.from(tokenBytes)
@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     token: { id: token.id, name: token.name, created_at: token.created_at },
-    // plain_token is shown only once — user must copy it now
+    // plain_token is shown only once - user must copy it now
     plain_token: `cm_${plainToken}`,
   })
 }

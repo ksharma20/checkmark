@@ -10,7 +10,7 @@ export interface User {
   timezone: string | null
   timezone_updated_at: string | null
   timezone_confirmed: number  // 0 = unconfirmed, 1 = confirmed
-  deleted_at: string | null   // soft delete — null = active
+  deleted_at: string | null   // soft delete - null = active
   created_at: string
   updated_at: string
 }
@@ -34,7 +34,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
   )
 }
 
-// Includes deactivated — used only in auth flows (check-email, login, reactivate)
+// Includes deactivated - used only in auth flows (check-email, login, reactivate)
 export async function getUserByEmailIncludeDeleted(email: string): Promise<User | null> {
   return db.queryOne<User>('SELECT * FROM users WHERE email = ?', [email])
 }
@@ -102,7 +102,7 @@ export async function updateUserTimezone(
   )
 }
 
-// Soft delete — sets deleted_at timestamp. Data is preserved.
+// Soft delete - sets deleted_at timestamp. Data is preserved.
 export async function deactivateUser(userId: string): Promise<void> {
   await db.execute(
     `UPDATE users SET deleted_at = datetime('now'), updated_at = datetime('now') WHERE id = ?`,
@@ -110,7 +110,7 @@ export async function deactivateUser(userId: string): Promise<void> {
   )
 }
 
-// Reactivate — clears deleted_at. Called from the reactivate endpoint.
+// Reactivate - clears deleted_at. Called from the reactivate endpoint.
 export async function reactivateUser(userId: string): Promise<void> {
   await db.execute(
     `UPDATE users SET deleted_at = NULL, updated_at = datetime('now') WHERE id = ?`,

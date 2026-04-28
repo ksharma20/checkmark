@@ -4,7 +4,7 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "checkmark for Teams — Attendance without the hardware",
+  title: "checkmark for Teams - Attendance without the hardware",
   description:
     "Manage hybrid office attendance and field force visit logs. No hardware, no app installs. Set up in under 10 minutes.",
 };

@@ -119,7 +119,7 @@ code, pre, .mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* ── Dark theme — authenticated app pages ─────────────────────────────── */
+/* ── Dark theme - authenticated app pages ─────────────────────────────── */
 .vz-dark {
   --surface-0:      #1A2635;
   --surface-1:      #0D1B2A;
@@ -186,7 +186,7 @@ code, pre, .mono {
   100% { transform: translateY(0) scaleY(1); opacity: 1; }
 }
 
-/* Looping drop — 2s cycle, pin lands at 40% (0.8s) */
+/* Looping drop - 2s cycle, pin lands at 40% (0.8s) */
 @keyframes pinDropLoop {
   0%   { transform: translateY(-100px) scaleY(0.7); opacity: 0; }
   25%  { transform: translateY(8px) scaleY(1.06); opacity: 1; }
@@ -220,7 +220,7 @@ code, pre, .mono {
   to { opacity: 1; transform: scale(1) translateX(0); }
 }
 
-/* Badge synced to pinDropLoop — same 2s cycle, starts 0.8s after pin (when it lands) */
+/* Badge synced to pinDropLoop - same 2s cycle, starts 0.8s after pin (when it lands) */
 @keyframes badgeLoopSync {
   0%   { opacity: 0; transform: scale(0.6) translateX(-6px); }
   10%  { opacity: 1; transform: scale(1) translateX(0); }
@@ -294,7 +294,7 @@ code, pre, .mono {
   z-index: 10;
 }
 
-/* Press-down brightness dip — fast in, fast out */
+/* Press-down brightness dip - fast in, fast out */
 button:not([disabled]):active,
 a[href]:active {
   filter: brightness(0.86) !important;
@@ -307,14 +307,14 @@ a[href] {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Workspace sidebar — collapsible ─────────────────────── */
+/* ── Workspace sidebar - collapsible ─────────────────────── */
 
 /* Mobile: JS controls collapse state; only lock max-width when fully collapsed */
 @media (max-width: 767px) {
   .ws-sidebar-bottom  { display: none !important; }
 }
 
-/* ── People / member row — mobile layout ── */
+/* ── People / member row - mobile layout ── */
 @media (max-width: 540px) {
   .member-row {
     flex-wrap: wrap !important;

@@ -534,7 +534,7 @@ export default function PeopleClient({ slug }: Props) {
                 )}
               </div>
 
-              {/* Role + Status + Actions — wraps below name on mobile */}
+              {/* Role + Status + Actions - wraps below name on mobile */}
               <div className="member-meta" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
                 <span
                   style={{

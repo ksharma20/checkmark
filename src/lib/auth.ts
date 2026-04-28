@@ -19,7 +19,7 @@ function getJwtSecret(): Uint8Array {
 export interface JwtPayload {
   sub: string   // userId
   email: string
-  jti: string   // unique token id — used for revocation
+  jti: string   // unique token id - used for revocation
   iat: number
   exp: number
 }
@@ -104,7 +104,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 export function generateOtp(): string {
   if (!process.env.RESEND_API_KEY) {
-    // First 6 digits of current Unix epoch seconds — predictable from the clock.
+    // First 6 digits of current Unix epoch seconds - predictable from the clock.
     // Stays constant for ~10,000 seconds (~2.7 hrs). Tell testers: floor(Date.now()/1000).toString().slice(0,6)
     return String(Math.floor(Date.now() / 1000)).slice(0, 6);
   }
@@ -154,7 +154,7 @@ export async function clearOtpCookie(): Promise<void> {
 
 // ─── Server component helper ──────────────────────────────────────────────────
 
-/** Read the user identity set by proxy.ts — only valid in Server Components and Route Handlers. */
+/** Read the user identity set by proxy.ts - only valid in Server Components and Route Handlers. */
 export async function getServerUser(): Promise<{ userId: string; email: string } | null> {
   const h = await headers()
   const userId = h.get('x-user-id')

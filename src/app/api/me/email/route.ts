@@ -12,8 +12,8 @@ function err(msg: string, code: string, status: number) {
 /**
  * POST /api/me/email
  *
- * Step 1 — request: { newEmail }   → sends OTP to newEmail
- * Step 2 — confirm: { newEmail, code } → verifies OTP, updates email
+ * Step 1 - request: { newEmail }   → sends OTP to newEmail
+ * Step 2 - confirm: { newEmail, code } → verifies OTP, updates email
  */
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')

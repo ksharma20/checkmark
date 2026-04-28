@@ -46,7 +46,7 @@ export default function MarketingNav() {
           </span>
         </Link>
 
-        {/* Center links — hidden on mobile */}
+        {/* Center links - hidden on mobile */}
         <div
           style={{
             display: "flex",

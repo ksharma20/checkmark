@@ -1,5 +1,5 @@
 /**
- * Node.js-only session helpers — NOT imported by src/proxy.ts (Edge middleware).
+ * Node.js-only session helpers - NOT imported by src/proxy.ts (Edge middleware).
  * Use these in Server Components, Route Handlers, and Layouts.
  */
 import { getSessionFromCookies, JwtPayload } from '@/lib/auth'

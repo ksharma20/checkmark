@@ -280,7 +280,7 @@ export async function getAdminWorkspacesForUser(userId: string): Promise<Workspa
  * Returns active (non-archived) workspaces where the given user is the ONLY
  * active admin. Used to block account deactivation.
  *
- * Archived workspaces are excluded — a deactivated account is fine as the
+ * Archived workspaces are excluded - a deactivated account is fine as the
  * owner of an archived workspace since it can't affect any running team.
  */
 export async function getSoleAdminWorkspaces(userId: string): Promise<Workspace[]> {

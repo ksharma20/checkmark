@@ -31,7 +31,7 @@ export async function PATCH(
   return NextResponse.json({ event: updated })
 }
 
-// Presence data is never permanently deleted — soft-delete only
+// Presence data is never permanently deleted - soft-delete only
 export async function DELETE() {
   return NextResponse.json(
     { error: 'Presence data cannot be deleted', code: 'NOT_SUPPORTED' },

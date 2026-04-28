@@ -37,7 +37,7 @@ export async function getIpGeo(ip: string): Promise<IpGeoResult | null> {
 
   try {
     const res = await fetch(`http://ip-api.com/json/${ip}?fields=lat,lon,city,status`, {
-      // No caching — always fresh
+      // No caching - always fresh
       cache: 'no-store',
     })
 

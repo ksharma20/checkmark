@@ -70,7 +70,7 @@ export async function GET(
     return { minute: i, label, count: users.size }
   })
 
-  // Location breakdown — seed all configured locations first (count = 0), then fill from events
+  // Location breakdown - seed all configured locations first (count = 0), then fill from events
   const locationMap = new Map<string, Set<string>>()
   for (const cfg of signalConfigs) {
     const label = cfg.location_name

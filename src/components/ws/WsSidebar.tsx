@@ -139,7 +139,7 @@ export default function WsSidebar({ slug }: Props) {
           })}
         </nav>
 
-        {/* Bottom links — expanded */}
+        {/* Bottom links - expanded */}
         {!collapsed && (
           <div className="ws-sidebar-bottom" style={{
             padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.07)',
@@ -168,7 +168,7 @@ export default function WsSidebar({ slug }: Props) {
           </div>
         )}
 
-        {/* Bottom links — collapsed (icon only) */}
+        {/* Bottom links - collapsed (icon only) */}
         {collapsed && (
           <div style={{
             padding: '12px 8px', borderTop: '1px solid rgba(255,255,255,0.07)',

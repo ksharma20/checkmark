@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerUser } from '@/lib/auth'
 import { updateUserTimezone } from '@/lib/db/queries/users'
 
-// Rough IANA timezone validation — must contain a slash (e.g. "Asia/Kolkata")
+// Rough IANA timezone validation - must contain a slash (e.g. "Asia/Kolkata")
 function isValidIana(tz: string): boolean {
   if (!tz || typeof tz !== 'string') return false
   try {

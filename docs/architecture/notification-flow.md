@@ -39,7 +39,7 @@ sequenceDiagram
     SW-->>U: PushSubscription { endpoint, keys }
   end
   U->>API: POST /api/push/subscribe\n{ endpoint, keys: { p256dh, auth } }
-  API->>API: getServerUser() — userId from header
+  API->>API: getServerUser() - userId from header
   API->>DB: upsertPushSubscription(userId, endpoint, p256dh, auth)
   API-->>U: { success: true }
 ```
@@ -60,27 +60,27 @@ flowchart TD
     F --> G[delay = checkinMs + hour×3600000 − now]
     G --> H{delay > 0?}
     H -->|Yes| I[window.setTimeout\nfireStaleNotification hour\n+ in-app toast\n+ playChime]
-    H -->|No| J[skip — already past]
+    H -->|No| J[skip - already past]
   end
 
   subgraph WarningTimer["Auto-checkout Warning"]
     E --> K[warningDelay = scheduledCheckoutMs − 15min − now]
     K --> L{warningDelay > 0?}
     L -->|Yes| M[window.setTimeout\nfireMidnightWarning\n+ playChime + toast]
-    L -->|No — in warning window| N[fire immediately]
+    L -->|No - in warning window| N[fire immediately]
   end
 
   subgraph CheckoutTimer["Auto-checkout"]
     E --> O[checkoutDelay = scheduledCheckoutMs − now]
     O --> P{checkoutDelay > 0?}
     P -->|Yes| Q[window.setTimeout\ntriggerAutoCheckout]
-    P -->|No — overdue| R[triggerAutoCheckout immediately]
+    P -->|No - overdue| R[triggerAutoCheckout immediately]
   end
 ```
 
 ---
 
-## 4. Notification Display — Browser/SW Path
+## 4. Notification Display - Browser/SW Path
 
 ```mermaid
 flowchart TD
@@ -94,7 +94,7 @@ flowchart TD
   H --> I[Basic browser notification]
 ```
 
-**requireInteraction: true** — notification stays visible until user interacts. Without this, notifications auto-dismiss in a few seconds on some platforms.
+**requireInteraction: true** - notification stays visible until user interacts. Without this, notifications auto-dismiss in a few seconds on some platforms.
 
 **Why notifications might appear only in notification center (not as popups):** Chrome's per-site "quiet notifications" setting. Users can change this at `chrome://settings/content/notifications → [site] → Allow popups`.
 
@@ -137,22 +137,22 @@ sequenceDiagram
   participant UI as Toast + Audio
 
   SW->>CK: navigator.serviceWorker message event\n{ type: 'push-received', title, body }
-  CK->>UI: playChime() — Web Audio API tone
-  CK->>UI: showToast(body, 'info') — 4s in-app banner
+  CK->>UI: playChime() - Web Audio API tone
+  CK->>UI: showToast(body, 'info') - 4s in-app banner
 ```
 
 This means even if the OS notification is silenced, the app always shows a visible + audible alert when it's open.
 
 ---
 
-## 7. Notification Click — Service Worker Handler
+## 7. Notification Click - Service Worker Handler
 
 ```mermaid
 flowchart TD
   A[User clicks OS notification] --> B{action?}
   B -->|'extend'| C[POST /api/checkin/extend\n+ clients.openWindow /me]
   B -->|'checkout'| D[POST /api/checkin/checkout\nreason: midnight_auto_checkout\n+ clients.openWindow /me]
-  B -->|no action — notification body click| E[clients.matchAll type:window]
+  B -->|no action - notification body click| E[clients.matchAll type:window]
   E --> F{existing /me tab open?}
   F -->|Yes| G[client.focus]
   F -->|No| H[clients.openWindow /me]
@@ -161,7 +161,7 @@ flowchart TD
 
 ---
 
-## 8. Sound — Web Audio API Chime
+## 8. Sound - Web Audio API Chime
 
 No audio file needed. Generates a pure-tone chime at runtime:
 
@@ -198,13 +198,13 @@ Each notification type uses a unique `tag`:
 | Auto-checkout warning | `checkmark-midnight-warning` | `true` |
 | Check-in confirmation | `checkmark-checkin-confirm` | `false` |
 
-Using the same `tag` replaces the previous notification with the same tag — no notification spam. The stale reminder at 4h replaces itself at 8h, 12h, etc.
+Using the same `tag` replaces the previous notification with the same tag - no notification spam. The stale reminder at 4h replaces itself at 8h, 12h, etc.
 
 ---
 
 ## 10. Push Subscription Cleanup
 
-When a push delivery fails with HTTP 410 (Gone — subscription expired), the endpoint is automatically removed:
+When a push delivery fails with HTTP 410 (Gone - subscription expired), the endpoint is automatically removed:
 
 ```typescript
 // In lib/push.ts

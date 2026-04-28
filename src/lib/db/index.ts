@@ -1,4 +1,4 @@
-// DB abstraction layer — better-sqlite3 (local dev) | Turso/libSQL (production)
+// DB abstraction layer - better-sqlite3 (local dev) | Turso/libSQL (production)
 // All query files use this interface; switching backends requires no query changes.
 
 import { en } from "@/locales/en";
@@ -63,7 +63,7 @@ function createTursoDB(): DB {
     authToken: process.env.TURSO_AUTH_TOKEN,
   });
 
-  // libSQL Row objects have a special prototype — spread into plain objects
+  // libSQL Row objects have a special prototype - spread into plain objects
   // so they can safely cross the Server → Client Component boundary.
   const toPlain = <T>(row: unknown): T => ({ ...(row as object) }) as T
 

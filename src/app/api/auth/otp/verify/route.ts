@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   const otp = await getValidOtp(email, code, 'signup')
   if (!otp) {
-    // Wrong code — increment attempts on the latest OTP
+    // Wrong code - increment attempts on the latest OTP
     await incrementOtpAttempts(latest.id)
     return apiError('Invalid or expired code', 'INVALID_OTP', 400)
   }

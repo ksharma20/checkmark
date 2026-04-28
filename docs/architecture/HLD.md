@@ -1,4 +1,4 @@
-# CheckMark — High Level Design
+# CheckMark - High Level Design
 
 > Last updated: 2026-04-21 (post Phases 1–6 overhaul)
 
@@ -8,14 +8,14 @@
 
 ```mermaid
 C4Context
-  title CheckMark — System Context
+  title CheckMark - System Context
 
   Person(user, "Individual User", "Records personal presence via mobile PWA")
   Person(admin, "Org Admin", "Queries team presence via desktop PWA")
 
-  System(checkmark, "CheckMark", "Presence intelligence platform — multi-signal verification, attendance analytics")
+  System(checkmark, "CheckMark", "Presence intelligence platform - multi-signal verification, attendance analytics")
 
-  System_Ext(resend, "Resend", "Transactional email — OTPs, consent invites")
+  System_Ext(resend, "Resend", "Transactional email - OTPs, consent invites")
   System_Ext(ipapi, "ip-api.com", "IP geolocation (free, 45 req/min)")
   System_Ext(nominatim, "Nominatim / OSM", "Reverse geocoding GPS → human label")
   System_Ext(dns, "DNS", "Domain verification TXT record lookup")
@@ -81,7 +81,7 @@ graph TB
 
 ---
 
-## 3. Database Schema — Entity Relationships
+## 3. Database Schema - Entity Relationships
 
 ```mermaid
 erDiagram
@@ -241,7 +241,7 @@ erDiagram
 
 ## 4. Key Design Decisions
 
-### 4.1 Signal AND Semantics — Core USP
+### 4.1 Signal AND Semantics - Core USP
 
 Every configured signal type **must** match for a check-in to be `verified`. Partial matches are tracked but don't count as office presence. See [`signal-matching.md`](./signal-matching.md).
 
@@ -259,7 +259,7 @@ event D: (override)      → override  ✅ counts as office
 | Layer | What it does | Why |
 |-------|-------------|-----|
 | Edge (proxy.ts) | JWT signature verify only | Fast, no DB access, blocks unauthenticated requests at CDN |
-| Node (route handlers) | Full `getSessionFromCookies()` — includes revocation check | Revocation requires SQLite/Turso query |
+| Node (route handlers) | Full `getSessionFromCookies()` - includes revocation check | Revocation requires SQLite/Turso query |
 
 ### 4.3 Immutable Events
 
@@ -267,7 +267,7 @@ event D: (override)      → override  ✅ counts as office
 
 ### 4.4 Soft Deletes
 
-`users.deleted_at` and `workspaces.archived_at` — data is never hard-deleted. The `deleted_at IS NULL` filter is placed on the **JOIN condition** for LEFT JOINs (not in WHERE) to avoid converting LEFT JOINs into INNER JOINs.
+`users.deleted_at` and `workspaces.archived_at` - data is never hard-deleted. The `deleted_at IS NULL` filter is placed on the **JOIN condition** for LEFT JOINs (not in WHERE) to avoid converting LEFT JOINs into INNER JOINs.
 
 ### 4.5 Plan History Gates
 
@@ -307,7 +307,7 @@ sequenceDiagram
   end
   E->>E: Set x-user-id, x-user-email headers
   E->>N: Forward request + headers
-  N->>D: getSessionFromCookies() — checks revoked_tokens
+  N->>D: getSessionFromCookies() - checks revoked_tokens
   alt jti revoked
     N-->>B: 401 UNAUTHORIZED
   end

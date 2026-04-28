@@ -1,4 +1,4 @@
-// Authoritative schema — every table and every column.
+// Authoritative schema - every table and every column.
 // scripts/migrate.js reads this implicitly (inlines compatible SQL) and runs
 // additive ALTER TABLE statements for columns added after initial table creation.
 

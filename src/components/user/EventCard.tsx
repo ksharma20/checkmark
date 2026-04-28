@@ -24,9 +24,9 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
 
   const duration = durationLabel(event.checkin_at, event.checkout_at)
 
-  // "1:37 PM — 2:15 PM" or just "1:37 PM"
+  // "1:37 PM - 2:15 PM" or just "1:37 PM"
   const timeRange = event.checkout_at
-    ? `${fmtTime(event.checkin_at)} — ${fmtTime(event.checkout_at)}`
+    ? `${fmtTime(event.checkin_at)} - ${fmtTime(event.checkout_at)}`
     : fmtTime(event.checkin_at)
 
   async function saveNote() {
@@ -118,7 +118,7 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
             }}
           >
             {isOutsideRadius ? '⚠' : '✓'} {event.checkout_location_mismatch}m away from office
-            {isOutsideRadius ? ' — outside radius' : ''}
+            {isOutsideRadius ? ' - outside radius' : ''}
           </span>
         </div>
       )}

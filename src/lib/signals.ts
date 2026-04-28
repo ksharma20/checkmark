@@ -73,7 +73,7 @@ export async function queryWorkspaceEvents(
   const signals = await getWorkspaceSignals(workspaceId)
   const overrideEventIds = await getOverrideEventIds(workspaceId)
 
-  // Config-light mode: no signals configured — all events pass through as verified
+  // Config-light mode: no signals configured - all events pass through as verified
   if (signals.length === 0) {
     return filteredEvents.map((event) => ({
       ...event,
@@ -101,7 +101,7 @@ export async function queryWorkspaceEvents(
   const result: PresenceEventWithMatch[] = []
 
   for (const event of filteredEvents) {
-    // Admin override always passes through — bypass signal matching entirely
+    // Admin override always passes through - bypass signal matching entirely
     if (overrideEventIds.has(event.id)) {
       result.push({ ...event, matched_by: 'override', matched_signals: [] })
       continue

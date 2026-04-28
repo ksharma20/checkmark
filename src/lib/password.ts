@@ -1,4 +1,4 @@
-// Shared password validation — used by register and password-change routes.
+// Shared password validation - used by register and password-change routes.
 
 const WEAK_PASSWORDS = new Set([
   'password', 'password1', 'password123', '12345678', '123456789', '1234567890',

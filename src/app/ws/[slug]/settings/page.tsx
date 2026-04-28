@@ -313,7 +313,7 @@ function SignalsSection({ slug }: { slug: string }) {
             setGpsLat('')
             setGpsLng('')
             setGpsStatus(null)
-            // The server will return the detected tz in a future PATCH — show toast
+            // The server will return the detected tz in a future PATCH - show toast
             showToast('Location registered. Workspace timezone auto-updated.')
             setTzDetected(null)
           } else {
@@ -397,8 +397,8 @@ function SignalsSection({ slug }: { slug: string }) {
   }
 
   function signalLabel(s: SignalRow) {
-    if (s.signal_type === 'gps') return `GPS — ${s.location_name ?? 'Office'} (${s.gps_lat?.toFixed(4)}, ${s.gps_lng?.toFixed(4)}, ${s.gps_radius_m}m radius)`
-    if (s.signal_type === 'ip') return `IP — lat ${s.ip_geo_lat?.toFixed(4)}, lng ${s.ip_geo_lng?.toFixed(4)}`
+    if (s.signal_type === 'gps') return `GPS - ${s.location_name ?? 'Office'} (${s.gps_lat?.toFixed(4)}, ${s.gps_lng?.toFixed(4)}, ${s.gps_radius_m}m radius)`
+    if (s.signal_type === 'ip') return `IP - lat ${s.ip_geo_lat?.toFixed(4)}, lng ${s.ip_geo_lng?.toFixed(4)}`
     return s.signal_type
   }
 

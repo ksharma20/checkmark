@@ -15,7 +15,7 @@ export async function DELETE(
 
   if (!left) {
     return NextResponse.json(
-      { error: 'Cannot leave workspace — you are the sole admin. Transfer admin role first.', code: 'SOLE_ADMIN' },
+      { error: 'Cannot leave workspace - you are the sole admin. Transfer admin role first.', code: 'SOLE_ADMIN' },
       { status: 403 }
     )
   }

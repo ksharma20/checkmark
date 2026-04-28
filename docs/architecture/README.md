@@ -1,7 +1,7 @@
-# CheckMark — Architecture Documentation
+# CheckMark - Architecture Documentation
 
 > Comprehensive technical reference for the CheckMark presence intelligence platform.
-> All diagrams use [Mermaid](https://mermaid.js.org/) — rendered automatically on GitHub.
+> All diagrams use [Mermaid](https://mermaid.js.org/) - rendered automatically on GitHub.
 
 ---
 
@@ -18,17 +18,17 @@
 
 ---
 
-## Quick Reference — Current State (post overhaul)
+## Quick Reference - Current State (post overhaul)
 
 ### Signal Matching
-- **AND semantics** — ALL configured signal types must match. Partial matches don't count.
+- **AND semantics** - ALL configured signal types must match. Partial matches don't count.
 - `MatchedBy`: `verified` | `partial` | `none` | `override`
-- `eventCountsAsOfficePresence()` — also requires no checkout location mismatch
+- `eventCountsAsOfficePresence()` - also requires no checkout location mismatch
 
 ### Auth
 - JWT (HS256, 30d) in `cm_session` httpOnly SameSite=Lax cookie
 - OTP: 6 digits, 10-min expiry, 5 attempts max, 3 sends per 15 min
-- Password reset: OTP-gated via `cm_otp_ok` cookie — never trust client-side `otpVerified`
+- Password reset: OTP-gated via `cm_otp_ok` cookie - never trust client-side `otpVerified`
 - API tokens: O(1) prefix lookup (`token_prefix` column + index)
 
 ### Notifications
@@ -43,13 +43,13 @@
 - Stored in `rate_limit_log` table (sliding window)
 
 ### DB New Tables (added in overhaul)
-- `push_subscriptions` — VAPID endpoint per user/device
-- `rate_limit_log` — sliding-window rate limiting
+- `push_subscriptions` - VAPID endpoint per user/device
+- `rate_limit_log` - sliding-window rate limiting
 
 ### DB New Columns (added in overhaul)
-- `presence_events.scheduled_checkout_at` — T+12h from check-in
-- `presence_events.checkout_location_mismatch` — distance in metres
-- `user_api_tokens.token_prefix` — first 8 chars for O(1) lookup
+- `presence_events.scheduled_checkout_at` - T+12h from check-in
+- `presence_events.checkout_location_mismatch` - distance in metres
+- `user_api_tokens.token_prefix` - first 8 chars for O(1) lookup
 
 ---
 

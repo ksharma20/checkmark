@@ -14,14 +14,14 @@ const SIGNAL_BADGE: Record<MatchedBy, { label: string; color: string }> = {
 };
 
 const TRUST_LABELS: Record<string, string> = {
-  mock_gps_suspected: "Mock GPS — accuracy ≤1m (likely fake GPS app)",
+  mock_gps_suspected: "Mock GPS - accuracy ≤1m (likely fake GPS app)",
   timezone_mismatch:
-    "Timezone mismatch — browser timezone differs from IP location",
-  vpn_suspected: "VPN/proxy — IP flagged as hosting or proxy provider",
+    "Timezone mismatch - browser timezone differs from IP location",
+  vpn_suspected: "VPN/proxy - IP flagged as hosting or proxy provider",
   impossible_travel:
-    "Impossible travel — >500km from previous check-in in <2 hours",
+    "Impossible travel - >500km from previous check-in in <2 hours",
   checkout_outside_radius:
-    "Checkout outside office — location was beyond the configured office radius",
+    "Checkout outside office - location was beyond the configured office radius",
 };
 
 interface MemberInfo {
@@ -185,7 +185,7 @@ function EventRow({ ev }: { ev: EventWithMatch }) {
           }}
         >
           {fmtTime(ev.checkin_at)}
-          {ev.checkout_at ? ` — ${fmtTime(ev.checkout_at)}` : ""}
+          {ev.checkout_at ? ` - ${fmtTime(ev.checkout_at)}` : ""}
         </span>
         {dur && (
           <span

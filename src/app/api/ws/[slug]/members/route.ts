@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, { params }: Props) {
   const isDomainVerified = workspaceDomains.some(d => d.domain === emailDomain && d.verified_at !== null)
   if (isDomainVerified) {
     return NextResponse.json({
-      error: `The domain @${emailDomain} is verified for this workspace — people with this email domain join automatically when they sign up. No invite needed.`,
+      error: `The domain @${emailDomain} is verified for this workspace - people with this email domain join automatically when they sign up. No invite needed.`,
       code: 'DOMAIN_AUTO_ENROL',
     }, { status: 409 })
   }
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'This person is already an active member', code: 'ALREADY_MEMBER' }, { status: 409 })
   }
 
-  // Block re-invite if consent is already pending — don't silently reset their token
+  // Block re-invite if consent is already pending - don't silently reset their token
   if (existing?.status === 'pending_consent') {
     return NextResponse.json(
       {

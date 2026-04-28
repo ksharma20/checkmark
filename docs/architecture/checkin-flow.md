@@ -2,7 +2,7 @@
 
 ---
 
-## 1. Check-in — Full Sequence
+## 1. Check-in - Full Sequence
 
 ```mermaid
 sequenceDiagram
@@ -17,35 +17,35 @@ sequenceDiagram
   U->>U: navigator.geolocation.getCurrentPosition()
   Note over U: 8s timeout. On deny → proceeds with null GPS.
   U->>U: navigator.connection?.ssid (WiFi, Chrome/Android only)
-  U->>U: collectDeviceInfo() — user-agent, timezone
+  U->>U: collectDeviceInfo() - user-agent, timezone
 
   U->>API: POST /api/checkin\n{ gps_lat, gps_lng, gps_accuracy_m,\n  wifi_ssid, device_info, device_timezone }
 
-  API->>API: getServerUser() — reads x-user-id header (never from body)
+  API->>API: getServerUser() - reads x-user-id header (never from body)
   API->>DB: getRateLimitCount(userId, 'checkin', 60min)
   alt >= 10 check-ins in last hour
     API-->>U: 429 RATE_LIMITED
   end
   API->>DB: recordRateLimitHit(userId, 'checkin')
-  API->>DB: getOpenEventToday(userId) — any event today with no checkout?
+  API->>DB: getOpenEventToday(userId) - any event today with no checkout?
   alt already checked in
     API-->>U: 409 ALREADY_CHECKED_IN
   end
 
-  API->>IPAPI: getIpGeo(clientIp) — lat/lng from IP
+  API->>IPAPI: getIpGeo(clientIp) - lat/lng from IP
   API->>DB: createEvent(userId, gps, wifi, ip, device_info, ...)
 
   API->>DB: setScheduledCheckout(eventId, now + 12h)
-  API->>DB: updateUserStats(userId) — fire-and-forget
+  API->>DB: updateUserStats(userId) - fire-and-forget
 
   alt gps_lat not null
-    API->>Nom: reverseGeocodeLabel(lat, lng) — fire-and-forget
+    API->>Nom: reverseGeocodeLabel(lat, lng) - fire-and-forget
     Note over API, Nom: Retries once after 30s on failure
     Nom-->>API: "123 Main St, City"
     API->>DB: updateEventLocationLabel(eventId, label)
   end
 
-  API->>API: evaluateTrust(event) — device timezone vs IP timezone — fire-and-forget
+  API->>API: evaluateTrust(event) - device timezone vs IP timezone - fire-and-forget
 
   API-->>U: { event } with scheduled_checkout_at
 
@@ -59,7 +59,7 @@ sequenceDiagram
 
 ---
 
-## 2. Checkout — Full Sequence
+## 2. Checkout - Full Sequence
 
 ```mermaid
 sequenceDiagram
@@ -73,9 +73,9 @@ sequenceDiagram
 
   U->>API: POST /api/checkin/checkout\n{ gps_lat, gps_lng, gps_accuracy_m, wifi_ssid }
 
-  API->>API: getServerUser() — userId from header
+  API->>API: getServerUser() - userId from header
 
-  API->>DB: getOpenEvent(userId) — most recent event with no checkout_at
+  API->>DB: getOpenEvent(userId) - most recent event with no checkout_at
   alt no open event
     API-->>U: 409 NOT_CHECKED_IN
   end
@@ -85,12 +85,12 @@ sequenceDiagram
   API->>DB: checkoutEvent(eventId, userId, {\n  checkout_gps, checkout_wifi,\n  checkout_ip, checkout_ip_geo,\n  checkout_location_mismatch,\n  checkout_reason\n})
   Note over DB: UPDATE presence_events SET checkout_at = now(),\ncheckout signals, mismatch distance
 
-  API->>DB: updateUserStats(userId) — fire-and-forget
+  API->>DB: updateUserStats(userId) - fire-and-forget
   API-->>U: { success: true, duration_hours }
 
   U->>U: Cancel all notification timers
   U->>U: localStorage.removeItem stale notif keys
-  U->>U: showToast("Checked out — Xh logged")
+  U->>U: showToast("Checked out - Xh logged")
 ```
 
 ---
@@ -117,7 +117,7 @@ gantt
   Auto-checkout   :milestone, 12:00, 0m
 ```
 
-These timers are scheduled in a `useEffect` on `activeEvent` — they are re-scheduled on page reload using the persisted `checkin_at` and `scheduled_checkout_at` from the server. Timer IDs stored in a `useRef<number[]>` and cancelled on checkout.
+These timers are scheduled in a `useEffect` on `activeEvent` - they are re-scheduled on page reload using the persisted `checkin_at` and `scheduled_checkout_at` from the server. Timer IDs stored in a `useRef<number[]>` and cancelled on checkout.
 
 ---
 
@@ -136,7 +136,7 @@ sequenceDiagram
   Timer->>Timer: window.location.reload()
 ```
 
-`checkout_reason` is stored in `presence_events` — admins can see it was an automatic checkout, not a manual one.
+`checkout_reason` is stored in `presence_events` - admins can see it was an automatic checkout, not a manual one.
 
 ---
 
@@ -150,7 +150,7 @@ sequenceDiagram
   participant Client as CheckinButtons (if open)
 
   Note over SW: User clicks "Still here (+8h)" action on notification
-  SW->>API: POST /api/checkin/extend\n(credentials: 'include' — cookie auth)
+  SW->>API: POST /api/checkin/extend\n(credentials: 'include' - cookie auth)
   API->>API: getServerUser()
   API->>DB: getOpenEvent(userId)
   alt no open event
@@ -206,7 +206,7 @@ presence_events row:
   # Check-in signals
   gps_lat, gps_lng         float | null
   gps_accuracy_m           int | null
-  wifi_ssid                string | null (raw SSID — user's own data)
+  wifi_ssid                string | null (raw SSID - user's own data)
   ip_address               string | null
   ip_geo_lat, ip_geo_lng   float | null
   

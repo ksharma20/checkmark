@@ -2,7 +2,7 @@
  * Client-side time formatting utilities.
  *
  * SQLite stores datetimes as "2026-03-17 07:54:11" (space, no Z).
- * new Date("2026-03-17 07:54:11") is implementation-defined — browsers treat
+ * new Date("2026-03-17 07:54:11") is implementation-defined - browsers treat
  * it as LOCAL time, not UTC. Always normalize before parsing.
  *
  * All functions here assume the input is a UTC string (from the DB) and
@@ -18,7 +18,7 @@ function parseUtc(s: string): Date {
 }
 
 /**
- * "1:37 PM" — time only, in browser's local timezone.
+ * "1:37 PM" - time only, in browser's local timezone.
  */
 export function fmtTime(utcStr: string): string {
   return parseUtc(utcStr).toLocaleTimeString('en-US', {
@@ -29,7 +29,7 @@ export function fmtTime(utcStr: string): string {
 }
 
 /**
- * "1:37 PM on 17 Mar 2026" — full datetime with "on" separator.
+ * "1:37 PM on 17 Mar 2026" - full datetime with "on" separator.
  * Used consistently throughout the platform for all event timestamps.
  */
 export function fmtTimeOnDate(utcStr: string): string {
@@ -40,7 +40,7 @@ export function fmtTimeOnDate(utcStr: string): string {
 }
 
 /**
- * "YYYY-MM-DD" — extracts the UTC date portion for grouping/counting distinct days.
+ * "YYYY-MM-DD" - extracts the UTC date portion for grouping/counting distinct days.
  * Uses slice(0,10) which works for both "2026-03-17 ..." and "2026-03-17T..." formats.
  */
 export function utcDateKey(utcStr: string): string {
@@ -64,7 +64,7 @@ export function durationLabel(checkinStr: string, checkoutStr: string | null): s
 }
 
 /**
- * Duration in fractional hours — for aggregating totals.
+ * Duration in fractional hours - for aggregating totals.
  */
 export function durationHoursNum(checkinStr: string, checkoutStr: string | null): number {
   if (!checkoutStr) return 0

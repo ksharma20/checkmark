@@ -4,7 +4,7 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "checkmark for You — Your presence record, forever",
+  title: "checkmark for You - Your presence record, forever",
   description:
     "checkmark is free for individuals, forever. Own your work history. No employer required.",
 };
@@ -24,7 +24,7 @@ const features = [
   {
     icon: "✅",
     title: "Tap once when you arrive",
-    body: "Check in at the office, a client site, a coffee shop — anywhere. Check out when you leave. One tap each way.",
+    body: "Check in at the office, a client site, a coffee shop - anywhere. Check out when you leave. One tap each way.",
   },
   {
     icon: "📅",
@@ -49,14 +49,14 @@ const features = [
   {
     icon: "💸",
     title: "Free forever",
-    body: "No subscription. No trial period. checkmark is free for individuals, forever. Your employer pays for team features — not you.",
+    body: "No subscription. No trial period. checkmark is free for individuals, forever. Your employer pays for team features - not you.",
   },
 ];
 
 const privacyFacts = [
   { q: 'What we store', a: 'Your check-in time, check-out time, GPS coordinates (if you share them), and IP address. That\'s it.' },
   { q: 'What we don\'t store', a: 'We don\'t track your location in the background. We don\'t read your contacts, calendar, or any other app data. We only record what you explicitly submit.' },
-  { q: 'Who can see your data', a: 'Only you — and any organisation you explicitly consent to share with. You can see every organisation that has access and revoke it instantly.' },
+  { q: 'Who can see your data', a: 'Only you - and any organisation you explicitly consent to share with. You can see every organisation that has access and revoke it instantly.' },
   { q: 'How long we keep it', a: 'Your data is retained for 7 years from the date it was created, then permanently deleted. You can request deletion earlier from your account settings.' },
 ]
 
@@ -92,7 +92,7 @@ export default function ForYouPage() {
               marginBottom: "32px",
             }}
           >
-            Free forever — no credit card required
+            Free forever - no credit card required
           </p>
           <br />
           <Link href="/login" style={S.btnPrimary}>

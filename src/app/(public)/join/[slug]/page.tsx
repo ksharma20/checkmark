@@ -114,7 +114,7 @@ export default async function JoinPage({ params }: Props) {
     )
   }
 
-  // No invite but domain might match verified domains — auto-enrol
+  // No invite but domain might match verified domains - auto-enrol
   const matchingIds = await getVerifiedDomainsForEmail(email)
   if (matchingIds.includes(workspace.id)) {
     await addWorkspaceMember({
@@ -127,7 +127,7 @@ export default async function JoinPage({ params }: Props) {
     redirect('/me')
   }
 
-  // No path to join — invite required
+  // No path to join - invite required
   return (
     <InfoCard>
       <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '20px', fontWeight: 700, color: 'var(--navy)', marginBottom: '8px' }}>

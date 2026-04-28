@@ -30,8 +30,8 @@ export default async function WsDashboardPage({ params }: Props) {
       color: atLimit ? 'var(--danger)' : 'var(--text-secondary)',
     }}>
       {atLimit
-        ? `Member limit reached — ${memberCount}/${planLimits.maxUsers} on the ${workspace.plan} plan. Upgrade to add more members.`
-        : `Approaching member limit — ${memberCount}/${planLimits.maxUsers} on the ${workspace.plan} plan.`}
+        ? `Member limit reached - ${memberCount}/${planLimits.maxUsers} on the ${workspace.plan} plan. Upgrade to add more members.`
+        : `Approaching member limit - ${memberCount}/${planLimits.maxUsers} on the ${workspace.plan} plan.`}
     </div>
   ) : null
 

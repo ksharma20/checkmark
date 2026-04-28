@@ -1,4 +1,4 @@
-# CheckMark — AGENTS.md
+# CheckMark - AGENTS.md
 
 AI agent coordination guide for working on this codebase.
 
@@ -11,13 +11,13 @@ AI agent coordination guide for working on this codebase.
 - Read files in `src/lib/`, `src/app/api/`, `src/app/(public)/`, `src/app/me/`, `src/app/ws/`
 - Map signal flow: client → API route → query function → DB
 - Check schema in `lib/db/schema.ts` + `scripts/migrate.js`
-- Never write code — report findings only
+- Never write code - report findings only
 
 ### Implementation Agent
 **Use for:** Writing or editing code based on a spec.
 - Always read the file before editing
 - Follow patterns in CLAUDE.md exactly
-- One file per task — no sweeping refactors unless scoped
+- One file per task - no sweeping refactors unless scoped
 - After changes: check TypeScript compiles (`npm run build`)
 
 ### Audit Agent
@@ -30,10 +30,10 @@ AI agent coordination guide for working on this codebase.
 
 ### Reviewer Agent
 **Use for:** Validating a completed change before merge.
-- Run `npm run build` — must pass
+- Run `npm run build` - must pass
 - Verify changed routes use `getServerUser()` not req.body.userId
 - Verify new DB queries are in `lib/db/queries/` not inline
-- Check for new signal matching logic — must be AND semantics
+- Check for new signal matching logic - must be AND semantics
 
 ---
 
@@ -52,7 +52,7 @@ AI agent coordination guide for working on this codebase.
 
 ---
 
-## Signal Matching — The Core
+## Signal Matching - The Core
 
 Before touching `lib/signals.ts` or any dashboard code, understand this:
 
@@ -67,10 +67,10 @@ queryWorkspaceEvents() → compares event signals against workspace config
 **Config-light mode:** No signals configured → all events pass (for small teams / trial orgs).
 
 `MatchedBy` type: `'verified' | 'partial' | 'none' | 'override'`
-- `verified` — all configured signals matched
-- `partial` — some signals matched, not all
-- `none` — no signals matched (check-in exists but not verified)
-- `override` — admin manually overrode this event
+- `verified` - all configured signals matched
+- `partial` - some signals matched, not all
+- `none` - no signals matched (check-in exists but not verified)
+- `override` - admin manually overrode this event
 
 ---
 
@@ -144,10 +144,10 @@ Common codes: `UNAUTHORIZED`, `NOT_FOUND`, `VALIDATION_ERROR`, `ALREADY_EXISTS`,
 ## When to Read First
 
 Before editing any of these files, always read them first:
-- `lib/signals.ts` — core logic, easy to break AND semantics
-- `lib/auth.ts` — security-critical, JWT + cookie handling
-- `lib/db/schema.ts` — understand all columns before adding queries
-- `proxy.ts` — edge middleware, limited runtime (no Node.js APIs)
+- `lib/signals.ts` - core logic, easy to break AND semantics
+- `lib/auth.ts` - security-critical, JWT + cookie handling
+- `lib/db/schema.ts` - understand all columns before adding queries
+- `proxy.ts` - edge middleware, limited runtime (no Node.js APIs)
 
 ---
 
@@ -166,11 +166,11 @@ Before editing any of these files, always read them first:
 
 ## Keeping Docs in Sync
 
-**REQUIRED:** Whenever you change code that affects documented behaviour — API routes, auth flow, signal matching logic, plan limits, cookie settings, DB schema, environment variables — you MUST also update the relevant docs:
+**REQUIRED:** Whenever you change code that affects documented behaviour - API routes, auth flow, signal matching logic, plan limits, cookie settings, DB schema, environment variables - you MUST also update the relevant docs:
 
-1. `README.md` — update the affected section
-2. `CLAUDE.md` — update invariants, architecture, or key rules if affected
-3. `AGENTS.md` — update conventions or patterns if affected
+1. `README.md` - update the affected section
+2. `CLAUDE.md` - update invariants, architecture, or key rules if affected
+3. `AGENTS.md` - update conventions or patterns if affected
 
 Never let code and docs diverge. Stale docs cause bugs in future AI-assisted sessions because agents rely on them for context.
 

@@ -43,45 +43,45 @@ export default function Home() {
       <div className="pointer-events-none fixed left-1/2 top-[-20%] z-0 h-[700px] w-[900px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(27,77,255,0.09)_0%,transparent_70%)]" />
       <Navigation />
 
-      {/* 1 — Hero: base #0D1B2A */}
+      {/* 1 - Hero: base #0D1B2A */}
       <Hero />
 
-      {/* 2 — Marquee: alt */}
+      {/* 2 - Marquee: alt */}
       <div className="bg-[#1E2D3D]">
         <Marquee />
       </div>
 
-      {/* 3 — HowItWorks: base */}
+      {/* 3 - HowItWorks: base */}
       <HowItWorks />
       <SectionDivider />
 
-      {/* 4 — Features: alt */}
+      {/* 4 - Features: alt */}
       <div className="bg-[#1E2D3D]">
         <Features />
       </div>
       <SectionDivider />
 
-      {/* 5 — Industries: base */}
+      {/* 5 - Industries: base */}
       <Industries />
       <SectionDivider />
 
-      {/* 6 — ComparisonTable: alt */}
+      {/* 6 - ComparisonTable: alt */}
       <div className="bg-[#1E2D3D]">
         <ComparisonTable />
       </div>
       <SectionDivider />
 
-      {/* 7 — ForWho: base */}
+      {/* 7 - ForWho: base */}
       <ForWho />
       <SectionDivider />
 
-      {/* 8 — FAQ: alt */}
+      {/* 8 - FAQ: alt */}
       <div className="bg-[#1E2D3D]">
         <FAQ />
       </div>
       <SectionDivider />
 
-      {/* 9 — ComingSoon: base */}
+      {/* 9 - ComingSoon: base */}
       <ComingSoon />
 
       <CTABandFooter />

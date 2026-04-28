@@ -139,7 +139,7 @@ export async function GET(request: NextRequest, { params }: Props) {
           remote_days++
         }
       } else {
-        // No signals — all check-ins count as "office"
+        // No signals - all check-ins count as "office"
         days[dateStr] = 'office'
         office_days++
       }

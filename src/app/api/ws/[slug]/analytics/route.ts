@@ -70,7 +70,7 @@ function isDifferentLocation(ev: {
   return haversineMetres(ev.gps_lat, ev.gps_lng, ev.checkout_gps_lat, ev.checkout_gps_lng) > 1000
 }
 
-/** Count distinct GPS clusters (for field force — simple 500m clustering). */
+/** Count distinct GPS clusters (for field force - simple 500m clustering). */
 function countGpsClusters(latlngs: [number, number][]): number {
   const clusters: [number, number][] = []
   for (const [lat, lng] of latlngs) {
