@@ -29,7 +29,7 @@ npm install
 5. Migrate DB:
 
 ```bash
-node scripts/migrate.js
+npm run migrate
 ```
 
 6. Run project:
@@ -71,6 +71,16 @@ git push origin fix/issue-name
 ```
 
 6. Open a Pull Request against `main` on `ksharma20/checkmark`
+
+---
+
+## One-Branch OSS Model (Important)
+
+CheckMark OSS uses a single long-lived branch:
+
+- `main` - the source of truth for OSS
+
+All open source contributions land via PRs to `main`.
 
 ---
 
