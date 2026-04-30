@@ -42,18 +42,40 @@ interface CalendarCellProps {
   dateStr: string
   status: DayStatus | undefined
   signalsConfigured: boolean
+  joinedDate: string
 }
 
-function CalendarCell({ day, dateStr, status, signalsConfigured }: CalendarCellProps) {
+function CalendarCell({ day, dateStr, status, signalsConfigured, joinedDate }: CalendarCellProps) {
   const isWeekend = (() => {
     const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay()
     return dow === 0 || dow === 6
   })()
 
+  const isPreJoin = dateStr < joinedDate
+
+  if (isPreJoin) {
+    return (
+      <div
+        title={`${dateStr}: not yet a member`}
+        style={{
+          width: '100%', height: '28px', borderRadius: '4px',
+          background: 'var(--surface-1)',
+          border: '1px dashed var(--border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          opacity: 0.45,
+        }}
+      >
+        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', color: 'var(--text-muted)' }}>
+          {day}
+        </span>
+      </div>
+    )
+  }
+
   if (isWeekend) {
     return (
       <div style={{
-        width: '28px', height: '28px', borderRadius: '4px',
+        width: '100%', height: '28px', borderRadius: '4px',
         background: 'var(--surface-2)',
         border: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -72,7 +94,7 @@ function CalendarCell({ day, dateStr, status, signalsConfigured }: CalendarCellP
     <div
       title={`${dateStr}: ${s}`}
       style={{
-        width: '28px', height: '28px', borderRadius: '4px',
+        width: '100%', height: '28px', borderRadius: '4px',
         background: dayColor(s, signalsConfigured),
         border: `1px solid ${dayBorder(s, signalsConfigured)}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -98,7 +120,7 @@ interface MemberRowProps {
   signalsConfigured: boolean
 }
 
-function MemberRow({ member, daysInMonth, year, month, signalsConfigured }: MemberRowProps) {
+function MemberRow({ member, daysInMonth, year, month, signalsConfigured}: MemberRowProps) {
   const ini = member.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
   const monthStr = String(month).padStart(2, '0')
 
@@ -106,7 +128,6 @@ function MemberRow({ member, daysInMonth, year, month, signalsConfigured }: Memb
     <div style={{
       display: 'flex', alignItems: 'center', gap: '12px',
       padding: '10px 16px', borderBottom: '1px solid var(--border)',
-      minWidth: 'max-content',
     }}>
       {/* Avatar + name */}
       <div style={{ width: '160px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
@@ -135,7 +156,7 @@ function MemberRow({ member, daysInMonth, year, month, signalsConfigured }: Memb
       </div>
 
       {/* Day cells */}
-      <div style={{ display: 'flex', gap: '3px', alignItems: 'center' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${daysInMonth}, 1fr)`, gap: '2px', flex: 1, minWidth: 0 }}>
         {Array.from({ length: daysInMonth }, (_, i) => {
           const d = i + 1
           const dateStr = `${year}-${monthStr}-${String(d).padStart(2, '0')}`
@@ -147,6 +168,7 @@ function MemberRow({ member, daysInMonth, year, month, signalsConfigured }: Memb
               dateStr={dateStr}
               status={status}
               signalsConfigured={signalsConfigured}
+              joinedDate={member.joined_date}
             />
           )
         })}
@@ -357,7 +379,7 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
       ) : (
         <div style={{
           background: 'var(--surface-0)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)', overflow: 'hidden', overflowX: 'auto',
+          borderRadius: 'var(--radius-lg)', overflow: 'hidden',
         }}>
           {!data.signals_configured && (
             <div style={{

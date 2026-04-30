@@ -14,6 +14,7 @@ import { Users, Monitor, Home, Activity } from 'lucide-react'
 interface Props {
   slug: string
   planLimitBanner?: React.ReactNode
+  workspaceCreatedAt: string
 }
 
 
@@ -315,7 +316,7 @@ const STATS_INTERVALS: { key: StatsInterval; label: string }[] = [
   { key: 'custom', label: 'Custom' },
 ]
 
-function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange, customRange, onCustomApply }: {
+function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange, customRange, onCustomApply, minDate }: {
   slug: string
   statsData: MemberStatsResponse | null
   loading: boolean
@@ -323,7 +324,9 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
   onIntervalChange: (iv: StatsInterval) => void
   customRange: { start: string; end: string }
   onCustomApply: (range: { start: string; end: string }) => void
+  minDate: string
 }) {
+  const today = new Date().toISOString().split('T')[0]
   const [localStart, setLocalStart] = useState(customRange.start)
   const [localEnd, setLocalEnd]     = useState(customRange.end)
   const [search, setSearch] = useState('')
@@ -420,6 +423,8 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
             <input
               type="date"
               value={localStart}
+              min={minDate}
+              max={localEnd || today}
               onChange={(e) => setLocalStart(e.target.value)}
               style={{
                 height: '34px', padding: '0 10px',
@@ -448,6 +453,8 @@ function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange
             <input
               type="date"
               value={localEnd}
+              min={minDate}
+              max={today}
               onChange={(e) => setLocalEnd(e.target.value)}
               style={{
                 height: '34px', padding: '0 10px',
@@ -833,7 +840,7 @@ function OfficePresenceGraph({ buckets, loading }: { buckets: InsightBucket[]; l
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function TodayClient({ slug, planLimitBanner }: Props) {
+export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt }: Props) {
   const [data, setData] = useState<DashboardResponse | null>(null)
   const [modal, setModal] = useState<{ title: string; members: DashboardMember[] } | null>(null)
 
@@ -1105,6 +1112,7 @@ export default function TodayClient({ slug, planLimitBanner }: Props) {
             setCustomRange(range)
             fetchStats('custom', range)
           }}
+          minDate={workspaceCreatedAt}
         />
       </div>
 

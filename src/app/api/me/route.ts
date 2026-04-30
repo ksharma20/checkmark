@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   }
   const user = await getUserById(userId)
   if (!user) return NextResponse.json({ error: 'User not found', code: 'NOT_FOUND' }, { status: 404 })
-  return NextResponse.json({ user: { id: user.id, email: user.email, full_name: user.full_name } })
+  return NextResponse.json({ user: { id: user.id, email: user.email, full_name: user.full_name, created_at: user.created_at } })
 }
 
 export async function PATCH(request: NextRequest) {

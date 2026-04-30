@@ -34,11 +34,27 @@ function formatDateHeading(dateStr: string): string {
 
 export default function TimelinePage() {
   const defaults = getMonthBounds()
+  const today = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState(defaults.start)
   const [endDate, setEndDate] = useState(defaults.end)
+  const [joinedDate, setJoinedDate] = useState<string | null>(null)
   const [events, setEvents] = useState<PresenceEvent[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/me')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user?.created_at) {
+          const minDate = data.user.created_at.slice(0, 10)
+          setJoinedDate(minDate)
+          if (startDate < minDate) setStartDate(minDate)
+        }
+      })
+      .catch(() => {})
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchEvents = useCallback(async () => {
     setLoading(true)
@@ -108,6 +124,8 @@ export default function TimelinePage() {
           <input
             type="date"
             value={startDate}
+            min={joinedDate ?? undefined}
+            max={endDate}
             onChange={(e) => setStartDate(e.target.value)}
             style={{
               width: '100%',
@@ -139,6 +157,8 @@ export default function TimelinePage() {
           <input
             type="date"
             value={endDate}
+            min={startDate}
+            max={today}
             onChange={(e) => setEndDate(e.target.value)}
             style={{
               width: '100%',

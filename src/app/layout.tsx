@@ -1,3 +1,4 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import "./globals.css";
 
@@ -40,7 +41,6 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: "/favicon-logo.png" },
-      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
     ],
     apple: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
   },

@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 interface Props { params: Promise<{ slug: string }> }
 
-export type InsightInterval = 'today' | 'week' | 'month' | '3month' | '6month' | 'year'
+export type InsightInterval = 'today' | 'week' | 'month' | '3month' | '6month' | 'year' | 'custom'
 
 export interface InsightBucket {
   label: string    // display label (e.g. "9 AM", "Mon 17", "Mar")
@@ -59,6 +59,8 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   const url = new URL(request.url)
   const interval = (url.searchParams.get('interval') ?? 'month') as InsightInterval
+  const fromParam = url.searchParams.get('from') // YYYY-MM-DD (custom only)
+  const toParam   = url.searchParams.get('to')   // YYYY-MM-DD (custom only)
 
   const now = new Date()
   const todayStr = now.toISOString().slice(0, 10)
@@ -198,6 +200,50 @@ export async function GET(request: NextRequest, { params }: Props) {
         match: (dt) => dt.toISOString().slice(0, 10) >= monthKey && dt.toISOString().slice(0, 10) <= monthEnd,
       })
       cur.setUTCMonth(cur.getUTCMonth() + 1)
+    }
+  } else if (interval === 'custom') {
+    if (!fromParam || !toParam) {
+      return NextResponse.json({ error: 'Missing from/to params', code: 'BAD_REQUEST' }, { status: 400 })
+    }
+    startDate = fromParam + 'T00:00:00Z'
+    endDate   = toParam   + 'T23:59:59Z'
+    const fromD = new Date(startDate)
+    const toD   = new Date(endDate)
+    const daysDiff = (toD.getTime() - fromD.getTime()) / (1000 * 60 * 60 * 24)
+
+    if (daysDiff <= 31) {
+      // Daily buckets
+      const cur = new Date(fromD)
+      while (cur <= toD) {
+        const dayStr = cur.toISOString().slice(0, 10)
+        const label  = cur.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+        bucketDefs.push({ key: dayStr, label, match: (dt) => dt.toISOString().slice(0, 10) === dayStr })
+        cur.setUTCDate(cur.getUTCDate() + 1)
+      }
+    } else if (daysDiff <= 90) {
+      // Weekly buckets
+      const cur = new Date(fromD)
+      while (cur <= toD) {
+        const ws  = cur.toISOString().slice(0, 10)
+        const we  = new Date(cur); we.setUTCDate(we.getUTCDate() + 6)
+        const weStr = we.toISOString().slice(0, 10)
+        const label = cur.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
+        bucketDefs.push({ key: ws, label, match: (dt) => dt.toISOString().slice(0, 10) >= ws && dt.toISOString().slice(0, 10) <= weStr })
+        cur.setUTCDate(cur.getUTCDate() + 7)
+      }
+    } else {
+      // Monthly buckets
+      const cur = new Date(Date.UTC(fromD.getUTCFullYear(), fromD.getUTCMonth(), 1))
+      const toMonth = new Date(Date.UTC(toD.getUTCFullYear(), toD.getUTCMonth(), 1))
+      while (cur <= toMonth) {
+        const y = cur.getUTCFullYear(), m = cur.getUTCMonth() + 1
+        const monthKey = isoDate(y, m, 1)
+        const lastD    = new Date(Date.UTC(y, m, 0)).getUTCDate()
+        const monthEnd = isoDate(y, m, lastD)
+        const label    = cur.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+        bucketDefs.push({ key: monthKey, label, match: (dt) => dt.toISOString().slice(0, 10) >= monthKey && dt.toISOString().slice(0, 10) <= monthEnd })
+        cur.setUTCMonth(cur.getUTCMonth() + 1)
+      }
     }
   } else {
     // year - 12 monthly buckets

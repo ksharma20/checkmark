@@ -22,6 +22,7 @@ export interface MemberMonthRow {
   user_id: string;
   name: string;
   email: string;
+  joined_date: string; // YYYY-MM-DD in workspace timezone — days before this are pre-join
   days: Record<string, DayStatus>; // key = 'YYYY-MM-DD'
   office_days: number;
   remote_days: number;
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       user_id: member.user_id,
       name: member.full_name ?? member.email,
       email: member.email,
+      joined_date: memberStartDate,
       days: summary.days,
       office_days: summary.officeDays,
       remote_days: summary.remoteDays,

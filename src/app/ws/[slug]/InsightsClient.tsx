@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import type { InsightInterval, InsightBucket, InsightsResponse } from '@/app/api/ws/[slug]/insights/route'
 import { fmtHours } from '@/lib/client/format-time'
 
-interface Props { slug: string }
+interface Props { slug: string; workspaceCreatedAt: string }
 
 const INTERVALS: { key: InsightInterval; label: string }[] = [
   { key: 'today',   label: 'Today' },
@@ -13,7 +13,10 @@ const INTERVALS: { key: InsightInterval; label: string }[] = [
   { key: '3month',  label: '3 Months' },
   { key: '6month',  label: '6 Months' },
   { key: 'year',    label: 'Year' },
+  { key: 'custom',  label: 'Custom' },
 ]
+
+const todayISO = () => new Date().toISOString().slice(0, 10)
 
 // ─── Skeleton ─────────────────────────────────────────────────────────────────
 
@@ -194,22 +197,34 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
 
 // ─── Main component ─────────────────────────────────────────────────────────────
 
-export default function InsightsClient({ slug }: Props) {
+export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
   const [interval, setInterval] = useState<InsightInterval>('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [data, setData] = useState<InsightsResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
-  const fetchData = useCallback(async (iv: InsightInterval) => {
+  const fetchData = useCallback(async (iv: InsightInterval, from?: string, to?: string) => {
     setLoading(true)
     try {
-      const res = await fetch(`/api/ws/${slug}/insights?interval=${iv}`)
+      let url = `/api/ws/${slug}/insights?interval=${iv}`
+      if (iv === 'custom' && from && to) url += `&from=${from}&to=${to}`
+      const res = await fetch(url)
       if (res.ok) setData(await res.json())
     } finally {
       setLoading(false)
     }
   }, [slug])
 
-  useEffect(() => { fetchData(interval) }, [fetchData, interval])
+  useEffect(() => {
+    if (interval === 'custom') {
+      if (customFrom && customTo && customFrom <= customTo) {
+        fetchData('custom', customFrom, customTo)
+      }
+      return
+    }
+    fetchData(interval)
+  }, [fetchData, interval, customFrom, customTo])
 
   // Derived stats
   const totalCheckins = data?.total_checkins ?? 0
@@ -230,29 +245,74 @@ export default function InsightsClient({ slug }: Props) {
       </div>
 
       {/* Interval selector */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        {INTERVALS.map((iv) => (
-          <button
-            key={iv.key}
-            type="button"
-            onClick={() => setInterval(iv.key)}
-            style={{
-              height: '34px', padding: '0 14px',
-              background: interval === iv.key ? 'var(--brand)' : 'var(--surface-0)',
-              color: interval === iv.key ? '#fff' : 'var(--text-secondary)',
-              border: `1px solid ${interval === iv.key ? 'var(--brand)' : 'var(--border)'}`,
-              borderRadius: 'var(--radius-md)',
-              fontSize: '13px', fontFamily: 'DM Sans, sans-serif', fontWeight: interval === iv.key ? 600 : 400,
-              cursor: 'pointer',
-              transition: 'background 0.15s, color 0.15s',
-            }}
-          >
-            {iv.label}
-          </button>
-        ))}
+      <div style={{ marginBottom: '24px' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {INTERVALS.map((iv) => (
+            <button
+              key={iv.key}
+              type="button"
+              onClick={() => setInterval(iv.key)}
+              style={{
+                height: '34px', padding: '0 14px',
+                background: interval === iv.key ? 'var(--brand)' : 'var(--surface-0)',
+                color: interval === iv.key ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${interval === iv.key ? 'var(--brand)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius-md)',
+                fontSize: '13px', fontFamily: 'DM Sans, sans-serif', fontWeight: interval === iv.key ? 600 : 400,
+                cursor: 'pointer',
+                transition: 'background 0.15s, color 0.15s',
+              }}
+            >
+              {iv.label}
+            </button>
+          ))}
+        </div>
+
+        {interval === 'custom' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+            <input
+              type="date"
+              value={customFrom}
+              min={workspaceCreatedAt}
+              max={customTo || todayISO()}
+              onChange={(e) => setCustomFrom(e.target.value)}
+              style={{
+                height: '34px', padding: '0 10px',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                color: 'var(--navy)', background: 'var(--surface-0)',
+                cursor: 'pointer', outline: 'none',
+              }}
+            />
+            <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif' }}>to</span>
+            <input
+              type="date"
+              value={customTo}
+              min={workspaceCreatedAt}
+              max={todayISO()}
+              onChange={(e) => setCustomTo(e.target.value)}
+              style={{
+                height: '34px', padding: '0 10px',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
+                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
+                color: 'var(--navy)', background: 'var(--surface-0)',
+                cursor: 'pointer', outline: 'none',
+              }}
+            />
+            {customFrom && customTo && customFrom > customTo && (
+              <span style={{ fontSize: '12px', color: 'var(--danger)', fontFamily: 'DM Sans, sans-serif' }}>
+                Start date must be before end date
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {loading ? (
+      {interval === 'custom' && (!customFrom || !customTo || customFrom > customTo) ? (
+        <div style={{ padding: '60px 24px', textAlign: 'center', background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Select a date range above to view insights.</p>
+        </div>
+      ) : loading ? (
         <InsightsSkeleton />
       ) : !data || data.buckets.length === 0 ? (
         <div style={{ padding: '60px 24px', textAlign: 'center', background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
