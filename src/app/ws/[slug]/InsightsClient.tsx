@@ -228,39 +228,65 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
 
   // Derived stats
   const totalCheckins = data?.total_checkins ?? 0
-  const totalHours = data?.total_hours ?? 0
+  const avgHours = data?.avg_hours_per_member ?? 0;
   const peakBucket = data?.buckets.find((b) => b.key === data.peak_bucket)
   const presentBuckets = data?.buckets.filter((b) => b.unique_users > 0).length ?? 0
 
   return (
-    <div style={{ maxWidth: '960px', margin: '0 auto', padding: '24px 20px' }}>
+    <div style={{ maxWidth: "960px", margin: "0 auto", padding: "24px 20px" }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
-        <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--navy)', margin: 0 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          gap: "12px",
+          marginBottom: "24px",
+          flexWrap: "wrap",
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: "Syne, sans-serif",
+            fontSize: "22px",
+            fontWeight: 700,
+            color: "var(--navy)",
+            margin: 0,
+          }}
+        >
           Insights
         </h1>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-secondary)' }}>
+        <p
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "14px",
+            color: "var(--text-secondary)",
+          }}
+        >
           Attendance patterns and trends
         </p>
       </div>
 
       {/* Interval selector */}
-      <div style={{ marginBottom: '24px' }}>
-        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+      <div style={{ marginBottom: "24px" }}>
+        <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
           {INTERVALS.map((iv) => (
             <button
               key={iv.key}
               type="button"
               onClick={() => setInterval(iv.key)}
               style={{
-                height: '34px', padding: '0 14px',
-                background: interval === iv.key ? 'var(--brand)' : 'var(--surface-0)',
-                color: interval === iv.key ? '#fff' : 'var(--text-secondary)',
-                border: `1px solid ${interval === iv.key ? 'var(--brand)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-md)',
-                fontSize: '13px', fontFamily: 'DM Sans, sans-serif', fontWeight: interval === iv.key ? 600 : 400,
-                cursor: 'pointer',
-                transition: 'background 0.15s, color 0.15s',
+                height: "34px",
+                padding: "0 14px",
+                background:
+                  interval === iv.key ? "var(--brand)" : "var(--surface-0)",
+                color: interval === iv.key ? "#fff" : "var(--text-secondary)",
+                border: `1px solid ${interval === iv.key ? "var(--brand)" : "var(--border)"}`,
+                borderRadius: "var(--radius-md)",
+                fontSize: "13px",
+                fontFamily: "DM Sans, sans-serif",
+                fontWeight: interval === iv.key ? 600 : 400,
+                cursor: "pointer",
+                transition: "background 0.15s, color 0.15s",
               }}
             >
               {iv.label}
@@ -268,8 +294,16 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
           ))}
         </div>
 
-        {interval === 'custom' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+        {interval === "custom" && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              marginTop: "10px",
+              flexWrap: "wrap",
+            }}
+          >
             <input
               type="date"
               value={customFrom}
@@ -277,14 +311,27 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
               max={customTo || todayISO()}
               onChange={(e) => setCustomFrom(e.target.value)}
               style={{
-                height: '34px', padding: '0 10px',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-                color: 'var(--navy)', background: 'var(--surface-0)',
-                cursor: 'pointer', outline: 'none',
+                height: "34px",
+                padding: "0 10px",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                fontSize: "13px",
+                fontFamily: "DM Sans, sans-serif",
+                color: "var(--navy)",
+                background: "var(--surface-0)",
+                cursor: "pointer",
+                outline: "none",
               }}
             />
-            <span style={{ fontSize: '13px', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif' }}>to</span>
+            <span
+              style={{
+                fontSize: "13px",
+                color: "var(--text-muted)",
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              to
+            </span>
             <input
               type="date"
               value={customTo}
@@ -292,15 +339,26 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
               max={todayISO()}
               onChange={(e) => setCustomTo(e.target.value)}
               style={{
-                height: '34px', padding: '0 10px',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-                color: 'var(--navy)', background: 'var(--surface-0)',
-                cursor: 'pointer', outline: 'none',
+                height: "34px",
+                padding: "0 10px",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                fontSize: "13px",
+                fontFamily: "DM Sans, sans-serif",
+                color: "var(--navy)",
+                background: "var(--surface-0)",
+                cursor: "pointer",
+                outline: "none",
               }}
             />
             {customFrom && customTo && customFrom > customTo && (
-              <span style={{ fontSize: '12px', color: 'var(--danger)', fontFamily: 'DM Sans, sans-serif' }}>
+              <span
+                style={{
+                  fontSize: "12px",
+                  color: "var(--danger)",
+                  fontFamily: "DM Sans, sans-serif",
+                }}
+              >
                 Start date must be before end date
               </span>
             )}
@@ -308,21 +366,71 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
         )}
       </div>
 
-      {interval === 'custom' && (!customFrom || !customTo || customFrom > customTo) ? (
-        <div style={{ padding: '60px 24px', textAlign: 'center', background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Select a date range above to view insights.</p>
+      {interval === "custom" &&
+      (!customFrom || !customTo || customFrom > customTo) ? (
+        <div
+          style={{
+            padding: "60px 24px",
+            textAlign: "center",
+            background: "var(--surface-0)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "15px",
+              color: "var(--text-secondary)",
+              marginBottom: "4px",
+            }}
+          >
+            Select a date range above to view insights.
+          </p>
         </div>
       ) : loading ? (
         <InsightsSkeleton />
       ) : !data || data.buckets.length === 0 ? (
-        <div style={{ padding: '60px 24px', textAlign: 'center', background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>No check-in data for this period.</p>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>Charts will appear as your team checks in.</p>
+        <div
+          style={{
+            padding: "60px 24px",
+            textAlign: "center",
+            background: "var(--surface-0)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+          }}
+        >
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "15px",
+              color: "var(--text-secondary)",
+              marginBottom: "4px",
+            }}
+          >
+            No check-in data for this period.
+          </p>
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "13px",
+              color: "var(--text-muted)",
+            }}
+          >
+            Charts will appear as your team checks in.
+          </p>
         </div>
       ) : (
         <>
           {/* Summary stats */}
-          <div style={{ display: 'flex', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              marginBottom: "24px",
+              flexWrap: "wrap",
+            }}
+          >
             <StatCard
               label="Total members"
               value={data.total_members}
@@ -331,18 +439,18 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
             <StatCard
               label="Avg attendance"
               value={data.avg_daily_users}
-              sub={`people per ${interval === 'today' ? 'hour' : 'day'}`}
+              sub={`people per ${interval === "today" ? "hour" : "day"}`}
               color="var(--teal)"
             />
             <StatCard
               label="Check-ins"
               value={totalCheckins}
-              sub={`over ${presentBuckets} active ${interval === 'today' ? 'hours' : 'days'}`}
+              sub={`over ${presentBuckets} active ${interval === "today" ? "hours" : "days"}`}
             />
             <StatCard
               label="Hours logged"
-              value={fmtHours(totalHours)}
-              sub="total tracked"
+              value={fmtHours(avgHours)}
+              sub="avg per employee per day"
               color="var(--brand)"
             />
             {peakBucket && (
@@ -356,9 +464,18 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
           </div>
 
           {/* Charts */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "24px" }}
+          >
             {/* Attendance chart */}
-            <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+            <div
+              style={{
+                background: "var(--surface-0)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-lg)",
+                padding: "20px",
+              }}
+            >
               <BarChart
                 buckets={data.buckets}
                 valueKey="unique_users"
@@ -369,7 +486,14 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
             </div>
 
             {/* Hours chart */}
-            <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
+            <div
+              style={{
+                background: "var(--surface-0)",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-lg)",
+                padding: "20px",
+              }}
+            >
               <BarChart
                 buckets={data.buckets}
                 valueKey="total_hours"
@@ -381,35 +505,99 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
 
             {/* Attendance % by bucket */}
             {data.total_members > 0 && (
-              <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-                <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '14px' }}>
+              <div
+                style={{
+                  background: "var(--surface-0)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-lg)",
+                  padding: "20px",
+                }}
+              >
+                <p
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: "12px",
+                    fontWeight: 600,
+                    color: "var(--text-muted)",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.07em",
+                    marginBottom: "14px",
+                  }}
+                >
                   Attendance rate
                 </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "6px",
+                  }}
+                >
                   {data.buckets
                     .filter((b) => b.unique_users > 0)
                     .sort((a, b) => b.unique_users - a.unique_users)
                     .slice(0, 8)
                     .map((b) => {
-                      const pct = Math.round((b.unique_users / data.total_members) * 100)
+                      const pct = Math.round(
+                        (b.unique_users / data.total_members) * 100,
+                      );
                       return (
-                        <div key={b.key} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                          <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-secondary)', minWidth: '60px', flexShrink: 0 }}>
+                        <div
+                          key={b.key}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "10px",
+                          }}
+                        >
+                          <span
+                            style={{
+                              fontFamily: "DM Sans, sans-serif",
+                              fontSize: "12px",
+                              color: "var(--text-secondary)",
+                              minWidth: "60px",
+                              flexShrink: 0,
+                            }}
+                          >
                             {b.label}
                           </span>
-                          <div style={{ flex: 1, height: '10px', background: 'var(--surface-2)', borderRadius: '5px', overflow: 'hidden' }}>
-                            <div style={{
-                              width: `${pct}%`, height: '100%',
-                              background: pct >= 80 ? 'var(--teal)' : pct >= 50 ? 'var(--brand)' : 'var(--amber)',
-                              borderRadius: '5px',
-                              transition: 'width 0.4s ease',
-                            }} />
+                          <div
+                            style={{
+                              flex: 1,
+                              height: "10px",
+                              background: "var(--surface-2)",
+                              borderRadius: "5px",
+                              overflow: "hidden",
+                            }}
+                          >
+                            <div
+                              style={{
+                                width: `${pct}%`,
+                                height: "100%",
+                                background:
+                                  pct >= 80
+                                    ? "var(--teal)"
+                                    : pct >= 50
+                                      ? "var(--brand)"
+                                      : "var(--amber)",
+                                borderRadius: "5px",
+                                transition: "width 0.4s ease",
+                              }}
+                            />
                           </div>
-                          <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '11px', color: 'var(--text-muted)', minWidth: '40px', textAlign: 'right' }}>
+                          <span
+                            style={{
+                              fontFamily: "JetBrains Mono, monospace",
+                              fontSize: "11px",
+                              color: "var(--text-muted)",
+                              minWidth: "40px",
+                              textAlign: "right",
+                            }}
+                          >
                             {pct}%
                           </span>
                         </div>
-                      )
+                      );
                     })}
                 </div>
               </div>
@@ -418,5 +606,5 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
         </>
       )}
     </div>
-  )
+  );
 }

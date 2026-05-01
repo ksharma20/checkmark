@@ -11,7 +11,11 @@ CheckMark sends two categories of notifications:
 | Stale reminders | 4h, 8h, 12h, 16h, 18h, 20h, 22h from check-in | Client `setTimeout` + SW `showNotification` |
 | Auto-checkout warning | T−15 min before `scheduled_checkout_at` | Client `setTimeout` + SW `showNotification` |
 | Auto-checkout | At `scheduled_checkout_at` (T+12h) | Client `setTimeout` → `POST /api/checkin/checkout` |
-| Server push (future) | Cron / admin-triggered | `sendPushToUser()` → VAPID → SW |
+| Server push (cron) | Hourly cron (server-driven) | `POST /api/push/cron` → `sendPushToUser()` → VAPID → SW |
+
+Notes:
+- The cron endpoint requires `Authorization: Bearer ${CRON_SECRET}` and is **disabled** if `CRON_SECRET` is not set in the runtime environment.
+- The bundled GitHub Actions workflow (`.github/workflows/push-reminders.yml`) is intentionally skipped unless both `CRON_SECRET` and `APP_URL` secrets are configured in that repo.
 
 When the app is **open**: `showNotification()` fires + `playChime()` sounds + in-app toast appears.
 When the app is **closed**: SW receives the push event → OS notification popup.

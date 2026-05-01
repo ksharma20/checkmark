@@ -51,7 +51,9 @@ export default function CheckinButtons({
     initialActiveEvent ? "checked_in" : "checked_out",
   );
   const [activeEvent, setActiveEvent] = useState(initialActiveEvent);
-  const [loading, setLoading] = useState(false);
+  type LoadingAction = null | "gps_checkin" | "remote_checkin" | "checkout";
+  const [loadingAction, setLoadingAction] = useState<LoadingAction>(null);
+  const loading = loadingAction !== null;
   const [toast, setToast] = useState<{
     message: string;
     type: ToastType;
@@ -60,6 +62,47 @@ export default function CheckinButtons({
     title: string;
     message: string;
   } | null>(null);
+
+  function formatRemaining(ms: number): string {
+    const totalMins = Math.max(0, Math.ceil(ms / 60_000));
+    const h = Math.floor(totalMins / 60);
+    const m = totalMins % 60;
+    if (h === 0) return `${m}m`;
+    if (m === 0) return `${h}h`;
+    return `${h}h ${m}m`;
+  }
+
+  const [autoCheckoutLabel, setAutoCheckoutLabel] = useState<string | null>(
+    null,
+  );
+
+  // Auto-checkout countdown (minute-based) using device clock
+  useEffect(() => {
+    const scheduled = activeEvent?.scheduled_checkout_at ?? null;
+    if (!scheduled) {
+      setAutoCheckoutLabel(null);
+      return;
+    }
+
+    const scheduledAtMs = new Date(scheduled).getTime();
+    if (!Number.isFinite(scheduledAtMs)) {
+      setAutoCheckoutLabel(null);
+      return;
+    }
+
+    const update = () => {
+      const remainingMs = scheduledAtMs - Date.now();
+      setAutoCheckoutLabel(
+        remainingMs > 0
+          ? `Auto checkout in ${formatRemaining(remainingMs)}`
+          : null,
+      );
+    };
+
+    update();
+    const id = window.setInterval(update, 60_000);
+    return () => window.clearInterval(id);
+  }, [activeEvent?.scheduled_checkout_at]);
 
   // Listen for push messages from the service worker — show in-app toast + play chime
   useEffect(() => {
@@ -76,7 +119,6 @@ export default function CheckinButtons({
     navigator.serviceWorker.addEventListener("message", handler);
     return () =>
       navigator.serviceWorker.removeEventListener("message", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function requestNotificationPermission() {
@@ -121,7 +163,7 @@ export default function CheckinButtons({
 
   async function handleCheckin() {
     if (state !== "checked_out" || loading) return;
-    setLoading(true);
+    setLoadingAction("gps_checkin");
     startProgress();
     try {
       const gps = await collectGps();
@@ -145,7 +187,7 @@ export default function CheckinButtons({
                     "Your device could not determine your location. Check that location services are enabled and try again.",
                 },
         );
-        setLoading(false);
+        setLoadingAction(null);
         stopProgress();
         return;
       }
@@ -188,13 +230,13 @@ export default function CheckinButtons({
       );
     } finally {
       stopProgress();
-      setLoading(false);
+      setLoadingAction(null);
     }
   }
 
   async function handleRemoteCheckin() {
     if (state !== "checked_out" || loading) return;
-    setLoading(true);
+    setLoadingAction("remote_checkin");
     startProgress();
     try {
       const deviceInfo = await collectDeviceInfo().catch(() => null);
@@ -208,7 +250,7 @@ export default function CheckinButtons({
           gps_accuracy_m: null,
           device_info: deviceInfo ? JSON.stringify(deviceInfo) : null,
           device_timezone: deviceInfo?.timezone ?? null,
-          is_remote: true,
+          event_type: "remote_checkin",
         }),
       });
 
@@ -234,27 +276,40 @@ export default function CheckinButtons({
       );
     } finally {
       stopProgress();
-      setLoading(false);
+      setLoadingAction(null);
     }
   }
 
   async function handleCheckout() {
     if (state !== "checked_in" || loading) return;
-    setLoading(true);
+    setLoadingAction("checkout");
     startProgress();
     try {
-      const gps = await collectGps();
+      const isRemote = activeEvent?.event_type === "remote_checkin";
+
+      // Remote sessions should not request or capture GPS on checkout.
+      // Office sessions: best-effort GPS, but never block checkout on it.
+      const gps = isRemote
+        ? ({ ok: false, reason: "unavailable" } as const)
+        : await Promise.race([
+            collectGps(),
+            new Promise<GpsResult>((resolve) =>
+              setTimeout(() => resolve({ ok: false, reason: "timeout" }), 1500),
+            ),
+          ]);
       const gpsCoords = gps.ok ? gps : null;
 
       const res = await fetch("/api/checkin/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          gps_lat: gpsCoords?.lat,
-          gps_lng: gpsCoords?.lng,
-          gps_accuracy_m: gpsCoords?.accuracy
-            ? Math.round(gpsCoords.accuracy)
-            : undefined,
+          gps_lat: isRemote ? null : gpsCoords?.lat,
+          gps_lng: isRemote ? null : gpsCoords?.lng,
+          gps_accuracy_m: isRemote
+            ? null
+            : gpsCoords?.accuracy
+              ? Math.round(gpsCoords.accuracy)
+              : undefined,
         }),
       });
 
@@ -264,7 +319,10 @@ export default function CheckinButtons({
         const hrs = data.duration_hours ? fmtHours(data.duration_hours) : "";
         setState("checked_out");
         setActiveEvent(null);
-        showToast(`Checked out${hrs ? ` — ${hrs} logged` : ""}`, "success");
+        showToast(
+          `Checked out${hrs ? ` — ${hrs} logged` : ""}${gps.ok ? "" : isRemote ? "" : " (location not captured)"}`,
+          "success",
+        );
         router.refresh();
       } else if (res.status === 409) {
         setState("checked_out");
@@ -278,7 +336,7 @@ export default function CheckinButtons({
       showToast("Network error. Please try again.", "error");
     } finally {
       stopProgress();
-      setLoading(false);
+      setLoadingAction(null);
     }
   }
 
@@ -330,13 +388,26 @@ export default function CheckinButtons({
           fontSize: "15px",
           fontFamily: "DM Sans, sans-serif",
           color: isCheckedIn ? "var(--teal)" : "var(--text-secondary)",
-          marginBottom: "16px",
+          marginBottom: autoCheckoutLabel ? "8px" : "16px",
         }}
       >
         {isCheckedIn && activeEvent
           ? `Checked in at ${fmtTimeOnDate(activeEvent.checkin_at)}`
           : "Not checked in yet"}
       </p>
+
+      {isCheckedIn && autoCheckoutLabel && (
+        <p
+          style={{
+            fontSize: "13px",
+            fontFamily: "DM Sans, sans-serif",
+            color: "var(--text-muted)",
+            marginBottom: "16px",
+          }}
+        >
+          {autoCheckoutLabel}
+        </p>
+      )}
 
       {/* Toast */}
       {toast && (
@@ -358,7 +429,13 @@ export default function CheckinButtons({
 
       {/* "I'm here" — only when CHECKED_OUT */}
       {!isCheckedIn && (
-        <div style={{ display: "flex", justifyContent: "space-between", gap: "5px" }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: "5px",
+          }}
+        >
           <button
             onClick={handleCheckin}
             disabled={loading}
@@ -376,7 +453,7 @@ export default function CheckinButtons({
               letterSpacing: "-0.2px",
             }}
           >
-            {loading ? "Getting location…" : "I'm here"}
+            {loadingAction === "gps_checkin" ? "Getting location…" : "I'm here"}
           </button>
           {allowRemote && (
             <button
@@ -396,7 +473,9 @@ export default function CheckinButtons({
                 letterSpacing: "-0.2px",
               }}
             >
-              Remote
+              {loadingAction === "remote_checkin"
+                ? "Checking in…"
+                : "Remote check-in"}
             </button>
           )}
         </div>
@@ -420,7 +499,7 @@ export default function CheckinButtons({
             cursor: loading ? "not-allowed" : "pointer",
           }}
         >
-          {loading ? "Getting location…" : "I'm leaving"}
+          {loadingAction === "checkout" ? "Checking out…" : "I'm leaving"}
         </button>
       )}
 

@@ -33,26 +33,32 @@ export async function POST(request: NextRequest) {
   }
 
   let body: {
-    gps_lat?: number
-    gps_lng?: number
-    gps_accuracy_m?: number
-    note?: string
-    event_type?: string
-    device_info?: string | null
-    device_timezone?: string | null
-  }
+    gps_lat?: number;
+    gps_lng?: number;
+    gps_accuracy_m?: number;
+    note?: string;
+    event_type?: string;
+    is_remote?: boolean;
+    device_info?: string | null;
+    device_timezone?: string | null;
+  };
   try {
-    body = await request.json()
+    body = await request.json();
   } catch {
-    body = {}
+    body = {};
   }
 
-  const ip = extractIp(request)
-  const geo = await getIpGeo(ip)
+  const ip = extractIp(request);
+  const geo = await getIpGeo(ip);
+
+  // Backwards compatibility: older clients send `is_remote: true`.
+  // Canonical representation is `event_type: 'remote_checkin'`.
+  const resolvedEventType =
+    body.event_type ?? (body.is_remote ? "remote_checkin" : "office_checkin");
 
   const event = await createEvent({
     userId,
-    eventType: body.event_type ?? 'office_checkin',
+    eventType: resolvedEventType,
     ipAddress: ip,
     ipGeoLat: geo?.lat ?? null,
     ipGeoLng: geo?.lng ?? null,
@@ -60,10 +66,10 @@ export async function POST(request: NextRequest) {
     gpsLng: body.gps_lng ?? null,
     gpsAccuracyM: body.gps_accuracy_m ?? null,
     note: body.note ?? null,
-    source: 'user_app',
+    source: "user_app",
     deviceInfo: body.device_info ?? null,
     deviceTimezone: body.device_timezone ?? null,
-  })
+  });
   if (!event)
     return NextResponse.json({ error: 'Check-in failed', code: 'DB_ERROR' }, { status: 500 })
 

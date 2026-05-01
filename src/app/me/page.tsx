@@ -1,73 +1,90 @@
-import Link from 'next/link'
-import { getServerUser } from '@/lib/auth'
-import { getOpenEventToday, getUserEvents } from '@/lib/db/queries/events'
-import { getUserWorkspaces, getWorkspacesByIds } from '@/lib/db/queries/workspaces'
-import { getUserById } from '@/lib/db/queries/users'
-import { queryWorkspaceEvents } from '@/lib/signals'
-import { dateKeyInTimezone, summarizeAttendanceDays } from '@/lib/attendance-summary'
-import { monthBoundsUtc, todayInTz } from '@/lib/timezone'
-import CheckinButtons from '@/components/user/CheckinButtons'
-import EventCard from '@/components/user/EventCard'
-import TimezoneReporter from '@/components/user/TimezoneReporter'
+import { getServerUser } from "@/lib/auth";
+import { getOpenEventToday, getUserEvents } from "@/lib/db/queries/events";
+import {
+  getUserWorkspaces,
+  getWorkspacesByIds,
+} from "@/lib/db/queries/workspaces";
+import { getUserById } from "@/lib/db/queries/users";
+import { queryWorkspaceEvents } from "@/lib/signals";
+import {
+  dateKeyInTimezone,
+  summarizeAttendanceDays,
+} from "@/lib/attendance-summary";
+import { monthBoundsUtc, todayInTz } from "@/lib/timezone";
+import CheckinButtons from "@/components/user/CheckinButtons";
+import EventCard from "@/components/user/EventCard";
+import TimezoneReporter from "@/components/user/TimezoneReporter";
+import WorkspacesStrip from "./WorkspacesStrip";
 
 export default async function MePage() {
-  const user = await getServerUser()
-  if (!user) return null
+  const user = await getServerUser();
+  if (!user) return null;
 
-  const todayUtcStr = new Date().toISOString().split('T')[0]
+  const todayUtcStr = new Date().toISOString().split("T")[0];
 
   const [activeEvent, todayResult, memberships, profile] = await Promise.all([
     getOpenEventToday(user.userId),
-    getUserEvents({ userId: user.userId, start: `${todayUtcStr}T00:00:00.000Z`, end: `${todayUtcStr}T23:59:59.999Z` }),
+    getUserEvents({
+      userId: user.userId,
+      start: `${todayUtcStr}T00:00:00.000Z`,
+      end: `${todayUtcStr}T23:59:59.999Z`,
+    }),
     getUserWorkspaces(user.userId),
     getUserById(user.userId),
-  ])
+  ]);
 
-  const todayEvents = todayResult.events
+  const todayEvents = todayResult.events;
 
   // Workspace names for the orgs strip
-  const workspaceIds = memberships.map((m) => m.workspace_id)
-  const workspaces = await getWorkspacesByIds(workspaceIds)
-  const wsMap = new Map(workspaces.map((w) => [w.id, w]))
-  const primaryMembership = memberships[0] ?? null
-  const primaryWorkspace = primaryMembership ? wsMap.get(primaryMembership.workspace_id) : null
+  const workspaceIds = memberships.map((m) => m.workspace_id);
+  const workspaces = await getWorkspacesByIds(workspaceIds);
+  const wsMap = new Map(workspaces.map((w) => [w.id, w]));
+  const primaryMembership = memberships[0] ?? null;
+  const primaryWorkspace = primaryMembership
+    ? wsMap.get(primaryMembership.workspace_id)
+    : null;
 
-  let wfoDays = 0
-  let wfhDays = 0
-  let leaveDays = 0
+  let wfoDays = 0;
+  let wfhDays = 0;
+  let leaveDays = 0;
 
   if (primaryMembership && primaryWorkspace) {
-    const timezone = primaryWorkspace.display_timezone
-    const todayLocal = todayInTz(timezone)
-    const [year, month] = todayLocal.split('-').map(Number)
-    const monthStartLocal = `${year}-${String(month).padStart(2, '0')}-01`
-    const joinedLocal = dateKeyInTimezone(primaryMembership.added_at, timezone)
-    const summaryStart = joinedLocal > monthStartLocal ? joinedLocal : monthStartLocal
-    const bounds = monthBoundsUtc(year, month, timezone)
-    const monthEvents = await queryWorkspaceEvents(primaryWorkspace.id, primaryWorkspace.plan, {
-      startDate: bounds.start,
-      endDate: bounds.end,
-      userId: user.userId,
-    })
+    const timezone = primaryWorkspace.display_timezone;
+    const todayLocal = todayInTz(timezone);
+    const [year, month] = todayLocal.split("-").map(Number);
+    const monthStartLocal = `${year}-${String(month).padStart(2, "0")}-01`;
+    const joinedLocal = dateKeyInTimezone(primaryMembership.added_at, timezone);
+    const summaryStart =
+      joinedLocal > monthStartLocal ? joinedLocal : monthStartLocal;
+    const bounds = monthBoundsUtc(year, month, timezone);
+    const monthEvents = await queryWorkspaceEvents(
+      primaryWorkspace.id,
+      primaryWorkspace.plan,
+      {
+        startDate: bounds.start,
+        endDate: bounds.end,
+        userId: user.userId,
+      },
+    );
     const summary = summarizeAttendanceDays({
       events: monthEvents,
       startDate: summaryStart,
       endDate: todayLocal,
       timezone,
       todayDate: todayLocal,
-    })
+    });
 
-    wfoDays = summary.officeDays
-    wfhDays = summary.remoteDays
-    leaveDays = summary.absentDays
+    wfoDays = summary.officeDays;
+    wfhDays = summary.remoteDays;
+    leaveDays = summary.absentDays;
   }
 
   return (
     <div
       style={{
-        maxWidth: '480px',
-        margin: '0 auto',
-        padding: '20px 16px',
+        maxWidth: "480px",
+        margin: "0 auto",
+        padding: "20px 16px",
       }}
     >
       {/* Silent timezone reporter - keeps DB in sync with browser timezone */}
@@ -76,38 +93,55 @@ export default async function MePage() {
       {/* Check-in / checkout buttons (includes status line + active indicator) */}
       <CheckinButtons
         activeEvent={activeEvent}
-        name={profile?.full_name ?? user.email.split('@')[0]}
+        name={profile?.full_name ?? user.email.split("@")[0]}
         allowRemote={!!primaryWorkspace?.allow_remote}
       />
 
       {/* This month attendance summary */}
       <div
         style={{
-          display: 'grid',
-          gridTemplateColumns: '1fr 1fr 1fr',
-          gap: '8px',
-          margin: '20px 0',
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr 1fr",
+          gap: "8px",
+          margin: "20px 0",
         }}
       >
-        {([
-          { value: wfoDays, label: 'WFO', sub: 'this month', color: 'var(--teal)' },
-          { value: wfhDays, label: 'WFH', sub: 'this month', color: 'var(--brand)' },
-          { value: leaveDays, label: 'On Leave', sub: 'this month', color: 'var(--amber)' },
-        ] as const).map((card) => (
+        {(
+          [
+            {
+              value: wfoDays,
+              label: "WFO",
+              sub: "this month",
+              color: "var(--teal)",
+            },
+            {
+              value: wfhDays,
+              label: "WFH",
+              sub: "this month",
+              color: "var(--brand)",
+            },
+            {
+              value: leaveDays,
+              label: "On Leave",
+              sub: "this month",
+              color: "var(--amber)",
+            },
+          ] as const
+        ).map((card) => (
           <div
             key={card.label}
             style={{
-              background: 'var(--surface-0)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)',
-              padding: '12px 8px',
-              textAlign: 'center',
+              background: "var(--surface-0)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: "12px 8px",
+              textAlign: "center",
             }}
           >
             <div
               style={{
-                fontFamily: 'Syne, sans-serif',
-                fontSize: '22px',
+                fontFamily: "Syne, sans-serif",
+                fontSize: "22px",
                 fontWeight: 700,
                 color: card.color,
                 lineHeight: 1,
@@ -117,21 +151,21 @@ export default async function MePage() {
             </div>
             <div
               style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '11px',
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "11px",
                 fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginTop: '4px',
+                color: "var(--text-primary)",
+                marginTop: "4px",
               }}
             >
               {card.label}
             </div>
             <div
               style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '10px',
-                color: 'var(--text-muted)',
-                marginTop: '1px',
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "10px",
+                color: "var(--text-muted)",
+                marginTop: "1px",
               }}
             >
               {card.sub}
@@ -142,16 +176,16 @@ export default async function MePage() {
 
       {/* Today's events */}
       {todayEvents.length > 0 && (
-        <section style={{ marginBottom: '24px' }}>
+        <section style={{ marginBottom: "24px" }}>
           <h2
             style={{
-              fontFamily: 'Syne, sans-serif',
-              fontSize: '14px',
+              fontFamily: "Syne, sans-serif",
+              fontSize: "14px",
               fontWeight: 600,
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '10px',
+              color: "var(--text-secondary)",
+              textTransform: "uppercase",
+              letterSpacing: "0.05em",
+              marginBottom: "10px",
             }}
           >
             Today
@@ -162,89 +196,48 @@ export default async function MePage() {
         </section>
       )}
 
-      {/* Orgs strip */}
-      {memberships.length > 0 && (
-        <section>
-          <h2
-            style={{
-              fontFamily: 'Syne, sans-serif',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '10px',
-            }}
-          >
-            In workspaces
-          </h2>
-          {memberships.map((m) => {
-            const ws = wsMap.get(m.workspace_id)
-            if (!ws) return null
-            return (
-              <Link
-                key={m.id}
-                href={`/me/ws/${ws.slug}`}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  background: 'var(--surface-0)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '12px 14px',
-                  marginBottom: '8px',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                }}
-                className="ws-card-link"
-              >
-                <div>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
-                    {ws.name}
-                  </div>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                    {m.role}
-                  </div>
-                </div>
-                <div style={{ marginLeft: 'auto', textAlign: 'right', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div>
-                    <div style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px', color: 'var(--navy)' }}>
-                      {wfoDays + wfhDays}
-                    </div>
-                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      days this month
-                    </div>
-                  </div>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--brand)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="9 18 15 12 9 6" />
-                  </svg>
-                </div>
-              </Link>
-            )
-          })}
-        </section>
-      )}
+      {/* Workspaces strip */}
+      <WorkspacesStrip
+        items={memberships.flatMap((m) => {
+          const ws = wsMap.get(m.workspace_id);
+          if (!ws) return [];
+          return [{ id: m.id, slug: ws.slug, name: ws.name, role: m.role }];
+        })}
+      />
 
       {/* Empty state - no activity yet */}
       {todayEvents.length === 0 && memberships.length === 0 && (
         <div
           style={{
-            marginTop: '32px',
-            padding: '32px 20px',
-            textAlign: 'center',
-            background: 'var(--surface-0)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-lg)',
+            marginTop: "32px",
+            padding: "32px 20px",
+            textAlign: "center",
+            background: "var(--surface-0)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
           }}
         >
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "15px",
+              color: "var(--text-secondary)",
+              marginBottom: "4px",
+            }}
+          >
             Tap &ldquo;I&apos;m here&rdquo; when you arrive somewhere.
           </p>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>
+          <p
+            style={{
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "13px",
+              color: "var(--text-muted)",
+            }}
+          >
             Your check-in history will build up here over time.
           </p>
         </div>
       )}
     </div>
-  )
+  );
 }
