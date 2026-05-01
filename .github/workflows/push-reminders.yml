@@ -7,11 +7,22 @@ on:
 
 jobs:
   remind:
-    if: ${{ secrets.CRON_SECRET != '' && secrets.APP_URL != '' }}
     runs-on: ubuntu-latest
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      APP_URL: ${{ secrets.APP_URL }}
     steps:
+      - name: Gate (require cron secrets)
+        id: gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const ok = Boolean(process.env.CRON_SECRET && process.env.APP_URL)
+            core.setOutput('ok', ok ? 'true' : 'false')
+
       - name: Trigger push reminders
+        if: steps.gate.outputs.ok == 'true'
         run: |
           curl -sf -m 30 -X POST \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "${{ secrets.APP_URL }}/api/push/cron"
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "${APP_URL}/api/push/cron"
