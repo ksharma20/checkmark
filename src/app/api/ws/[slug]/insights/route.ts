@@ -46,6 +46,23 @@ function isoDate(y: number, m: number, d: number) {
   return `${y}-${zp(m)}-${zp(d)}`;
 }
 
+function weekdayFromDateStr(dateStr: string): number {
+  // dateStr is YYYY-MM-DD in workspace timezone; use noon UTC to avoid day rollover.
+  return new Date(`${dateStr}T12:00:00Z`).getUTCDay();
+}
+
+function addDays(dateStr: string, deltaDays: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10);
+}
+
+function startOfWeekMonday(dateStr: string): string {
+  // Monday=0, Sunday=6
+  const dow = weekdayFromDateStr(dateStr); // 0=Sun..6=Sat
+  const daysSinceMonday = (dow + 6) % 7;
+  return addDays(dateStr, -daysSinceMonday);
+}
+
 /** Sum session hours for completed events */
 function sessionHours(
   events: { checkin_at: string; checkout_at: string | null }[],
@@ -108,7 +125,13 @@ export async function GET(request: NextRequest, { params }: Props) {
   const toParam = url.searchParams.get("to"); // YYYY-MM-DD (custom only)
 
   const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
+  let tz = ctx.workspace.display_timezone || "UTC";
+  const todayStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
 
   // Compute date range and bucket definitions based on interval
   let startDate: string;
@@ -123,8 +146,6 @@ export async function GET(request: NextRequest, { params }: Props) {
   const bucketDefs: BucketDef[] = [];
 
   if (interval === "today") {
-    const tz = ctx.workspace.display_timezone || "UTC";
-
     // Helper: date string (YYYY-MM-DD) in workspace timezone
     const localDateStr = (dt: Date) =>
       new Intl.DateTimeFormat("en-CA", {
@@ -205,40 +226,53 @@ export async function GET(request: NextRequest, { params }: Props) {
       });
     }
   } else if (interval === "week") {
-    const weekAgo = new Date(now);
-    weekAgo.setUTCDate(weekAgo.getUTCDate() - 6);
-    startDate = weekAgo.toISOString().slice(0, 10) + "T00:00:00Z";
+    const weekStart = startOfWeekMonday(todayStr);
+    startDate = weekStart + "T00:00:00Z";
     endDate = todayStr + "T23:59:59Z";
-    // Daily buckets for last 7 days
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(now);
-      d.setUTCDate(d.getUTCDate() - i);
-      const dayStr = d.toISOString().slice(0, 10);
-      const label = d.toLocaleDateString("en-US", {
-        weekday: "short",
-        month: "short",
-        day: "numeric",
-        timeZone: "UTC",
-      });
+
+    // Daily buckets for current week (Mon..today in workspace timezone)
+    for (let i = 0; i < 7; i++) {
+      const dayStr = addDays(weekStart, i);
+      if (dayStr > todayStr) break;
+      const label = new Date(dayStr + "T12:00:00Z").toLocaleDateString(
+        "en-US",
+        {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        },
+      );
       bucketDefs.push({
         key: dayStr,
         label,
-        match: (dt) => dt.toISOString().slice(0, 10) === dayStr,
+        match: (dt) =>
+          new Intl.DateTimeFormat("en-CA", {
+            timeZone: tz,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(dt) === dayStr,
       });
     }
   } else if (interval === "month") {
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth() + 1;
-    startDate = isoDate(year, month, 1) + "T00:00:00Z";
-    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-    endDate = isoDate(year, month, lastDay) + "T23:59:59Z";
-    // Daily buckets 1..lastDay
-    for (let d = 1; d <= lastDay; d++) {
-      const dayStr = isoDate(year, month, d);
+    const [y, m, d] = todayStr.split("-").map(Number);
+    const monthStart = isoDate(y, m, 1);
+    startDate = monthStart + "T00:00:00Z";
+    endDate = todayStr + "T23:59:59Z";
+
+    // Daily buckets 1..today (workspace timezone)
+    for (let day = 1; day <= d; day++) {
+      const dayStr = isoDate(y, m, day);
       bucketDefs.push({
         key: dayStr,
-        label: String(d),
-        match: (dt) => dt.toISOString().slice(0, 10) === dayStr,
+        label: String(day),
+        match: (dt) =>
+          new Intl.DateTimeFormat("en-CA", {
+            timeZone: tz,
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
+          }).format(dt) === dayStr,
       });
     }
   } else if (interval === "3month") {
@@ -436,7 +470,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     return ev.matched_by === "verified" || ev.matched_by === "override";
   });
 
-  const tz = ctx.workspace.display_timezone || "UTC";
+  tz = ctx.workspace.display_timezone || "UTC";
   const localToday = new Intl.DateTimeFormat("en-CA", {
     timeZone: tz,
     year: "numeric",

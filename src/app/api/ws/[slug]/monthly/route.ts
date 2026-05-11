@@ -10,13 +10,14 @@ import {
   nextDateKey,
   summarizeAttendanceDays,
 } from "@/lib/attendance-summary";
+import { listHolidayDatesInRange } from "@/lib/db/queries/holidays";
 import { localMidnightToUtc, todayInTz } from "@/lib/timezone";
 
 interface Props {
   params: Promise<{ slug: string }>;
 }
 
-export type DayStatus = "office" | "remote" | "absent" | "future";
+export type DayStatus = "office" | "remote" | "absent" | "holiday" | "future";
 
 export interface MemberMonthRow {
   user_id: string;
@@ -91,18 +92,19 @@ export async function GET(request: NextRequest, { params }: Props) {
   const startUtc = localMidnightToUtc(startDate, tz);
   const endUtc = localMidnightToUtc(nextDateKey(endDate), tz);
 
-  const [allEvents, memberDetails, workspaceSignals] = await Promise.all([
+  const [allEvents, memberDetails, workspaceSignals, holidayDates] = await Promise.all([
     queryWorkspaceEvents(workspace.id, workspace.plan, {
       startDate: startUtc,
       endDate: endUtc,
     }),
     getActiveMembersWithDetails(workspace.id),
     getWorkspaceSignals(workspace.id),
+    listHolidayDatesInRange(workspace.id, startDate, endDate),
   ]);
 
   const signals_configured = workspaceSignals.length > 0;
   const effectiveEndDate = endDate > todayStr ? todayStr : endDate;
-  const working_days = countWorkdays(startDate, effectiveEndDate);
+  const working_days = countWorkdays(startDate, effectiveEndDate, holidayDates);
   const byUser = new Map<string, typeof allEvents>();
   for (const ev of allEvents) {
     const userEvents = byUser.get(ev.user_id) ?? [];
@@ -119,6 +121,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       endDate,
       timezone: tz,
       todayDate: todayStr,
+      holidayDates,
     });
 
     return {

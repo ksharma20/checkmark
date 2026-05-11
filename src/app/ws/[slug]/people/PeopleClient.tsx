@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
-import { KeyRound, Trash2 } from 'lucide-react'
+import { useState, useCallback, useEffect, useRef } from "react";
+import { KeyRound, Search, Trash2 } from "lucide-react";
+import { en } from "@/locales/en";
 
 interface Member {
   member_id: string
@@ -255,22 +256,70 @@ function TransferOwnershipModal({ slug, target, onDone, onCancel }: TransferModa
 export default function PeopleClient({ slug }: Props) {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [pagination, setPagination] = useState<{
+    nextOffset: number | null;
+    total: number;
+  } | null>(null);
+  const paginationNextRef = useRef<number | null>(null);
+  const [search, setSearch] = useState("");
+  const [searchDraft, setSearchDraft] = useState("");
   const [email, setEmail] = useState('')
   const [inviting, setInviting] = useState(false)
   const [inviteStatus, setInviteStatus] = useState<{ text: string; ok: boolean } | null>(null)
   const [removingId, setRemovingId] = useState<string | null>(null)
   const [transferTarget, setTransferTarget] = useState<Member | null>(null);
 
-  const loadMembers = useCallback(async () => {
-    const res = await fetch(`/api/ws/${slug}/members`)
-    if (res.ok) {
-      const data = await res.json()
-      setMembers(data.members ?? [])
-    }
-    setLoading(false)
-  }, [slug])
+  const loadMembers = useCallback(
+    async (opts?: { append?: boolean }) => {
+      const append = !!opts?.append;
+      if (append) setLoadingMore(true);
+      else setLoading(true);
 
-  useEffect(() => { loadMembers() }, [loadMembers])
+      if (!append) paginationNextRef.current = null;
+      const nextOffset = append ? (paginationNextRef.current ?? 0) : 0;
+      const res = await fetch(
+        `/api/ws/${slug}/members?limit=10&offset=${nextOffset}&search=${encodeURIComponent(search)}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const nextMembers = (data.members ?? []) as Member[];
+        const nextCursor = data.pagination?.nextOffset ?? null;
+        paginationNextRef.current = nextCursor;
+        setMembers((prev) =>
+          append ? [...prev, ...nextMembers] : nextMembers,
+        );
+        setPagination((prev) => ({
+          nextOffset: nextCursor,
+          total: data.total ?? prev?.total ?? 0,
+        }));
+      }
+      if (append) setLoadingMore(false);
+      else setLoading(false);
+    },
+    [slug, search],
+  );
+
+  useEffect(() => {
+    setMembers([]);
+    setPagination(null);
+    paginationNextRef.current = null;
+    loadMembers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug, search]);
+
+  // useEffect(() => {
+  //   const handle = window.setTimeout(() => {
+  //     const next = searchDraft.trim();
+  //     if (next !== search) setSearch(next);
+  //   }, 300);
+  //   return () => window.clearTimeout(handle);
+  // }, [searchDraft, search]);
+
+  function applySearch() {
+    const next = searchDraft.trim();
+    if (next !== search) setSearch(next);
+  }
 
   async function invite() {
     const e = email.trim().toLowerCase()
@@ -306,43 +355,15 @@ export default function PeopleClient({ slug }: Props) {
     setRemovingId(null)
   }
 
-  if (loading) {
-    const skBase: React.CSSProperties = {
-      background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
-      backgroundSize: '600px 100%',
-      animation: 'shimmer 1.4s ease-in-out infinite',
-      borderRadius: '6px',
-    }
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {/* Invite form skeleton */}
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '20px' }}>
-          <div style={{ ...skBase, height: '14px', width: '120px', marginBottom: '14px' }} />
-          <div style={{ ...skBase, height: '13px', width: '280px', marginBottom: '14px' }} />
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <div style={{ ...skBase, flex: 1, height: '40px', borderRadius: 'var(--radius-md)' }} />
-            <div style={{ ...skBase, width: '100px', height: '40px', borderRadius: 'var(--radius-md)' }} />
-          </div>
-        </div>
-        {/* Member list skeleton */}
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-            <div style={{ ...skBase, height: '14px', width: '90px' }} />
-          </div>
-          {[1, 2, 3].map((i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 20px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ ...skBase, width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0 }} />
-              <div style={{ flex: 1 }}>
-                <div style={{ ...skBase, height: '13px', width: '140px', marginBottom: '6px' }} />
-                <div style={{ ...skBase, height: '11px', width: '180px' }} />
-              </div>
-              <div style={{ ...skBase, height: '20px', width: '48px', borderRadius: '4px' }} />
-            </div>
-          ))}
-        </div>
-      </div>
-    )
-  }
+  const skBase: React.CSSProperties = {
+    background:
+      "linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)",
+    backgroundSize: "600px 100%",
+    animation: "shimmer 1.4s ease-in-out infinite",
+    borderRadius: "6px",
+  };
+
+  const canViewMore = pagination?.nextOffset != null;
 
   return (
     <div>
@@ -365,17 +386,27 @@ export default function PeopleClient({ slug }: Props) {
           marginBottom: "16px",
         }}
       >
-        <h2
+        <div
           style={{
-            fontFamily: "Syne, sans-serif",
-            fontSize: "15px",
-            fontWeight: 600,
-            color: "var(--navy)",
-            marginBottom: "12px",
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
           }}
         >
-          Invite someone
-        </h2>
+          <h2
+            style={{
+              fontFamily: "Syne, sans-serif",
+              fontSize: "15px",
+              fontWeight: 600,
+              color: "var(--navy)",
+              marginBottom: "12px",
+            }}
+          >
+            Invite someone
+          </h2>
+        </div>
         <p
           style={{
             fontFamily: "DM Sans, sans-serif",
@@ -443,6 +474,11 @@ export default function PeopleClient({ slug }: Props) {
       >
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "12px",
+            flexWrap: "wrap",
             padding: "16px 20px",
             borderBottom: "1px solid var(--border)",
           }}
@@ -455,159 +491,356 @@ export default function PeopleClient({ slug }: Props) {
               color: "var(--navy)",
             }}
           >
-            Members ({members.length})
+            Members ({pagination?.total ?? members.length})
           </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+            <input
+              type="search"
+              placeholder="Search name or email"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && applySearch()}
+              style={{
+                height: "36px",
+                padding: "0 10px",
+                border: "1px solid var(--border)",
+                borderRadius: "var(--radius-md)",
+                fontSize: "13px",
+                fontFamily: "DM Sans, sans-serif",
+                background: "var(--surface-0)",
+                color: "var(--text-primary)",
+                outline: "none",
+                minWidth: "220px",
+                flex: "0 1 260px",
+              }}
+            />
+            <button
+              type="button"
+              onClick={applySearch}
+              title="Apply search"
+              style={{
+                height: "36px",
+                width: "36px",
+                borderRadius: "var(--radius-md)",
+                border: "1px solid var(--border)",
+                background: "var(--surface-0)",
+                color: "var(--text-secondary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                cursor: "pointer",
+                flexShrink: 0,
+              }}
+            >
+              <Search size={16} />
+            </button>
+          </div>
         </div>
 
-        {members.length === 0 ? (
-          <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+        {loading ? (
+          <div style={{ padding: "16px 20px" }}>
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  padding: "14px 0",
+                  borderBottom: i < 3 ? "1px solid var(--border)" : "none",
+                }}
+              >
+                <div
+                  style={{
+                    ...skBase,
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "50%",
+                    flexShrink: 0,
+                  }}
+                />
+                <div style={{ flex: 1 }}>
+                  <div
+                    style={{
+                      ...skBase,
+                      height: "13px",
+                      width: "140px",
+                      marginBottom: "6px",
+                    }}
+                  />
+                  <div style={{ ...skBase, height: "11px", width: "180px" }} />
+                </div>
+                <div
+                  style={{
+                    ...skBase,
+                    height: "20px",
+                    width: "48px",
+                    borderRadius: "4px",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        ) : members.length === 0 ? (
+          <div style={{ padding: "40px 24px", textAlign: "center" }}>
+            <p
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "15px",
+                color: "var(--text-secondary)",
+                marginBottom: "4px",
+              }}
+            >
               No members yet.
             </p>
-            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>
+            <p
+              style={{
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "13px",
+                color: "var(--text-muted)",
+              }}
+            >
               Use the invite form above to add your team.
             </p>
           </div>
         ) : (
-          members.map((m, i) => (
-            <div
-              key={m.member_id}
-              className="member-row"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                padding: "14px 20px",
-                borderBottom:
-                  i < members.length - 1 ? "1px solid var(--border)" : "none",
-              }}
-            >
-              {/* Avatar */}
+          <>
+            {members.map((m, i) => (
               <div
+                key={m.member_id}
+                className="member-row"
                 style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "50%",
-                  background:
-                    "color-mix(in srgb, var(--brand) 15%, transparent)",
                   display: "flex",
                   alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "14px",
-                  fontFamily: "DM Sans, sans-serif",
-                  fontWeight: 600,
-                  color: "var(--brand)",
-                  flexShrink: 0,
+                  gap: "12px",
+                  padding: "14px 20px",
+                  borderBottom:
+                    i < members.length - 1 || loadingMore
+                      ? "1px solid var(--border)"
+                      : "none",
                 }}
               >
-                {(m.full_name ?? m.email)[0].toUpperCase()}
-              </div>
-
-              {/* Info */}
-              <div style={{ flex: 1, minWidth: 0 }}>
+                {/* Avatar */}
                 <div
                   style={{
-                    fontFamily: "DM Sans, sans-serif",
+                    width: "36px",
+                    height: "36px",
+                    borderRadius: "50%",
+                    background:
+                      "color-mix(in srgb, var(--brand) 15%, transparent)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                     fontSize: "14px",
-                    fontWeight: 500,
-                    color: "var(--text-primary)",
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
+                    fontFamily: "DM Sans, sans-serif",
+                    fontWeight: 600,
+                    color: "var(--brand)",
+                    flexShrink: 0,
                   }}
                 >
-                  {m.full_name ?? m.email}
+                  {(m.full_name ?? m.email)[0].toUpperCase()}
                 </div>
-                {m.full_name && (
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
                       fontFamily: "DM Sans, sans-serif",
-                      fontSize: "12px",
-                      color: "var(--text-muted)",
+                      fontSize: "14px",
+                      fontWeight: 500,
+                      color: "var(--text-primary)",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                     }}
                   >
-                    {m.email}
+                    {m.full_name ?? m.email}
                   </div>
-                )}
-              </div>
+                  {m.full_name && (
+                    <div
+                      style={{
+                        fontFamily: "DM Sans, sans-serif",
+                        fontSize: "12px",
+                        color: "var(--text-muted)",
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {m.email}
+                    </div>
+                  )}
+                </div>
 
-              {/* Role + Status + Actions - wraps below name on mobile */}
-              <div className="member-meta" style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-                <span
+                {/* Role + Status + Actions - wraps below name on mobile */}
+                <div
+                  className="member-meta"
                   style={{
-                    fontSize: "12px",
-                    fontFamily: "DM Sans, sans-serif",
-                    color: "var(--text-muted)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    flexShrink: 0,
                   }}
                 >
-                  {m.role}
-                </span>
-
-                <span className="member-status-badge">{statusBadge(m.status)}</span>
-                <span
-                  className="member-status-dot"
-                  title={m.status === 'active' ? 'Active' : m.status === 'pending_consent' ? 'Invite sent' : 'Declined'}
-                  style={{
-                    width: '8px', height: '8px', borderRadius: '50%', flexShrink: 0,
-                    background: m.status === 'active' ? 'var(--teal)' : m.status === 'pending_consent' ? 'var(--amber)' : 'var(--danger)',
-                    display: 'none',
-                  }}
-                />
-
-                {m.role !== "admin" && m.status === "active" && (
-                  <button
-                    onClick={() => setTransferTarget(m)}
-                    title="Make owner"
+                  <span
                     style={{
-                      background: "none",
-                      border: "1px solid var(--border)",
-                      borderRadius: "var(--radius-sm)",
-                      color: "var(--text-secondary)",
-                      fontSize: "11px",
-                      fontFamily: "DM Sans, sans-serif",
-                      cursor: "pointer",
-                      padding: "3px 8px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
-                    }}
-                  >
-                    <KeyRound className="member-btn-icon" size={14} />
-                    <span className="member-btn-label">Make owner</span>
-                  </button>
-                )}
-
-                {m.role !== "admin" && (
-                  <button
-                    onClick={() => remove(m.member_id)}
-                    disabled={removingId === m.member_id}
-                    title="Remove member"
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--danger)",
                       fontSize: "12px",
                       fontFamily: "DM Sans, sans-serif",
-                      cursor: removingId === m.member_id ? "not-allowed" : "pointer",
-                      padding: "0 4px",
-                      opacity: removingId === m.member_id ? 0.5 : 1,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "4px",
+                      color: "var(--text-muted)",
                     }}
                   >
-                    <Trash2 className="member-btn-icon" size={13} />
-                    <span className="member-btn-label">Remove</span>
-                  </button>
-                )}
+                    {m.role}
+                  </span>
+
+                  <span className="member-status-badge">
+                    {statusBadge(m.status)}
+                  </span>
+                  <span
+                    className="member-status-dot"
+                    title={
+                      m.status === "active"
+                        ? "Active"
+                        : m.status === "pending_consent"
+                          ? "Invite sent"
+                          : "Declined"
+                    }
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                      background:
+                        m.status === "active"
+                          ? "var(--teal)"
+                          : m.status === "pending_consent"
+                            ? "var(--amber)"
+                            : "var(--danger)",
+                      display: "none",
+                    }}
+                  />
+
+                  {m.role !== "admin" && m.status === "active" && (
+                    <button
+                      onClick={() => setTransferTarget(m)}
+                      title="Make owner"
+                      style={{
+                        background: "none",
+                        border: "1px solid var(--border)",
+                        borderRadius: "var(--radius-sm)",
+                        color: "var(--text-secondary)",
+                        fontSize: "11px",
+                        fontFamily: "DM Sans, sans-serif",
+                        cursor: "pointer",
+                        padding: "3px 8px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <KeyRound className="member-btn-icon" size={14} />
+                      <span className="member-btn-label">Make owner</span>
+                    </button>
+                  )}
+
+                  {m.role !== "admin" && (
+                    <button
+                      onClick={() => remove(m.member_id)}
+                      disabled={removingId === m.member_id}
+                      title="Remove member"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--danger)",
+                        fontSize: "12px",
+                        fontFamily: "DM Sans, sans-serif",
+                        cursor:
+                          removingId === m.member_id
+                            ? "not-allowed"
+                            : "pointer",
+                        padding: "0 4px",
+                        opacity: removingId === m.member_id ? 0.5 : 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                      }}
+                    >
+                      <Trash2 className="member-btn-icon" size={13} />
+                      <span className="member-btn-label">Remove</span>
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            ))}
+            {loadingMore &&
+              [1, 2, 3].map((k) => (
+                <div
+                  key={`sk-more-${k}`}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    padding: "14px 20px",
+                    borderBottom: k < 3 ? "1px solid var(--border)" : "none",
+                  }}
+                >
+                  <div
+                    style={{
+                      ...skBase,
+                      width: "36px",
+                      height: "36px",
+                      borderRadius: "50%",
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        ...skBase,
+                        height: "13px",
+                        width: "140px",
+                        marginBottom: "6px",
+                      }}
+                    />
+                    <div
+                      style={{ ...skBase, height: "11px", width: "180px" }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      ...skBase,
+                      height: "20px",
+                      width: "48px",
+                      borderRadius: "4px",
+                    }}
+                  />
+                </div>
+              ))}
+          </>
         )}
       </div>
+
+      {canViewMore && (
+        <div style={{ marginTop: "12px" }}>
+          <button
+            type="button"
+            onClick={() => loadMembers({ append: true })}
+            disabled={loadingMore}
+            style={{
+              height: "44px",
+              width: "100%",
+              borderRadius: "var(--radius-md)",
+              border: "1px solid var(--border)",
+              background: "var(--surface-0)",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "13px",
+              fontWeight: 600,
+              cursor: loadingMore ? "default" : "pointer",
+            }}
+          >
+            {loadingMore ? en.wsPeople.loadingMore : en.wsPeople.viewMore}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

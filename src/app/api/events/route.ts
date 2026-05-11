@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl
   const start = searchParams.get('start') ?? undefined
   const end = searchParams.get('end') ?? undefined
-  const limit = Math.min(parseInt(searchParams.get('limit') ?? '50', 10), 500)
+  const limit = Math.min(parseInt(searchParams.get("limit") ?? "10", 10), 500);
   const offset = parseInt(searchParams.get('offset') ?? '0', 10)
 
   const { events, total } = await getUserEvents({ userId, start, end, limit, offset })

@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getOpenEventToday, checkoutEvent, updateCheckoutLocationLabel } from '@/lib/db/queries/events'
+import {
+  getOpenEventToday,
+  checkoutEvent,
+  updateCheckoutLocationLabel,
+  getEventByIdForUser,
+} from "@/lib/db/queries/events";
 import { updateUserStats } from '@/lib/stats'
 import { extractIp, getIpGeo, haversineMetres } from '@/lib/geo'
 import { getGpsSignalsForUser } from '@/lib/db/queries/workspaces'
 import { reverseGeocodeLabel } from '@/lib/geo-label'
+
+/** Budget for resolving checkout address before responding (ms); slower paths use fire-and-forget */
+const CHECKOUT_GEOCODE_INLINE_TIMEOUT_MS = 2500
+
+async function reverseGeocodeLabelWithTimeout(
+  lat: number,
+  lng: number,
+): Promise<string | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      reverseGeocodeLabel(lat, lng).catch(() => null),
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), CHECKOUT_GEOCODE_INLINE_TIMEOUT_MS)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -79,12 +104,27 @@ export async function POST(request: NextRequest) {
 
   updateUserStats(userId).catch(console.error)
 
-  // Fire-and-forget: resolve checkout GPS to human label
+  let responseEvent = event;
   if (body.gps_lat != null && body.gps_lng != null) {
-    reverseGeocodeLabel(body.gps_lat, body.gps_lng)
-      .then((label) => { if (label) return updateCheckoutLocationLabel(event.id, label) })
-      .catch(() => {})
+    const inlineLabel = await reverseGeocodeLabelWithTimeout(
+      body.gps_lat,
+      body.gps_lng,
+    );
+    if (inlineLabel) {
+      await updateCheckoutLocationLabel(event.id, inlineLabel);
+      const refreshed = await getEventByIdForUser(event.id, userId);
+      if (refreshed) responseEvent = refreshed;
+    } else {
+      reverseGeocodeLabel(body.gps_lat, body.gps_lng)
+        .then((label) => {
+          if (label) return updateCheckoutLocationLabel(event.id, label);
+        })
+        .catch(() => {});
+    }
   }
 
-  return NextResponse.json({ event, duration_hours: durationHours })
+  return NextResponse.json({
+    event: responseEvent,
+    duration_hours: durationHours,
+  });
 }

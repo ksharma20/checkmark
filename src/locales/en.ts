@@ -7,32 +7,32 @@ export const en = {
   brand: {
     name: brand,
     shortName: brand,
-    tagline: 'Presence Intelligence Platform',
+    tagline: "Presence Intelligence Platform",
     taglineLong: "Know where your team is. Own where you've been.",
-    domain: 'checkmark.kabirinnovations.com',
-    email: 'noreply@kabirinnovations.com',
+    domain: "checkmark.kabirinnovations.com",
+    email: "noreply@kabirinnovations.com",
     description: `Presence Intelligence Platform - know where your team is, own where you've been.`,
   },
 
   landing: {
-    heroHeadline: 'Presence intelligence\nfor modern teams',
+    heroHeadline: "Presence intelligence\nfor modern teams",
     heroSubtitle: `Know who's in the office. Plan your week with purpose. ${brand} makes hybrid work actually work - without surveillance.`,
-    footerText: 'Built for humans who work in offices sometimes.',
+    footerText: "Built for humans who work in offices sometimes.",
     features: [
       {
         title: "Know who's in today",
-        body: 'Your Today dashboard shows which team members are in the office right now, who visited earlier, and who stayed remote - updated by the second.',
+        body: "Your Today dashboard shows which team members are in the office right now, who visited earlier, and who stayed remote - updated by the second.",
       },
       {
-        title: 'Privacy by design',
-        body: 'Employees choose to participate. Every data point belongs to the person who created it. Consent can be withdrawn at any time with one click.',
+        title: "Privacy by design",
+        body: "Employees choose to participate. Every data point belongs to the person who created it. Consent can be withdrawn at any time with one click.",
       },
       {
-        title: 'Verified domains, zero friction',
-        body: 'Add your company domain and anyone who signs up with a matching email is auto-enrolled - no invite required.',
+        title: "Verified domains, zero friction",
+        body: "Add your company domain and anyone who signs up with a matching email is auto-enrolled - no invite required.",
       },
       {
-        title: 'Multiple signals',
+        title: "Multiple signals",
         body: "Wi-Fi network detection, GPS check-in, IP geofencing, and manual override. Whichever fits your team's setup.",
       },
     ],
@@ -60,16 +60,77 @@ export const en = {
     brandLogo: brand,
   },
 
+  /** Member workspace Today accordion (/me/ws/[slug]) */
+  meWsToday: {
+    tabPeopleInOffice: "People in Office Today",
+    tabPeopleRemote: "People working Remotely Today",
+    tabPeopleNotCheckedIn: "People not Checked in Today",
+    tabHolidayCalendar: "Holiday Calendar",
+    badgeRemote: "Remote",
+    errorFailedToLoad: "Failed to load",
+    errorWorkspaceNotFound: "Workspace not found",
+    emptyNoHolidaysConfigured: (year: number) =>
+      `No holidays configured for ${year}`,
+    badgeToday: "Today",
+    emptyNoOneHereYet: "No one here yet",
+    leaveWorkspaceButtonAria: "Leave this workspace",
+    leaveWorkspaceTitle: "Leave workspace?",
+    leaveWorkspaceMessage: (workspaceName: string) =>
+      `Leave ${workspaceName}? You will no longer appear in their presence dashboard.`,
+    leaveWorkspaceConfirm: "Leave",
+    leaveWorkspaceCancel: "Cancel",
+    leaveWorkspaceLoading: "Leaving…",
+    leaveWorkspaceError: "Could not leave workspace. Try again.",
+    leaveWorkspaceSoleAdmin:
+      "You are the only workspace admin. Transfer ownership before leaving.",
+  },
+
+  /** /me/timeline workspace filter + per-workspace verification context */
+  meTimeline: {
+    workspaceLabel: "Workspace",
+    workspaceAll: "All workspaces",
+    transparencyHint:
+      "All workspaces shows your events without org-specific verification. Pick a workspace to see how your check-ins evaluate against that workspace’s signals.",
+    matchedVerified: "Verified",
+    matchedPartial: "Partial match",
+    matchedNone: "Unverified",
+    matchedOverride: "Admin override",
+    matchedSignals: "Signals matched",
+    checkoutLocationNotCaptured: "Location not captured",
+    viewMore: "View more",
+    loadingMore: "Loading more…",
+    emptyNoCheckinsTitle: "No check-ins in this date range.",
+    emptyNoCheckinsBody: "Try expanding the date range above.",
+  },
+
+  wsDisputes: {
+    viewMore: "View more",
+    loadingMore: "Loading more…",
+  },
+
+  wsPeople: {
+    viewMore: "View more",
+    loadingMore: "Loading more…",
+  },
+
+  /** /ws/:slug/members/:userId member timeline */
+  wsMemberTimeline: {
+    viewMore: "View more",
+    loadingMore: "Loading more…",
+  },
+
   email: {
     otp: {
       subject: (code: string) => `${code} is your ${brand} verification code`,
       heading: `Your ${brand} verification code`,
-      body: 'Use this code to verify your email address. It expires in 10 minutes.',
+      body: "Use this code to verify your email address. It expires in 10 minutes.",
       footer: "If you didn't request this, you can safely ignore this email.",
     },
     consent: {
-      subject: (workspaceName: string) => `${workspaceName} wants to track your work presence`,
-      heading: (workspaceName: string) => `You've been invited to ${workspaceName}`,
+      subject: (workspaceName: string) =>
+        `${workspaceName} wants to track your work presence`,
+      heading: (workspaceName: string) =>
+        `You've been invited to ${workspaceName}`,
       body: (workspaceName: string) =>
         `<strong>${workspaceName}</strong> has added your email to their ${brand} workspace. This means they can see your work presence events (office check-ins, client visits, etc.) after you consent.`,
       revoke: `Your data always belongs to you. You can revoke access at any time from your ${brand} profile.`,
@@ -79,46 +140,68 @@ export const en = {
 
   constants: {
     // ── Auth cookies ──────────────────────────────────────────────────────────
-    cookieSession:        'cm_session',
-    cookieOtp:            'cm_otp_ok',
-    cookieUI:             'cm_ui',
+    cookieSession: "cm_session",
+    cookieOtp: "cm_otp_ok",
+    cookieUI: "cm_ui",
 
     // ── Domain verification ───────────────────────────────────────────────────
     // DNS TXT: _checkmark-verify.{domain}  IN TXT  "checkmark-verify={token}"
-    dnsVerifySubdomain:   '_checkmark-verify',
-    dnsVerifyValuePrefix: 'checkmark-verify',
+    dnsVerifySubdomain: "_checkmark-verify",
+    dnsVerifyValuePrefix: "checkmark-verify",
 
     // ── Database ──────────────────────────────────────────────────────────────
-    dbFile:               'checkmark.db',
+    dbFile: "checkmark.db",
 
     // ── HTTP ──────────────────────────────────────────────────────────────────
-    geoUserAgent:         'CheckMark/1.0 (presence-platform)',
+    geoUserAgent: "CheckMark/1.0 (presence-platform)",
 
     // ── Browser storage / notification tags (CheckinButtons) ─────────────────
-    staleNotifKey:        'cm_stale_notif_count',
-    staleNotifEventKey:   'cm_stale_notif_event',
-    notifTagStale:        'cm-stale-checkin',
-    notifTagAutoCheckout: 'cm-auto-checkout',
+    staleNotifKey: "cm_stale_notif_count",
+    staleNotifEventKey: "cm_stale_notif_event",
+    notifTagStale: "cm-stale-checkin",
+    notifTagAutoCheckout: "cm-auto-checkout",
   },
 
   notifications: {
     // Stale check-in reminders - fired at 4h, 8h, 12h, 16h, 18h, 20h, 22h after check-in
     stale: {
-      4:  { title: `${brand} - half day?`,                 body: "You've been in for 4 hours. If you're doing a half day, now's a good time to check out and head home!" },
-      8:  { title: `${brand} - time to wrap up?`,          body: "It's been 8 hours. Work-life balance matters - feel free to head out!" },
-      12: { title: `${brand} - still going?`,              body: '12 hours in! Dedication noted, but rest is important too. Time to head home.' },
-      16: { title: `${brand} - seriously though`,          body: '16 hours checked in. Even the most committed need sleep. Please check out!' },
-      18: { title: `${brand} - we are worried`,            body: "18 hours! Your productivity has left the building. Be kind to yourself - go home." },
-      20: { title: `${brand} - this is getting serious`,   body: '20 hours and counting. We genuinely recommend a bed over your desk right now.' },
-      22: { title: `${brand} - final warning`,             body: '22 hours! Auto-checkout happens in 2 hours. This is your last chance to do it yourself.' },
+      4: {
+        title: `${brand} - half day?`,
+        body: "You've been in for 4 hours. If you're doing a half day, now's a good time to check out and head home!",
+      },
+      8: {
+        title: `${brand} - time to wrap up?`,
+        body: "It's been 8 hours. Work-life balance matters - feel free to head out!",
+      },
+      12: {
+        title: `${brand} - still going?`,
+        body: "12 hours in! Dedication noted, but rest is important too. Time to head home.",
+      },
+      16: {
+        title: `${brand} - seriously though`,
+        body: "16 hours checked in. Even the most committed need sleep. Please check out!",
+      },
+      18: {
+        title: `${brand} - we are worried`,
+        body: "18 hours! Your productivity has left the building. Be kind to yourself - go home.",
+      },
+      20: {
+        title: `${brand} - this is getting serious`,
+        body: "20 hours and counting. We genuinely recommend a bed over your desk right now.",
+      },
+      22: {
+        title: `${brand} - final warning`,
+        body: "22 hours! Auto-checkout happens in 2 hours. This is your last chance to do it yourself.",
+      },
     } as Record<number, { title: string; body: string }>,
     staleFallback: {
       title: `${brand} - still checked in?`,
-      body: (hours: number) => `You've been checked in for ${hours} hours. Did you forget to check out?`,
+      body: (hours: number) =>
+        `You've been checked in for ${hours} hours. Did you forget to check out?`,
     },
     autoCheckout: {
       title: `${brand} - auto checked out`,
-      body: 'You were automatically checked out after 24 hours.',
+      body: "You were automatically checked out after 24 hours.",
     },
   },
-}
+};

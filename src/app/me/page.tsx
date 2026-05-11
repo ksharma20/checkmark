@@ -10,6 +10,7 @@ import {
   dateKeyInTimezone,
   summarizeAttendanceDays,
 } from "@/lib/attendance-summary";
+import { listHolidayDatesInRange } from "@/lib/db/queries/holidays";
 import { monthBoundsUtc, todayInTz } from "@/lib/timezone";
 import CheckinButtons from "@/components/user/CheckinButtons";
 import EventCard from "@/components/user/EventCard";
@@ -57,21 +58,21 @@ export default async function MePage() {
     const summaryStart =
       joinedLocal > monthStartLocal ? joinedLocal : monthStartLocal;
     const bounds = monthBoundsUtc(year, month, timezone);
-    const monthEvents = await queryWorkspaceEvents(
-      primaryWorkspace.id,
-      primaryWorkspace.plan,
-      {
+    const [monthEvents, holidayDates] = await Promise.all([
+      queryWorkspaceEvents(primaryWorkspace.id, primaryWorkspace.plan, {
         startDate: bounds.start,
         endDate: bounds.end,
         userId: user.userId,
-      },
-    );
+      }),
+      listHolidayDatesInRange(primaryWorkspace.id, summaryStart, todayLocal),
+    ]);
     const summary = summarizeAttendanceDays({
       events: monthEvents,
       startDate: summaryStart,
       endDate: todayLocal,
       timezone,
       todayDate: todayLocal,
+      holidayDates,
     });
 
     wfoDays = summary.officeDays;

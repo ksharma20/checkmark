@@ -5,6 +5,7 @@ import { queryWorkspaceEvents } from '@/lib/signals'
 import { getWorkspaceSignals } from '@/lib/db/queries/signals'
 import { haversineMetres } from '@/lib/geo'
 import { countWorkdays, dateKeyInTimezone, isOfficeMatched, nextDateKey, summarizeAttendanceDays } from '@/lib/attendance-summary'
+import { listHolidayDatesInRange } from '@/lib/db/queries/holidays'
 import { localMidnightToUtc, todayInTz } from '@/lib/timezone'
 
 interface Props { params: Promise<{ slug: string }> }
@@ -93,12 +94,13 @@ export async function GET(request: NextRequest, { params }: Props) {
   const endUtc = localMidnightToUtc(nextDateKey(endDate), tz)
 
   // Fetch all events in range (signal-matched)
-  const [allEvents, workspaceSignals] = await Promise.all([
+  const [allEvents, workspaceSignals, holidayDates] = await Promise.all([
     queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, {
       startDate: startUtc,
       endDate: endUtc,
     }),
     getWorkspaceSignals(ctx.workspace.id),
+    listHolidayDatesInRange(ctx.workspace.id, startDate, effectiveEndDate),
   ])
 
   const signals_configured = workspaceSignals.length > 0
@@ -113,7 +115,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   // Get member details for names
   const memberDetails = await getActiveMembersWithDetails(ctx.workspace.id)
 
-  const global_working_days = countWorkdays(startDate, effectiveEndDate)
+  const global_working_days = countWorkdays(startDate, effectiveEndDate, holidayDates)
 
   const members: AnalyticsMember[] = []
 
@@ -162,6 +164,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       endDate: effectiveEndDate,
       timezone: tz,
       todayDate: todayLocal,
+      holidayDates,
     })
     const attendance_days = summary.officeDays + summary.remoteDays
     const total_hours = office_hours + wfh_hours

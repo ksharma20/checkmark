@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAdmin } from '@/lib/ws-admin'
 import {
-  getAllMembersWithDetails,
+  getAllMembersWithDetailsPaged,
   getWorkspaceDomains,
   getWorkspaceMemberByEmail,
   upsertInvitedMember,
-} from '@/lib/db/queries/workspaces'
+} from "@/lib/db/queries/workspaces";
 import { sendConsentEmail } from '@/lib/email'
 
 interface Props { params: Promise<{ slug: string }> }
@@ -15,8 +15,28 @@ export async function GET(request: NextRequest, { params }: Props) {
   const ctx = await requireWsAdmin(request, slug)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
-  const members = await getAllMembersWithDetails(ctx.workspace.id)
-  return NextResponse.json({ members })
+  const sp = request.nextUrl.searchParams;
+  const limit = Math.min(parseInt(sp.get("limit") ?? "10", 10), 100);
+  const offset = Math.max(0, parseInt(sp.get("offset") ?? "0", 10));
+  const search = sp.get("search") ?? "";
+
+  const { members, total } = await getAllMembersWithDetailsPaged({
+    workspaceId: ctx.workspace.id,
+    limit,
+    offset,
+    search,
+  });
+
+  return NextResponse.json({
+    members,
+    total,
+    pagination: {
+      offset,
+      limit,
+      nextOffset:
+        offset + members.length < total ? offset + members.length : null,
+    },
+  });
 }
 
 export async function POST(request: NextRequest, { params }: Props) {

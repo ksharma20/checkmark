@@ -45,14 +45,12 @@ export async function queryWorkspaceEvents(
   // Get active member user IDs (only status='active' members)
   let memberIds = await getActiveMemberIds(workspaceId)
 
-  // Apply user limit for free plan
-  if (planLimits.maxUsers !== null && memberIds.length > planLimits.maxUsers) {
-    memberIds = memberIds.slice(0, planLimits.maxUsers)
-  }
-
-  // Filter to specific user if requested
+  // Filter to a single member if requested (skip free-plan cap so that member always sees their own rows)
   if (options.userId) {
-    memberIds = memberIds.filter((id) => id === options.userId)
+    if (!memberIds.includes(options.userId)) return []
+    memberIds = [options.userId]
+  } else if (planLimits.maxUsers !== null && memberIds.length > planLimits.maxUsers) {
+    memberIds = memberIds.slice(0, planLimits.maxUsers)
   }
 
   if (memberIds.length === 0) return []

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getWorkspaceBySlug, getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
-import { db } from '@/lib/db'
+import {
+  getWorkspaceBySlug,
+  getActiveMembersWithDetails,
+  getWorkspaceMember,
+} from "@/lib/db/queries/workspaces";
 import { todayInTz, localMidnightToUtc } from '@/lib/timezone'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import type { MatchedBy } from '@/lib/signals'
@@ -35,11 +38,10 @@ export async function GET(
   if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Auth: active member only (not necessarily admin)
-  const membership = await db.queryOne<{ id: string }>(
-    `SELECT id FROM workspace_members WHERE workspace_id = ? AND user_id = ? AND status = 'active'`,
-    [ws.id, userId]
-  )
-  if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const membership = await getWorkspaceMember(ws.id, userId);
+  if (!membership || membership.status !== "active") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const todayStr = todayInTz(ws.display_timezone)
   const startUtc = localMidnightToUtc(todayStr, ws.display_timezone)
@@ -90,5 +92,9 @@ export async function GET(
     }
   })
 
-  return NextResponse.json({ workspace: { name: ws.name, slug: ws.slug }, members: result })
+  return NextResponse.json({
+    workspace: { id: ws.id, name: ws.name, slug: ws.slug },
+    viewerRole: membership.role,
+    members: result,
+  });
 }

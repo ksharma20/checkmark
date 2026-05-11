@@ -53,6 +53,16 @@ AI agent coordination guide for working on this codebase.
 
 ---
 
+## User-facing copy
+
+English UI copy, emails, and stable technical identifiers live in `src/locales/en.ts`. Import `en` and use nested keys (for example `en.meWsToday.tabPeopleNotCheckedIn`). Avoid hardcoding product strings in components or routes; when editing a file that still has literals, prefer moving those strings into `en` in the same change. Technical identifiers (cookie names, DNS prefixes, DB filenames) already belong under `en.constants`.
+
+### Multi-workspace + `/me/timeline`
+
+Users can be active in multiple workspaces. The default **All workspaces** timeline (`GET /api/events`) shows the user’s presence history without workspace-scoped signal evaluation. When a workspace is selected in the UI, use **`GET /api/me/ws/[slug]/events`** (member auth + membership check) so `queryWorkspaceEvents()` can attach `matched_by` / `matched_signals` for that workspace only. Do not add `workspace_id` to `presence_events`; keep AND semantics in `lib/signals.ts`.
+
+---
+
 ## Signal Matching - The Core
 
 Before touching `lib/signals.ts` or any dashboard code, understand this:

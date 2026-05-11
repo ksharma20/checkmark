@@ -862,7 +862,9 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
   const fetchDash = useCallback(async (isSilent = false) => {
     if (!isSilent) setDashLoading(true)
     try {
-      const res = await fetch(`/api/ws/${slug}/dashboard?status=all&signal=all&sortBy=name&sortDir=asc&page=1&limit=500`)
+      const res = await fetch(
+        `/api/ws/${slug}/dashboard?status=all&signal=all&sortBy=name&sortDir=asc&page=1&limit=10`,
+      );
       if (res.ok) {
         setData(await res.json())
         setLastUpdated(new Date())

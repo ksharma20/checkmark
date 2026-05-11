@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+import { en } from "@/locales/en";
 import { useParams } from "next/navigation";
 import { fmtTime, durationLabel } from "@/lib/client/format-time";
 import type { MatchedBy } from "@/lib/signals";
@@ -57,7 +58,12 @@ interface EventWithMatch {
 interface TimelineResponse {
   member: MemberInfo;
   events: EventWithMatch[];
-  pagination: { page: number; limit: number; total: number; pages: number };
+  pagination: {
+    offset: number;
+    limit: number;
+    total: number;
+    nextOffset: number | null;
+  };
 }
 
 function TrustPopover({ flags }: { flags: string[] }) {
@@ -405,30 +411,65 @@ function groupByDay(events: EventWithMatch[]): { date: string; label: string; it
 
 export default function MemberDetailPage() {
   const { slug, memberId } = useParams<{ slug: string; memberId: string }>();
-  const [data, setData] = useState<TimelineResponse | null>(null);
+  const [member, setMember] = useState<MemberInfo | null>(null);
+  const [events, setEvents] = useState<EventWithMatch[]>([]);
+  const [pagination, setPagination] = useState<{
+    total: number;
+    nextOffset: number | null;
+  } | null>(null);
+  const nextOffsetRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const load = useCallback(
-    (p: number) => {
-      setLoading(true);
-      fetch(`/api/ws/${slug}/members/${memberId}/timeline?page=${p}`)
-        .then((r) => r.json())
-        .then((d: TimelineResponse) => {
-          setData(d);
-          setPage(p);
-          setLoading(false);
-        })
-        .catch(() => setLoading(false));
+    async (opts?: { append?: boolean }) => {
+      const append = !!opts?.append;
+      if (append) setLoadingMore(true);
+      else setLoading(true);
+      try {
+        if (!append) nextOffsetRef.current = null;
+        const offset = append ? (nextOffsetRef.current ?? 0) : 0;
+        const res = await fetch(
+          `/api/ws/${slug}/members/${memberId}/timeline?offset=${offset}`,
+        );
+        if (!res.ok) {
+          setMember(null);
+          setEvents([]);
+          setPagination(null);
+          return;
+        }
+        const d = (await res.json()) as TimelineResponse;
+        const next = d.pagination?.nextOffset ?? null;
+        nextOffsetRef.current = next;
+        if (!append) setMember(d.member);
+        setEvents((prev) => (append ? [...prev, ...d.events] : d.events));
+        setPagination({
+          total: d.pagination.total,
+          nextOffset: next,
+        });
+      } catch {
+        if (!append) {
+          setMember(null);
+          setEvents([]);
+          setPagination(null);
+        }
+      } finally {
+        if (append) setLoadingMore(false);
+        else setLoading(false);
+      }
     },
     [slug, memberId],
   );
 
   useEffect(() => {
-    load(1);
+    nextOffsetRef.current = null;
+    setMember(null);
+    setEvents([]);
+    setPagination(null);
+    load();
   }, [load]);
 
-  if (!data && loading)
+  if (!member && loading)
     return (
       <div
         style={{ maxWidth: "600px", margin: "0 auto", padding: "24px 16px" }}
@@ -449,8 +490,7 @@ export default function MemberDetailPage() {
       </div>
     );
 
-  if (!data) return null;
-  const { member, events, pagination } = data;
+  if (!member) return null;
 
   return (
     <div style={{ maxWidth: "600px", margin: "0 auto", padding: "24px 16px" }}>
@@ -610,21 +650,9 @@ export default function MemberDetailPage() {
             color: "var(--text-muted)",
           }}
         >
-          {pagination.total} events
+          {pagination?.total ?? 0} events
         </span>
       </div>
-
-      {loading && (
-        <div
-          style={{
-            height: "4px",
-            background: "var(--brand)",
-            borderRadius: "2px",
-            marginBottom: "12px",
-            animation: "cm-pulse 1s ease-in-out infinite",
-          }}
-        />
-      )}
 
       {events.length === 0 && !loading && (
         <p
@@ -640,33 +668,33 @@ export default function MemberDetailPage() {
       )}
 
       {groupByDay(events).map(({ date, label, items }) => (
-        <div key={date} style={{ marginBottom: '8px' }}>
+        <div key={date} style={{ marginBottom: "8px" }}>
           {/* Day heading */}
           <div
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              marginBottom: '10px',
-              marginTop: '20px',
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              marginBottom: "10px",
+              marginTop: "20px",
             }}
           >
             <div
               style={{
-                width: '3px',
-                height: '16px',
-                borderRadius: '2px',
-                background: 'var(--brand)',
+                width: "3px",
+                height: "16px",
+                borderRadius: "2px",
+                background: "var(--brand)",
                 flexShrink: 0,
               }}
             />
             <span
               style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '13px',
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "13px",
                 fontWeight: 700,
-                color: 'var(--text-secondary)',
-                whiteSpace: 'nowrap',
+                color: "var(--text-secondary)",
+                whiteSpace: "nowrap",
               }}
             >
               {label}
@@ -674,19 +702,19 @@ export default function MemberDetailPage() {
             <div
               style={{
                 flex: 1,
-                height: '1px',
-                background: 'rgba(27,77,255,0.3)',
+                height: "1px",
+                background: "rgba(27,77,255,0.3)",
               }}
             />
             <span
               style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '11px',
-                color: 'var(--text-muted)',
-                whiteSpace: 'nowrap',
+                fontFamily: "DM Sans, sans-serif",
+                fontSize: "11px",
+                color: "var(--text-muted)",
+                whiteSpace: "nowrap",
               }}
             >
-              {items.length} {items.length === 1 ? 'event' : 'events'}
+              {items.length} {items.length === 1 ? "event" : "events"}
             </span>
           </div>
           {items.map((ev) => (
@@ -695,56 +723,45 @@ export default function MemberDetailPage() {
         </div>
       ))}
 
-      {pagination.pages > 1 && (
-        <div
-          style={{
-            display: "flex",
-            gap: "8px",
-            justifyContent: "center",
-            marginTop: "16px",
-          }}
-        >
+      {loadingMore && (
+        <div style={{ marginTop: "8px" }}>
+          {[1, 2, 3].map((i) => (
+            <div
+              key={`tl-sk-${i}`}
+              style={{
+                height: "72px",
+                background: "var(--surface-2)",
+                borderRadius: "var(--radius-md)",
+                marginBottom: "8px",
+                animation: "cm-pulse 1.5s ease-in-out infinite",
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {(pagination?.nextOffset ?? null) !== null && (
+        <div style={{ marginTop: "16px" }}>
           <button
-            onClick={() => load(page - 1)}
-            disabled={page <= 1}
+            type="button"
+            onClick={() => load({ append: true })}
+            disabled={loadingMore}
             style={{
-              padding: "6px 16px",
+              width: "100%",
+              height: "44px",
+              borderRadius: "var(--radius-md)",
               border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              background: "transparent",
+              background: "var(--surface-0)",
               fontFamily: "DM Sans, sans-serif",
               fontSize: "13px",
-              cursor: page <= 1 ? "not-allowed" : "pointer",
-              opacity: page <= 1 ? 0.4 : 1,
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              cursor: loadingMore ? "default" : "pointer",
             }}
           >
-            ← Prev
-          </button>
-          <span
-            style={{
-              padding: "6px 12px",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "13px",
-              color: "var(--text-muted)",
-            }}
-          >
-            {page} / {pagination.pages}
-          </span>
-          <button
-            onClick={() => load(page + 1)}
-            disabled={page >= pagination.pages}
-            style={{
-              padding: "6px 16px",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              background: "transparent",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "13px",
-              cursor: page >= pagination.pages ? "not-allowed" : "pointer",
-              opacity: page >= pagination.pages ? 0.4 : 1,
-            }}
-          >
-            Next →
+            {loadingMore
+              ? en.wsMemberTimeline.loadingMore
+              : en.wsMemberTimeline.viewMore}
           </button>
         </div>
       )}

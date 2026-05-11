@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from "react";
 
 const NAV_ITEMS = [
   {
@@ -55,49 +56,69 @@ const NAV_ITEMS = [
 
 export default function BottomNav() {
   const pathname = usePathname()
+  const [workspaceCount, setWorkspaceCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data.workspaces))
+          setWorkspaceCount(data.workspaces.length);
+      })
+      .catch(() => {});
+  }, []);
+
+  const items = NAV_ITEMS.filter((item) => {
+    if (item.href !== "/me/orgs") return true;
+    if (workspaceCount === null) return true;
+    return workspaceCount > 1;
+  });
 
   return (
     <nav
       style={{
-        position: 'fixed',
+        position: "fixed",
         bottom: 0,
         left: 0,
         right: 0,
-        height: '64px',
-        background: 'var(--surface-0)',
-        borderTop: '1px solid var(--border)',
-        display: 'flex',
-        alignItems: 'stretch',
+        height: "64px",
+        background: "var(--surface-0)",
+        borderTop: "1px solid var(--border)",
+        display: "flex",
+        alignItems: "stretch",
         zIndex: 100,
       }}
     >
-      {NAV_ITEMS.map((item) => {
-        const active = item.href === '/me' ? pathname === '/me' : pathname.startsWith(item.href)
+      {items.map((item) => {
+        const active =
+          item.href === "/me"
+            ? pathname === "/me"
+            : pathname.startsWith(item.href);
         return (
           <Link
             key={item.href}
             href={item.href}
-            className={item.desktopOnly ? 'hidden sm:flex' : undefined}
+            className={item.desktopOnly ? "hidden sm:flex" : undefined}
             style={{
               flex: 1,
-              display: item.desktopOnly ? undefined : 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '3px',
-              textDecoration: 'none',
-              color: active ? 'var(--brand)' : 'var(--text-muted)',
-              fontSize: '11px',
-              fontFamily: 'DM Sans, sans-serif',
+              display: item.desktopOnly ? undefined : "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "3px",
+              textDecoration: "none",
+              color: active ? "var(--brand)" : "var(--text-muted)",
+              fontSize: "11px",
+              fontFamily: "DM Sans, sans-serif",
               fontWeight: active ? 500 : 400,
-              minHeight: '44px',
+              minHeight: "44px",
             }}
           >
             {item.icon(active)}
             {item.label}
           </Link>
-        )
+        );
       })}
     </nav>
-  )
+  );
 }

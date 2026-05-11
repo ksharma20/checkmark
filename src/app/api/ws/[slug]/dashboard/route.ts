@@ -72,7 +72,10 @@ export async function GET(
   const sortBy = (sp.get('sortBy') ?? 'time') as 'name' | 'time' | 'duration'
   const sortDir = (sp.get('sortDir') ?? 'asc') as 'asc' | 'desc'
   const page = Math.max(1, parseInt(sp.get('page') ?? '1', 10))
-  const limit = Math.min(100, Math.max(1, parseInt(sp.get('limit') ?? '25', 10)))
+  const limit = Math.min(
+    100,
+    Math.max(1, parseInt(sp.get("limit") ?? "10", 10)),
+  );
 
   // Today's UTC bounds
   const tz = workspace.display_timezone

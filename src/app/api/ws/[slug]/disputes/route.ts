@@ -27,10 +27,12 @@ export interface DisputeEvent {
 }
 
 export interface DisputesResponse {
-  events: DisputeEvent[]
-  start_date: string
-  end_date: string
-  signals_configured: boolean
+  events: DisputeEvent[];
+  start_date: string;
+  end_date: string;
+  signals_configured: boolean;
+  total: number;
+  pagination: { offset: number; limit: number; nextOffset: number | null };
 }
 
 /**
@@ -54,6 +56,18 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   const startDate = url.searchParams.get('start') ?? defaultStart
   const endDate = url.searchParams.get('end') ?? defaultEnd
+  const offset = Math.max(
+    0,
+    parseInt(url.searchParams.get("offset") ?? "0", 10),
+  );
+  const limit = Math.min(
+    parseInt(url.searchParams.get("limit") ?? "10", 10),
+    100,
+  );
+  const search = (url.searchParams.get("search") ?? "").trim().toLowerCase();
+  const type = (url.searchParams.get("type") ?? "all") as
+    | "all"
+    | DisputeEvent["dispute_type"];
   const startUtc = localMidnightToUtc(startDate, workspace.display_timezone)
   const endUtc = localMidnightToUtc(nextDateKey(endDate), workspace.display_timezone)
 
@@ -79,14 +93,19 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   const member = (userId: string) => memberMap.get(userId)
 
-  const events: DisputeEvent[] = disputeEvents.map((e) => {
-    const overridden = overriddenEventIds.has(e.id)
+  const eventsAllUnfiltered: DisputeEvent[] = disputeEvents.map((e) => {
+    const overridden = overriddenEventIds.has(e.id);
     return {
       event_id: e.id,
       user_id: e.user_id,
-      dispute_type: overridden ? 'overridden' : e.checkout_at === null ? 'missing_checkout' : 'signal_mismatch',
-      member_name: member(e.user_id)?.full_name ?? member(e.user_id)?.email ?? e.user_id,
-      member_email: member(e.user_id)?.email ?? '',
+      dispute_type: overridden
+        ? "overridden"
+        : e.checkout_at === null
+          ? "missing_checkout"
+          : "signal_mismatch",
+      member_name:
+        member(e.user_id)?.full_name ?? member(e.user_id)?.email ?? e.user_id,
+      member_email: member(e.user_id)?.email ?? "",
       checkin_at: e.checkin_at,
       checkout_at: e.checkout_at,
       matched_by: e.matched_by,
@@ -96,15 +115,35 @@ export async function GET(request: NextRequest, { params }: Props) {
       has_gps: e.gps_lat !== null,
       overridden,
       checkout_location_mismatch: e.checkout_location_mismatch ?? null,
-    }
-  })
+    };
+  });
+
+  const eventsAll = eventsAllUnfiltered.filter((e) => {
+    const matchesType = type === "all" || e.dispute_type === type;
+    if (!matchesType) return false;
+    if (!search) return true;
+    return (
+      e.member_name.toLowerCase().includes(search) ||
+      e.member_email.toLowerCase().includes(search)
+    );
+  });
+
+  const total = eventsAll.length;
+  const sliced = eventsAll.slice(offset, offset + limit);
 
   return NextResponse.json({
-    events,
+    events: sliced,
     start_date: startDate,
     end_date: endDate,
     signals_configured,
-  } satisfies DisputesResponse)
+    total,
+    pagination: {
+      offset,
+      limit,
+      nextOffset:
+        offset + sliced.length < total ? offset + sliced.length : null,
+    },
+  } satisfies DisputesResponse);
 }
 
 /**

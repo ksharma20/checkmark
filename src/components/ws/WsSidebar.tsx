@@ -4,17 +4,18 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
-  LayoutDashboard, Users, BarChart2, Calendar, Bell, Settings,
+  LayoutDashboard, Users, BarChart2, Calendar, CalendarDays, Bell, Settings,
   PanelLeftOpen, PanelLeftClose, LayoutGrid, User,
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { path: '',           label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
-  { path: '/people',    label: 'People',    icon: <Users size={18} /> },
-  { path: '/insights',  label: 'Analytics', icon: <BarChart2 size={18} /> },
-  { path: '/monthly',   label: 'Activity',  icon: <Calendar size={18} /> },
-  { path: '/disputes',  label: 'Alerts',    icon: <Bell size={18} /> },
-  { path: '/settings',  label: 'Settings',  icon: <Settings size={18} /> },
+  { path: '',           label: 'Dashboard',        icon: <LayoutDashboard size={18} /> },
+  { path: '/people',    label: 'People',           icon: <Users size={18} /> },
+  { path: '/insights',  label: 'Analytics',        icon: <BarChart2 size={18} /> },
+  { path: '/monthly',   label: 'Activity',         icon: <Calendar size={18} /> },
+  { path: '/holidays',  label: 'Holiday Calendar', icon: <CalendarDays size={18} /> },
+  { path: '/disputes',  label: 'Alerts',           icon: <Bell size={18} /> },
+  { path: '/settings',  label: 'Settings',         icon: <Settings size={18} /> },
 ]
 
 interface Props {

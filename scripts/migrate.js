@@ -9,7 +9,9 @@
 //   Existing  - CREATE TABLE IF NOT EXISTS skips; ALTER TABLE adds missing columns.
 //   DB rename - if checkmark.db absent but checkmark.db present, copies it automatically.
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs   = require('fs')
 
 // Load .env.local so TURSO_* vars are available when running locally
@@ -199,6 +201,7 @@ const ADDITIVE_MIGRATIONS = [
   `ALTER TABLE presence_events ADD COLUMN checkout_ip_address TEXT`,
   `ALTER TABLE presence_events ADD COLUMN checkout_ip_geo_lat REAL`,
   `ALTER TABLE presence_events ADD COLUMN checkout_ip_geo_lng REAL`,
+  `ALTER TABLE presence_events ADD COLUMN checkout_location_label TEXT`,
   `CREATE INDEX IF NOT EXISTS idx_presence_events_deleted ON presence_events(deleted_at)`,
 
   // workspaces
@@ -236,47 +239,80 @@ const ADDITIVE_MIGRATIONS = [
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 )`,
   `CREATE INDEX IF NOT EXISTS idx_push_subs_user ON push_subscriptions(user_id)`,
-]
+
+  // workspace_holidays - company holiday calendar
+  `CREATE TABLE IF NOT EXISTS workspace_holidays (
+  id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name         TEXT NOT NULL,
+  date         TEXT NOT NULL,
+  description  TEXT,
+  created_by   TEXT NOT NULL REFERENCES users(id),
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at   TEXT
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_workspace_holidays_ws_date ON workspace_holidays(workspace_id, date)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_holidays_ws_name_date_active ON workspace_holidays(workspace_id, name, date) WHERE deleted_at IS NULL`,
+];
 
 // ─── SQLite runner (local dev) ────────────────────────────────────────────────
 
 function runSQLite() {
-  const Database = require('better-sqlite3')
-  const dbPath   = path.join(__dirname, '../checkmark.db')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Database = require("better-sqlite3");
+  const dbPath = path.join(__dirname, "../checkmark.db");
   const oldPath = path.join(__dirname, "../checkmark.db");
 
   if (!fs.existsSync(dbPath) && fs.existsSync(oldPath)) {
-    fs.copyFileSync(oldPath, dbPath)
+    fs.copyFileSync(oldPath, dbPath);
     console.log("✓ Copied checkmark.db → checkmark.db");
   }
 
-  const db = new Database(dbPath)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
+  const db = new Database(dbPath);
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
 
-  const baseStatements = BASE_SCHEMA.split(';').map(s => s.trim()).filter(Boolean)
+  const baseStatements = BASE_SCHEMA.split(";")
+    .map((s) => s.trim())
+    .filter(Boolean);
 
-  let ran = 0, skipped = 0
+  let ran = 0,
+    skipped = 0;
   for (const stmt of baseStatements) {
-    try { db.prepare(stmt).run(); ran++ }
-    catch (err) { console.error(`Failed:\n${stmt}\n`, err); process.exit(1) }
+    try {
+      db.prepare(stmt).run();
+      ran++;
+    } catch (err) {
+      console.error(`Failed:\n${stmt}\n`, err);
+      process.exit(1);
+    }
   }
   for (const stmt of ADDITIVE_MIGRATIONS) {
-    try { db.prepare(stmt).run(); ran++ }
-    catch (err) {
-      const msg = err.message ?? ''
-      if (msg.includes('duplicate column') || msg.includes('already exists')) { skipped++ }
-      else { console.error(`Failed:\n${stmt}\n`, err); process.exit(1) }
+    try {
+      db.prepare(stmt).run();
+      ran++;
+    } catch (err) {
+      const msg = err.message ?? "";
+      if (msg.includes("duplicate column") || msg.includes("already exists")) {
+        skipped++;
+      } else {
+        console.error(`Failed:\n${stmt}\n`, err);
+        process.exit(1);
+      }
     }
   }
 
-  db.close()
-  console.log(`✓ SQLite migration complete - ${ran} executed, ${skipped} skipped - ${dbPath}`)
+  db.close();
+  console.log(
+    `✓ SQLite migration complete - ${ran} executed, ${skipped} skipped - ${dbPath}`,
+  );
 }
 
 // ─── Turso runner (production) ────────────────────────────────────────────────
 
 async function runTurso() {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createClient } = require('@libsql/client')
   const client = createClient({
     url: process.env.TURSO_DATABASE_URL,

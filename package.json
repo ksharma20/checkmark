@@ -15,6 +15,7 @@
     "@types/web-push": "^3.6.4",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.8.0",
+    "exceljs": "^4.4.0",
     "geo-tz": "^8.1.6",
     "jose": "^6.2.1",
     "lucide-react": "^1.8.0",

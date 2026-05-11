@@ -3,6 +3,7 @@ import { requireWsAdmin } from '@/lib/ws-admin'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import { countWorkdays, dateKeyInTimezone, nextDateKey, summarizeAttendanceDays } from '@/lib/attendance-summary'
+import { listHolidayDatesInRange } from '@/lib/db/queries/holidays'
 import { localMidnightToUtc, todayInTz } from '@/lib/timezone'
 
 export type StatsInterval = 'week' | 'month' | '3month' | 'custom'
@@ -81,12 +82,13 @@ export async function GET(
   const startUtc = localMidnightToUtc(startDate, tz)
   const endUtc = localMidnightToUtc(nextDateKey(endDate), tz)
 
-  const [events, members] = await Promise.all([
+  const [events, members, holidayDates] = await Promise.all([
     queryWorkspaceEvents(ctx.workspace.id, ctx.workspace.plan, { startDate: startUtc, endDate: endUtc }),
     getActiveMembersWithDetails(ctx.workspace.id),
+    listHolidayDatesInRange(ctx.workspace.id, startDate, effectiveEndDate),
   ])
 
-  const global_working_days = countWorkdays(startDate, effectiveEndDate)
+  const global_working_days = countWorkdays(startDate, effectiveEndDate, holidayDates)
 
   // Group events by user
   const byUser = new Map<string, typeof events>()
@@ -134,6 +136,7 @@ export async function GET(
       endDate: effectiveEndDate,
       timezone: tz,
       todayDate: todayStr,
+      holidayDates,
     })
     const present_days = summary.officeDays + summary.remoteDays
     const avg_hours_per_day = present_days > 0

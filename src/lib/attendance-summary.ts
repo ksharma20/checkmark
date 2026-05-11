@@ -1,12 +1,13 @@
 import type { MatchedBy, PresenceEventWithMatch } from './signals'
 
-export type AttendanceDayStatus = 'office' | 'remote' | 'absent' | 'future'
+export type AttendanceDayStatus = 'office' | 'remote' | 'absent' | 'holiday' | 'future'
 
 export interface AttendanceSummary {
   days: Record<string, AttendanceDayStatus>
   officeDays: number
   remoteDays: number
   absentDays: number
+  holidayDays: number
   workingDays: number
 }
 
@@ -45,10 +46,10 @@ export function nextDateKey(dateStr: string): string {
   ].join('-')
 }
 
-export function countWorkdays(startDate: string, endDate: string): number {
+export function countWorkdays(startDate: string, endDate: string, holidayDates?: Set<string>): number {
   let count = 0
   for (let date = startDate; date <= endDate; date = nextDateKey(date)) {
-    if (isWorkday(date)) count++
+    if (isWorkday(date) && !holidayDates?.has(date)) count++
   }
   return count
 }
@@ -59,6 +60,7 @@ export function summarizeAttendanceDays(params: {
   endDate: string
   timezone: string
   todayDate?: string
+  holidayDates?: Set<string>
 }): AttendanceSummary {
   const todayDate = params.todayDate ?? params.endDate
   const eventsByDay = new Map<string, PresenceEventWithMatch[]>()
@@ -75,6 +77,7 @@ export function summarizeAttendanceDays(params: {
   let officeDays = 0
   let remoteDays = 0
   let absentDays = 0
+  let holidayDays = 0
   let workingDays = 0
 
   for (let date = params.startDate; date <= params.endDate; date = nextDateKey(date)) {
@@ -84,6 +87,12 @@ export function summarizeAttendanceDays(params: {
     }
 
     if (!isWorkday(date)) continue
+
+    if (params.holidayDates?.has(date)) {
+      days[date] = 'holiday'
+      holidayDays++
+      continue
+    }
 
     workingDays++
     const dayEvents = eventsByDay.get(date) ?? []
@@ -100,5 +109,5 @@ export function summarizeAttendanceDays(params: {
     }
   }
 
-  return { days, officeDays, remoteDays, absentDays, workingDays }
+  return { days, officeDays, remoteDays, absentDays, holidayDays, workingDays }
 }

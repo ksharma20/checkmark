@@ -2,11 +2,16 @@
 
 import { useState } from 'react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
+import type { MatchedBy } from '@/lib/signals'
 import { fmtTime, durationLabel } from '@/lib/client/format-time'
+import { en } from '@/locales/en'
 
 
 interface EventCardProps {
-  event: PresenceEvent
+  event: PresenceEvent & {
+    matched_by?: MatchedBy
+    matched_signals?: string[]
+  }
   onNoteUpdate?: (id: string, note: string) => void
 }
 
@@ -24,6 +29,22 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
   const isOutsideRadius = trustFlags.includes('checkout_outside_radius')
 
   const duration = durationLabel(event.checkin_at, event.checkout_at)
+
+  const transparency = (() => {
+    if (event.matched_by == null) return null
+    switch (event.matched_by) {
+      case 'verified':
+        return { label: en.meTimeline.matchedVerified, color: 'var(--teal)' }
+      case 'partial':
+        return { label: en.meTimeline.matchedPartial, color: 'var(--amber)' }
+      case 'none':
+        return { label: en.meTimeline.matchedNone, color: 'var(--text-muted)' }
+      case 'override':
+        return { label: en.meTimeline.matchedOverride, color: 'var(--brand)' }
+      default:
+        return null
+    }
+  })()
 
   // "1:37 PM - 2:15 PM" or just "1:37 PM"
   const timeRange = event.checkout_at
@@ -106,6 +127,33 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
           </span>
         )}
       </div>
+
+      {transparency && (
+        <div style={{ marginBottom: "8px" }}>
+          <span
+            style={{
+              fontSize: "11px",
+              fontFamily: "DM Sans, sans-serif",
+              fontWeight: 600,
+              color: transparency.color,
+            }}
+          >
+            {transparency.label}
+          </span>
+          {event.matched_signals && event.matched_signals.length > 0 && (
+            <span
+              style={{
+                marginLeft: "8px",
+                fontSize: "11px",
+                color: "var(--text-muted)",
+                fontFamily: "DM Sans, sans-serif",
+              }}
+            >
+              {en.meTimeline.matchedSignals}: {event.matched_signals.join(", ")}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Checkout distance badge */}
       {event.checkout_location_mismatch != null && (
@@ -320,7 +368,6 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
                   ◉
                 </span>
                 {event.checkout_location_label ??
-                  event.location_label ??
                   `${event.checkout_gps_lat.toFixed(4)}, ${event.checkout_gps_lng.toFixed(4)}`}
               </a>
             ) : (
@@ -331,7 +378,7 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
                   fontFamily: "DM Sans, sans-serif",
                 }}
               >
-                Location not captured
+                {en.meTimeline.checkoutLocationNotCaptured}
               </span>
             )}
           </div>

@@ -434,6 +434,20 @@ export async function getActiveMembersWithDetails(workspaceId: string): Promise<
   )
 }
 
+export async function getActiveMemberWithDetails(
+  workspaceId: string,
+  userId: string,
+): Promise<MemberWithUser | null> {
+  return db.queryOne<MemberWithUser>(
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name, wm.added_at
+     FROM workspace_members wm
+     LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     WHERE wm.workspace_id = ? AND wm.status = 'active' AND wm.user_id = ?
+     LIMIT 1`,
+    [workspaceId, userId],
+  );
+}
+
 export async function getOverrideEventIds(workspaceId: string): Promise<Set<string>> {
   const rows = await db.query<{ presence_event_id: string }>(
     'SELECT presence_event_id FROM admin_overrides WHERE workspace_id = ?',
@@ -512,6 +526,41 @@ export async function getAllMembersWithDetails(workspaceId: string): Promise<Mem
      ORDER BY wm.added_at DESC`,
     [workspaceId]
   )
+}
+
+export async function getAllMembersWithDetailsPaged(params: {
+  workspaceId: string;
+  limit: number;
+  offset: number;
+  search?: string;
+}): Promise<{ members: MemberWithUserFull[]; total: number }> {
+  const q = (params.search ?? "").trim().toLowerCase();
+  const hasSearch = q.length > 0;
+  const where = hasSearch
+    ? `WHERE wm.workspace_id = ? AND (lower(wm.email) LIKE ? OR lower(COALESCE(u.full_name,'')) LIKE ?)`
+    : `WHERE wm.workspace_id = ?`;
+  const args = hasSearch
+    ? [params.workspaceId, `%${q}%`, `%${q}%`]
+    : [params.workspaceId];
+
+  const totalRow = await db.queryOne<{ total: number }>(
+    `SELECT COUNT(*) as total
+     FROM workspace_members wm
+     LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     ${where}`,
+    args,
+  );
+  const total = totalRow?.total ?? 0;
+  const members = await db.query<MemberWithUserFull>(
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, wm.status, wm.added_at, u.full_name
+     FROM workspace_members wm
+     LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     ${where}
+     ORDER BY wm.added_at DESC
+     LIMIT ? OFFSET ?`,
+    [...args, params.limit, params.offset],
+  );
+  return { members, total };
 }
 
 /**

@@ -8,6 +8,8 @@ CheckMark is a **presence intelligence platform**. Two PWA surfaces:
 
 **Core USP:** Multi-signal presence verification (AND, not OR). When a workspace has GPS + WiFi + IP signals configured, ALL must match for a check-in to count as verified. This makes faking presence extremely difficult.
 
+**Multi-workspace users:** One account can hold multiple active workspace memberships. `presence_events` rows do not store `workspace_id`; verification is always computed for a chosen workspace. On **`/me/timeline`**, the default **All workspaces** view uses `GET /api/events` (global history, no per-workspace `matched_by`). Selecting a workspace uses `GET /api/me/ws/[slug]/events`, which calls `queryWorkspaceEvents()` for that workspace and the current user so transparency matches admin-side AND semantics.
+
 ---
 
 ## Non-Negotiable Principles
@@ -65,6 +67,28 @@ Attendance stats are day-level, not event-level. Use `src/lib/attendance-summary
 
 ---
 
+## Holiday Calendar
+
+Workspace admins manage a per-workspace holiday list (`workspace_holidays` table). Holidays are soft-deleted (`deleted_at`), always scoped by `workspace_id`. At the database layer, active rows have a partial unique index on `(workspace_id, name, date)` where `deleted_at IS NULL`, so concurrent inserts cannot duplicate the same holiday.
+
+### Admin API (`/api/ws/[slug]/holidays`)
+- `GET ?year=YYYY` — list holidays for the given year; omit `year` for all
+- `POST` JSON `{ name, date, description? }` — create a single holiday (`date` is `YYYY-MM-DD`)
+- `POST` multipart `file` — bulk import from CSV or XLSX (≤ 2 MB); upserts by date (one holiday per date)
+- `PATCH /[id]` — partial update; at least one of `name`, `date`, `description` required
+- `DELETE /[id]` — soft delete; sets `deleted_at`
+
+Duplicate guard: `(name, date)` must be unique per workspace. Returns `409 DUPLICATE` on collision.
+
+### Member API (`/api/me/ws/[slug]/holidays`)
+- `GET ?year=YYYY` — read-only; authenticated workspace members only; defaults to current year
+
+### Import file format
+Columns (case-insensitive): `name` (required), `date` (required, `YYYY-MM-DD`), `description` (optional).
+Rows with a missing/invalid name or date are skipped and returned in the `errors` array; valid rows are always upserted.
+
+---
+
 ## Database Patterns
 
 ### DB abstraction
@@ -84,9 +108,13 @@ import { db } from '@/lib/db'
 - `stats.ts` - user stats
 - `tokens.ts` - API tokens (separate from users.ts)
 - `push.ts` - push subscriptions
+- `holidays.ts` - workspace holiday calendar
 
 ### Migration
-`scripts/migrate.js` - idempotent. `ALTER TABLE` wrapped in try/catch. Run: `node scripts/migrate.js`.
+`scripts/migrate.js` - **single migration script** and must always be **fully up-to-date**.
+- Fresh DB: creates every table/column.
+- Existing DB: additive `ALTER TABLE` statements add missing columns (wrapped to skip duplicates).
+Run: `npm run migrate`.
 
 ---
 
@@ -121,6 +149,9 @@ WiFi SSID: bcryptjs hash - same library, raw SSID never persisted.
 - Default: Server Components
 - Client only when: interactive state, browser APIs (GPS, Notification), usePathname/useParams
 - Never put business logic in Client Components - fetch from API routes instead
+
+### Copy (strings)
+- English UI and marketing copy lives in `src/locales/en.ts` — import `en` and use nested keys. Prefer adding keys there instead of hardcoding user-visible strings in components or routes.
 
 ### Layouts
 - `src/app/(public)/layout.tsx` - passthrough, public pages
