@@ -89,6 +89,37 @@ Rows with a missing/invalid name or date are skipped and returned in the `errors
 
 ---
 
+## Leave System
+
+Workspace admins configure per-workspace leave types (`workspace_leave_types` table). Employees submit leave requests (`leave_requests` table) from `/me/ws/[slug]`. Submissions are instantly `approved` — no approval workflow.
+
+### Tables
+- `workspace_leave_types`: `id, workspace_id, name, accrual_frequency ('monthly'|'quarterly'), accrual_credits, created_at, deleted_at` — soft-deleted, unique `(workspace_id, name) WHERE deleted_at IS NULL`
+- `leave_requests`: `id, workspace_id, user_id, leave_type_id, start_date, end_date, reason, status DEFAULT 'approved', created_at` — immutable after insert
+
+### Balance computation (no stored balance — always computed)
+```
+periods_elapsed = complete calendar months (or quarter-groups) since member.added_at
+total_accrued   = periods_elapsed × accrual_credits
+used_days       = SUM(end_date − start_date + 1) for approved requests of this type
+available_days  = max(0, total_accrued − used_days)
+```
+Logic lives in `lib/db/queries/leaves.ts → getLeaveTypesWithBalance()`. Uses calendar month arithmetic (not day approximations).
+
+### Admin API (`/api/ws/[slug]/leave-types`)
+- `GET` — list active leave types
+- `POST` JSON `{ name, accrual_frequency, accrual_credits }` — create
+- `DELETE /[id]` — soft-delete; existing requests unaffected
+
+### Employee API
+- `GET /api/me/ws/[slug]/leave-types` — list types with `available_days` for current user
+- `POST /api/me/ws/[slug]/leave` JSON `{ leave_type_id, start_date, end_date, reason? }` — submit; returns `400 INSUFFICIENT_BALANCE` if requested days exceed balance
+
+### Leave requests are immutable
+Never modify or delete `leave_requests` rows. Same principle as `presence_events`.
+
+---
+
 ## Database Patterns
 
 ### DB abstraction
@@ -109,6 +140,7 @@ import { db } from '@/lib/db'
 - `tokens.ts` - API tokens (separate from users.ts)
 - `push.ts` - push subscriptions
 - `holidays.ts` - workspace holiday calendar
+- `leaves.ts` - workspace leave types + leave requests (balance computed from member join date)
 
 ### Migration
 `scripts/migrate.js` - **single migration script** and must always be **fully up-to-date**.

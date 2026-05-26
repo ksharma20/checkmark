@@ -59,8 +59,11 @@ export async function GET(
   let endDate: string = todayStr
 
   if (interval === 'week') {
+    // Monday of the current calendar week (Mon–Fri), not a rolling 7-day window
+    const dow = new Date(`${todayStr}T12:00:00Z`).getUTCDay() // 0=Sun,1=Mon…6=Sat
+    const daysSinceMonday = (dow + 6) % 7
     const [year, month, day] = todayStr.split('-').map(Number)
-    const d = new Date(Date.UTC(year, month - 1, day - 6))
+    const d = new Date(Date.UTC(year, month - 1, day - daysSinceMonday))
     startDate = d.toISOString().slice(0, 10)
   } else if (interval === 'month') {
     startDate = `${todayYear}-${zp(todayMonth)}-01`

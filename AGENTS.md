@@ -43,7 +43,8 @@ AI agent coordination guide for working on this codebase.
 - Marketing page changes (`src/app/(public)/`)
 - SEO metadata and sitemap changes (`src/app/layout.tsx`, `src/app/robots.ts`, `src/app/sitemap.ts`)
 - Different API route domains (checkin vs workspace vs me)
-- Different query files (`users.ts` vs `events.ts`)
+- Different query files (`users.ts` vs `events.ts` vs `leaves.ts`)
+- Leave type admin routes vs leave request employee routes
 - UI components that don't share state
 
 ### Must be sequential (shared state)
@@ -117,6 +118,17 @@ export async function getActiveUser(userId: string) {
 
 Never inline SQL in route handlers. Never skip `AND workspace_id = ?`.
 
+Query files and their domains:
+- `users.ts` — user accounts, rate limits, revoked tokens
+- `events.ts` — presence events
+- `workspaces.ts` — workspaces, members, admin overrides
+- `signals.ts` — workspace signal configs
+- `stats.ts` — user stats
+- `tokens.ts` — API tokens
+- `push.ts` — push subscriptions
+- `holidays.ts` — workspace holiday calendar
+- `leaves.ts` — workspace leave types (`workspace_leave_types`) and leave requests (`leave_requests`); exports `getLeaveTypesWithBalance()` which computes balance from join date using calendar month/quarter arithmetic
+
 ---
 
 ## SEO Conventions
@@ -167,7 +179,7 @@ return NextResponse.json(
 )
 ```
 
-Common codes: `UNAUTHORIZED`, `NOT_FOUND`, `VALIDATION_ERROR`, `ALREADY_EXISTS`, `RATE_LIMITED`, `PLAN_LIMIT`.
+Common codes: `UNAUTHORIZED`, `NOT_FOUND`, `VALIDATION_ERROR`, `ALREADY_EXISTS`, `RATE_LIMITED`, `PLAN_LIMIT`, `INSUFFICIENT_BALANCE`.
 
 ---
 

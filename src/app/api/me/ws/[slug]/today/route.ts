@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import {
-  getWorkspaceBySlug,
-  getActiveMembersWithDetails,
-  getWorkspaceMember,
-} from "@/lib/db/queries/workspaces";
+import { requireWsMember } from '@/lib/ws-admin'
+import { getActiveMembersWithDetails } from "@/lib/db/queries/workspaces";
 import { todayInTz, localMidnightToUtc } from '@/lib/timezone'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import type { MatchedBy } from '@/lib/signals'
@@ -30,18 +27,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const userId = request.headers.get('x-user-id')
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { slug } = await params
-  const ws = await getWorkspaceBySlug(slug)
-  if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-  // Auth: active member only (not necessarily admin)
-  const membership = await getWorkspaceMember(ws.id, userId);
-  if (!membership || membership.status !== "active") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  const ctx = await requireWsMember(request, slug)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { workspace: ws, member: membership } = ctx
 
   const todayStr = todayInTz(ws.display_timezone)
   const startUtc = localMidnightToUtc(todayStr, ws.display_timezone)

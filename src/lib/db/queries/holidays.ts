@@ -159,6 +159,20 @@ export async function listHolidayDatesInRange(
   return new Set(rows.map((r) => r.date))
 }
 
+export async function getHolidaysInRange(
+  workspaceId: string,
+  startDate: string,
+  endDate: string,
+): Promise<Holiday[]> {
+  return db.query<Holiday>(
+    `SELECT * FROM workspace_holidays
+     WHERE workspace_id = ? AND deleted_at IS NULL
+       AND date >= ? AND date <= ?
+     ORDER BY date ASC`,
+    [workspaceId, startDate, endDate],
+  )
+}
+
 export async function deleteHoliday(id: string, workspaceId: string): Promise<void> {
   await db.execute(
     `UPDATE workspace_holidays

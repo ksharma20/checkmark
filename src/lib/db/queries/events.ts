@@ -1,5 +1,12 @@
 import { db } from '../index'
 
+// checkin_at is stored as SQLite datetime("YYYY-MM-DD HH:MM:SS") — space separator, no Z.
+// ISO range bounds use "T" separator (ASCII 84) which is > space (ASCII 32), so a same-day
+// event like "2026-05-12 09:00:00" fails >= "2026-05-12T00:00:00Z". Normalize before querying.
+function toSqliteDt(s: string): string {
+  return s.replace('T', ' ').replace('Z', '').slice(0, 19)
+}
+
 export interface PresenceEvent {
   id: string
   user_id: string
@@ -161,11 +168,11 @@ export async function getUserEvents(params: {
 
   if (params.start) {
     conditions.push('checkin_at >= ?')
-    args.push(params.start)
+    args.push(toSqliteDt(params.start))
   }
   if (params.end) {
     conditions.push('checkin_at <= ?')
-    args.push(params.end)
+    args.push(toSqliteDt(params.end))
   }
 
   const where = `WHERE ${conditions.join(' AND ')}`
@@ -251,7 +258,7 @@ export async function getEventsForUsers(params: {
        AND checkin_at >= ? AND checkin_at <= ?
        AND deleted_at IS NULL
      ORDER BY checkin_at DESC`,
-    [...params.userIds, params.start, params.end]
+    [...params.userIds, toSqliteDt(params.start), toSqliteDt(params.end)]
   )
 }
 

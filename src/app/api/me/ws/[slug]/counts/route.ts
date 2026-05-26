@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getWorkspaceBySlug } from '@/lib/db/queries/workspaces'
+import { requireWsMember } from '@/lib/ws-admin'
 import { db } from '@/lib/db'
 import { todayInTz } from '@/lib/timezone'
 
@@ -7,19 +7,10 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
-  const userId = request.headers.get('x-user-id')
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-
   const { slug } = await params
-  const ws = await getWorkspaceBySlug(slug)
-  if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-
-  // Verify requester is an active member
-  const membership = await db.queryOne<{ id: string }>(
-    `SELECT id FROM workspace_members WHERE workspace_id = ? AND user_id = ? AND status = 'active'`,
-    [ws.id, userId]
-  )
-  if (!membership) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  const ctx = await requireWsMember(request, slug)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const { workspace: ws } = ctx
 
   const today = todayInTz(ws.display_timezone)
 

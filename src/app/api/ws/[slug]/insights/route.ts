@@ -202,12 +202,12 @@ export async function GET(request: NextRequest, { params }: Props) {
           const cinDate = localDateStr(cinDt);
           const cinH = localHour(cinDt);
 
+          // Only count check-ins that happened today — stale open sessions
+          // from previous days must not bleed into today's hourly chart
+          if (cinDate !== localToday) return false;
+
           // Checked in after this bucket - not present yet
-          if (
-            cinDate > localToday ||
-            (cinDate === localToday && cinH > bucketH)
-          )
-            return false;
+          if (cinH > bucketH) return false;
 
           // Current hour: only count people still checked in right now
           if (bucketH === nowLocalH) return !coutDt;
@@ -230,10 +230,10 @@ export async function GET(request: NextRequest, { params }: Props) {
     startDate = weekStart + "T00:00:00Z";
     endDate = todayStr + "T23:59:59Z";
 
-    // Daily buckets for current week (Mon..today in workspace timezone)
-    for (let i = 0; i < 7; i++) {
+    // Always generate all 5 Mon–Fri buckets so the full work week is visible.
+    // Future days (after today) will simply have 0 events.
+    for (let i = 0; i < 5; i++) {
       const dayStr = addDays(weekStart, i);
-      if (dayStr > todayStr) break;
       const label = new Date(dayStr + "T12:00:00Z").toLocaleDateString(
         "en-US",
         {
@@ -459,8 +459,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   );
 
   const activeMemberIds = await getActiveMemberIds(ctx.workspace.id);
-  const eligibleMemberIds = activeMemberIds.filter((id) => id !== ctx.userId);
-  const eligibleMemberSet = new Set(eligibleMemberIds);
+  const eligibleMemberSet = new Set(activeMemberIds);
 
   // Only count events that are truly "in office" - same logic as the dashboard tile:
   // exclude remote_checkin and any office_checkin that failed signal matching (unverified)
@@ -502,7 +501,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   const total_checkins_period = periodEvents.length;
   const total_hours_period = sessionHours(periodEvents);
 
-  const total_members = eligibleMemberIds.length;
+  const total_members = activeMemberIds.length;
   // Average hours per employee per day in the selected interval.
   // This ensures month/week averages can't exceed the per-day cap (e.g. auto-checkout 12h),
   // while still reflecting multi-day periods.
@@ -512,7 +511,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       : interval === "custom"
         ? inclusiveDayCount(startDate, endDate)
         : interval === "week"
-          ? 7
+          ? 5
           : inclusiveDayCount(
               // month/3month/6month/year all end "today" effectively (no future days)
               startDate,

@@ -229,6 +229,9 @@ const ADDITIVE_MIGRATIONS = [
   // workspaces - remote work toggle
   `ALTER TABLE workspaces ADD COLUMN allow_remote INTEGER NOT NULL DEFAULT 0`,
 
+  // workspaces - leaves & holidays feature toggle
+  `ALTER TABLE workspaces ADD COLUMN leaves_enabled INTEGER NOT NULL DEFAULT 1`,
+
   // push_subscriptions - Web Push
   `CREATE TABLE IF NOT EXISTS push_subscriptions (
   id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
@@ -254,6 +257,37 @@ const ADDITIVE_MIGRATIONS = [
 )`,
   `CREATE INDEX IF NOT EXISTS idx_workspace_holidays_ws_date ON workspace_holidays(workspace_id, date)`,
   `CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_holidays_ws_name_date_active ON workspace_holidays(workspace_id, name, date) WHERE deleted_at IS NULL`,
+
+  // workspace_leave_types - per-workspace configurable leave types
+  `CREATE TABLE IF NOT EXISTS workspace_leave_types (
+  id                TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id      TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  name              TEXT NOT NULL,
+  accrual_frequency TEXT NOT NULL DEFAULT 'monthly',
+  accrual_credits   INTEGER NOT NULL DEFAULT 1,
+  credit_timing     TEXT NOT NULL DEFAULT 'start',
+  created_at        TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at        TEXT
+)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_wlt_ws_name_active
+   ON workspace_leave_types(workspace_id, name) WHERE deleted_at IS NULL`,
+  `CREATE INDEX IF NOT EXISTS idx_wlt_workspace ON workspace_leave_types(workspace_id)`,
+  `ALTER TABLE workspace_leave_types ADD COLUMN credit_timing TEXT NOT NULL DEFAULT 'start'`,
+
+  // leave_requests - employee leave submissions
+  `CREATE TABLE IF NOT EXISTS leave_requests (
+  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id       TEXT NOT NULL REFERENCES users(id),
+  leave_type_id TEXT NOT NULL REFERENCES workspace_leave_types(id),
+  start_date    TEXT NOT NULL,
+  end_date      TEXT NOT NULL,
+  reason        TEXT,
+  status        TEXT NOT NULL DEFAULT 'approved',
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_leave_requests_ws_user
+   ON leave_requests(workspace_id, user_id)`,
 ];
 
 // ─── SQLite runner (local dev) ────────────────────────────────────────────────

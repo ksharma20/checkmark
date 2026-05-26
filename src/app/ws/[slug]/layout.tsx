@@ -46,7 +46,7 @@ export default async function WsSlugLayout({ children, params }: Props) {
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <meta name="apple-mobile-web-app-title" content={`${en.brand.shortName} WS`} />
-      <WsLayoutClient slug={slug}>{children}</WsLayoutClient>
+      <WsLayoutClient slug={slug} leavesEnabled={!!workspace.leaves_enabled}>{children}</WsLayoutClient>
     </>
   );
 }

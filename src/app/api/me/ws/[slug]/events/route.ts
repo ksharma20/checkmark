@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerUser } from '@/lib/auth'
-import { getWorkspaceBySlug, getWorkspaceMember } from '@/lib/db/queries/workspaces'
+import { requireWsMember } from '@/lib/ws-admin'
 import { queryWorkspaceEvents } from '@/lib/signals'
 
 interface Props {
@@ -8,21 +7,12 @@ interface Props {
 }
 
 export async function GET(req: NextRequest, { params }: Props) {
-  const user = await getServerUser()
-  if (!user) {
+  const { slug } = await params
+  const ctx = await requireWsMember(req, slug)
+  if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
-
-  const { slug } = await params
-  const workspace = await getWorkspaceBySlug(slug)
-  if (!workspace) {
-    return NextResponse.json({ error: 'Not found', code: 'NOT_FOUND' }, { status: 404 })
-  }
-
-  const member = await getWorkspaceMember(workspace.id, user.userId)
-  if (!member || member.status !== 'active') {
-    return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
-  }
+  const { workspace, userId } = ctx
 
   const { searchParams } = req.nextUrl
   const start = searchParams.get('start') ?? undefined
@@ -40,7 +30,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   const events = await queryWorkspaceEvents(workspace.id, workspace.plan, {
     startDate: start,
     endDate: end,
-    userId: user.userId,
+    userId,
   })
 
   const total = events.length

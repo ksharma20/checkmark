@@ -19,6 +19,7 @@ const MONTH_NAMES = [
 function dayColor(status: DayStatus, signalsConfigured: boolean): string {
   if (status === 'future') return 'transparent'
   if (status === 'absent') return 'color-mix(in srgb, var(--danger) 15%, transparent)'
+  if (status === 'leave')  return 'color-mix(in srgb, #0EA5E9 15%, transparent)'
   if (status === 'holiday') return 'color-mix(in srgb, #8B5CF6 15%, transparent)'
   if (status === 'office') return 'color-mix(in srgb, var(--teal) 25%, transparent)'
   if (status === 'remote') return signalsConfigured
@@ -30,6 +31,7 @@ function dayColor(status: DayStatus, signalsConfigured: boolean): string {
 function dayBorder(status: DayStatus, signalsConfigured: boolean): string {
   if (status === 'future') return 'transparent'
   if (status === 'absent') return 'color-mix(in srgb, var(--danger) 35%, transparent)'
+  if (status === 'leave')  return 'color-mix(in srgb, #0EA5E9 35%, transparent)'
   if (status === 'holiday') return 'color-mix(in srgb, #8B5CF6 35%, transparent)'
   if (status === 'office') return 'color-mix(in srgb, var(--teal) 50%, transparent)'
   if (status === 'remote') return signalsConfigured
@@ -91,7 +93,7 @@ function CalendarCell({ day, dateStr, status, signalsConfigured, joinedDate }: C
   }
 
   const s = status ?? 'absent'
-  const titleLabel = s === 'holiday' ? 'holiday' : s
+  const titleLabel = s === 'holiday' ? 'holiday' : s === 'leave' ? 'on leave' : s
 
   return (
     <div
@@ -343,6 +345,7 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
             <LegendItem color="color-mix(in srgb, var(--amber) 25%, transparent)" border="color-mix(in srgb, var(--amber) 50%, transparent)" label="Remote" />
           )}
           <LegendItem color="color-mix(in srgb, var(--danger) 15%, transparent)" border="color-mix(in srgb, var(--danger) 35%, transparent)" label="Absent" />
+          <LegendItem color="color-mix(in srgb, #0EA5E9 15%, transparent)" border="color-mix(in srgb, #0EA5E9 35%, transparent)" label="On Leave" />
           <LegendItem color="color-mix(in srgb, #8B5CF6 15%, transparent)" border="color-mix(in srgb, #8B5CF6 35%, transparent)" label="Holiday" />
           <LegendItem color="var(--surface-2)" border="var(--border)" label="Weekend" />
           <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginLeft: 'auto' }}>

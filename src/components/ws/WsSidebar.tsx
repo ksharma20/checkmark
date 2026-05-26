@@ -4,28 +4,34 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
-  LayoutDashboard, Users, BarChart2, Calendar, CalendarDays, Bell, Settings,
+  LayoutDashboard, Users, BarChart2, Calendar, CalendarDays, CalendarOff, Bell, Settings,
   PanelLeftOpen, PanelLeftClose, LayoutGrid, User,
 } from 'lucide-react'
 
-const NAV_ITEMS = [
-  { path: '',           label: 'Dashboard',        icon: <LayoutDashboard size={18} /> },
-  { path: '/people',    label: 'People',           icon: <Users size={18} /> },
-  { path: '/insights',  label: 'Analytics',        icon: <BarChart2 size={18} /> },
-  { path: '/monthly',   label: 'Activity',         icon: <Calendar size={18} /> },
-  { path: '/holidays',  label: 'Holiday Calendar', icon: <CalendarDays size={18} /> },
-  { path: '/disputes',  label: 'Alerts',           icon: <Bell size={18} /> },
-  { path: '/settings',  label: 'Settings',         icon: <Settings size={18} /> },
+const BASE_NAV = [
+  { path: '',           label: 'Dashboard',        icon: <LayoutDashboard size={18} />, feature: null },
+  { path: '/people',    label: 'People',           icon: <Users size={18} />,           feature: null },
+  { path: '/insights',  label: 'Analytics',        icon: <BarChart2 size={18} />,       feature: null },
+  { path: '/monthly',   label: 'Activity',         icon: <Calendar size={18} />,        feature: null },
+  { path: '/holidays',  label: 'Holiday Calendar', icon: <CalendarDays size={18} />,    feature: 'leaves' },
+  { path: '/leaves',    label: 'Leaves',            icon: <CalendarOff size={18} />,    feature: 'leaves' },
+  { path: '/disputes',  label: 'Alerts',           icon: <Bell size={18} />,            feature: null },
+  { path: '/settings',  label: 'Settings',         icon: <Settings size={18} />,        feature: null },
 ]
 
 interface Props {
   slug: string
+  leavesEnabled: boolean
 }
 
-export default function WsSidebar({ slug }: Props) {
+export default function WsSidebar({ slug, leavesEnabled }: Props) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
+
+  const NAV_ITEMS = BASE_NAV.filter(
+    (item) => item.feature !== 'leaves' || leavesEnabled
+  )
 
   useEffect(() => {
     const check = () => {
