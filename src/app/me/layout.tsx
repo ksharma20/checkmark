@@ -5,6 +5,7 @@ import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
 import BottomNav from '@/components/user/BottomNav'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import PageTransition from '@/components/PageTransition'
+import NotificationBell from '@/components/notifications/NotificationBell'
 import { en } from '@/locales/en'
 
 export const metadata: Metadata = {
@@ -56,6 +57,7 @@ export default async function MeLayout({ children }: { children: React.ReactNode
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <NotificationBell pollUrl="/api/me/notifications/unread-count" href="/me/notifications" />
           {adminWorkspaces.length > 0 && (
             <Link
               href={wsHref}

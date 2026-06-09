@@ -90,6 +90,9 @@ export async function GET(request: NextRequest, { params }: Props) {
   const startDate = url.searchParams.get('start') ?? defaultStart
   const endDate = url.searchParams.get('end') ?? defaultEnd
   const effectiveEndDate = endDate > todayLocal ? todayLocal : endDate
+  const workingDayNums: number[] = (() => {
+    try { return JSON.parse(ctx.workspace.working_days ?? '[1,2,3,4,5]') } catch { return [1, 2, 3, 4, 5] }
+  })()
   const startUtc = localMidnightToUtc(startDate, tz)
   const endUtc = localMidnightToUtc(nextDateKey(endDate), tz)
 
@@ -115,7 +118,7 @@ export async function GET(request: NextRequest, { params }: Props) {
   // Get member details for names
   const memberDetails = await getActiveMembersWithDetails(ctx.workspace.id)
 
-  const global_working_days = countWorkdays(startDate, effectiveEndDate, holidayDates)
+  const global_working_days = countWorkdays(startDate, effectiveEndDate, holidayDates, workingDayNums)
 
   const members: AnalyticsMember[] = []
 
@@ -165,6 +168,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       timezone: tz,
       todayDate: todayLocal,
       holidayDates,
+      workingDays: workingDayNums,
     })
     const attendance_days = summary.officeDays + summary.remoteDays
     const total_hours = office_hours + wfh_hours

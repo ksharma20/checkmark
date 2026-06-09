@@ -9,6 +9,7 @@ import {
   bulkUpsertHolidays,
 } from '@/lib/db/queries/holidays'
 import type { HolidayImportRow } from '@/lib/db/queries/holidays'
+import { parseRawStr } from '@/lib/constants'
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
@@ -167,7 +168,7 @@ async function handleImport(req: NextRequest, workspaceId: string, userId: strin
     const rowNum = i + 2 // row 1 is header
     const raw = rawRows[i]
 
-    const name = typeof raw.name === 'string' ? raw.name.trim() : null
+    const name = parseRawStr(raw.name)
     if (!name) {
       errors.push({ row: rowNum, reason: 'Missing or empty "name"' })
       continue

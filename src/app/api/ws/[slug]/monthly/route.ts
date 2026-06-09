@@ -36,6 +36,7 @@ export interface MonthlyResponse {
   month: number;
   days_in_month: number;
   working_days: number;
+  off_days: number[];
   signals_configured: boolean;
   members: MemberMonthRow[];
 }
@@ -106,7 +107,11 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   const signals_configured = workspaceSignals.length > 0;
   const effectiveEndDate = endDate > todayStr ? todayStr : endDate;
-  const working_days = countWorkdays(startDate, effectiveEndDate, holidayDates);
+  const workingDayNums: number[] = (() => {
+    try { return JSON.parse(workspace.working_days ?? '[1,2,3,4,5]') } catch { return [1, 2, 3, 4, 5] }
+  })()
+  const off_days = [0, 1, 2, 3, 4, 5, 6].filter((d) => !workingDayNums.includes(d))
+  const working_days = countWorkdays(startDate, effectiveEndDate, holidayDates, workingDayNums);
   const byUser = new Map<string, typeof allEvents>();
   for (const ev of allEvents) {
     const userEvents = byUser.get(ev.user_id) ?? [];
@@ -145,6 +150,7 @@ for (const { user_id, start_date, end_date } of leaveRequests) {
       timezone: tz,
       todayDate: todayStr,
       holidayDates,
+      workingDays: workingDayNums,
     });
 
     const leaveDays = leaveByUser.get(member.user_id);
@@ -174,6 +180,7 @@ for (const { user_id, start_date, end_date } of leaveRequests) {
     month,
     days_in_month: daysInMonth,
     working_days,
+    off_days,
     signals_configured,
     members,
   } satisfies MonthlyResponse);

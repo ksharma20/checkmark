@@ -82,6 +82,9 @@ export async function GET(
   }
 
   const effectiveEndDate = endDate > todayStr ? todayStr : endDate
+  const workingDayNums: number[] = (() => {
+    try { return JSON.parse(ctx.workspace.working_days ?? '[1,2,3,4,5]') } catch { return [1, 2, 3, 4, 5] }
+  })()
   const startUtc = localMidnightToUtc(startDate, tz)
   const endUtc = localMidnightToUtc(nextDateKey(endDate), tz)
 
@@ -91,7 +94,7 @@ export async function GET(
     listHolidayDatesInRange(ctx.workspace.id, startDate, effectiveEndDate),
   ])
 
-  const global_working_days = countWorkdays(startDate, effectiveEndDate, holidayDates)
+  const global_working_days = countWorkdays(startDate, effectiveEndDate, holidayDates, workingDayNums)
 
   // Group events by user
   const byUser = new Map<string, typeof events>()
@@ -140,6 +143,7 @@ export async function GET(
       timezone: tz,
       todayDate: todayStr,
       holidayDates,
+      workingDays: workingDayNums,
     })
     const present_days = summary.officeDays + summary.remoteDays
     const avg_hours_per_day = present_days > 0

@@ -159,6 +159,7 @@ function WorkspaceSection({ slug }: { slug: string }) {
   const [tz, setTz] = useState('UTC')
   const [allowRemote, setAllowRemote] = useState(false)
   const [leavesEnabled, setLeavesEnabled] = useState(true)
+  const [workingDays, setWorkingDays] = useState<number[]>([1, 2, 3, 4, 5])
   const [fetching, setFetching] = useState(true)
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState<{ text: string; ok: boolean } | null>(null)
@@ -176,18 +177,23 @@ function WorkspaceSection({ slug }: { slug: string }) {
         }
         setAllowRemote(!!data.allow_remote)
         setLeavesEnabled(data.leaves_enabled !== false)
+        if (Array.isArray(data.working_days)) setWorkingDays(data.working_days)
       })
       .finally(() => setFetching(false))
   }, [slug])
 
   async function save() {
+    if (workingDays.length === 0) {
+      setStatus({ text: t.workingDaysSaveAtLeastOne, ok: false })
+      return
+    }
     setLoading(true)
     setStatus(null)
     try {
       const res = await fetch(`/api/ws/${slug}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() || undefined, displayTimezone: tz, allowRemote, leavesEnabled }),
+        body: JSON.stringify({ name: name.trim() || undefined, displayTimezone: tz, allowRemote, leavesEnabled, workingDays }),
       })
       if (res.ok) {
         setStatus({ text: t.saveSuccess, ok: true })
@@ -341,6 +347,43 @@ function WorkspaceSection({ slug }: { slug: string }) {
           />
         </button>
       </div>
+      <FieldGroup label={t.workingDaysLabel}>
+        <p style={{ fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-muted)', marginBottom: '8px' }}>
+          {t.workingDaysHint}
+        </p>
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+          {(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const).map((label, i) => {
+            const dayNum = i === 6 ? 0 : i + 1
+            const active = workingDays.includes(dayNum)
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() =>
+                  setWorkingDays((prev) =>
+                    active ? prev.filter((d) => d !== dayNum) : [...prev, dayNum].sort((a, b) => a - b)
+                  )
+                }
+                style={{
+                  height: '36px',
+                  minWidth: '44px',
+                  padding: '0 10px',
+                  border: `1px solid ${active ? 'var(--brand)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius-md)',
+                  background: active ? 'color-mix(in srgb, var(--brand) 12%, transparent)' : 'var(--surface-2)',
+                  color: active ? 'var(--brand)' : 'var(--text-secondary)',
+                  fontSize: '13px',
+                  fontFamily: 'DM Sans, sans-serif',
+                  fontWeight: active ? 600 : 400,
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            )
+          })}
+        </div>
+      </FieldGroup>
       <PrimaryBtn onClick={save} loading={loading}>{t.saveButton}</PrimaryBtn>
       <StatusLine msg={status} />
         </>

@@ -47,13 +47,11 @@ interface CalendarCellProps {
   status: DayStatus | undefined
   signalsConfigured: boolean
   joinedDate: string
+  offDays: number[]
 }
 
-function CalendarCell({ day, dateStr, status, signalsConfigured, joinedDate }: CalendarCellProps) {
-  const isWeekend = (() => {
-    const dow = new Date(dateStr + 'T12:00:00Z').getUTCDay()
-    return dow === 0 || dow === 6
-  })()
+function CalendarCell({ day, dateStr, status, signalsConfigured, joinedDate, offDays }: CalendarCellProps) {
+  const isWeekend = offDays.includes(new Date(dateStr + 'T12:00:00Z').getUTCDay())
 
   const isPreJoin = dateStr < joinedDate
 
@@ -123,9 +121,10 @@ interface MemberRowProps {
   year: number
   month: number
   signalsConfigured: boolean
+  offDays: number[]
 }
 
-function MemberRow({ member, daysInMonth, year, month, signalsConfigured}: MemberRowProps) {
+function MemberRow({ member, daysInMonth, year, month, signalsConfigured, offDays }: MemberRowProps) {
   const ini = member.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
   const monthStr = String(month).padStart(2, '0')
 
@@ -174,6 +173,7 @@ function MemberRow({ member, daysInMonth, year, month, signalsConfigured}: Membe
               status={status}
               signalsConfigured={signalsConfigured}
               joinedDate={member.joined_date}
+              offDays={offDays}
             />
           )
         })}
@@ -245,15 +245,13 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
     if (!canExport) return
     setExporting(true)
     try {
-      const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-      const endDate = `${year}-${String(month).padStart(2, '0')}-${String(data?.days_in_month ?? 31).padStart(2, '0')}`
-      const res = await fetch(`/api/ws/${slug}/export?start=${startDate}&end=${endDate}`)
+      const res = await fetch(`/api/ws/${slug}/export?year=${year}&month=${month}`)
       if (res.ok) {
         const blob = await res.blob()
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = `checkmark-${slug}-${year}-${String(month).padStart(2, '0')}.csv`
+        a.download = `attendance-${slug}-${year}-${String(month).padStart(2, '0')}.xlsx`
         a.click()
         URL.revokeObjectURL(url)
       }
@@ -332,7 +330,7 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
               marginLeft: 'auto',
             }}
           >
-            {exporting ? 'Exporting…' : '↓ Export CSV'}
+            {exporting ? 'Exporting…' : '↓ Export Report'}
           </button>
         )}
       </div>
@@ -397,15 +395,16 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
               No location signals configured - all check-ins counted as present. Configure GPS or IP signals in Settings to distinguish office vs remote.
             </div>
           )}
-          {data.members.map((member) => (
-            <MemberRow
-              key={member.user_id}
-              member={member}
-              daysInMonth={data.days_in_month}
-              year={year}
-              month={month}
-              signalsConfigured={data.signals_configured}
-            />
+            {data.members.map((member) => (
+              <MemberRow
+                key={member.user_id}
+                member={member}
+                daysInMonth={data.days_in_month}
+                year={year}
+                month={month}
+                signalsConfigured={data.signals_configured}
+                offDays={data.off_days}
+              />
           ))}
         </div>
       )}

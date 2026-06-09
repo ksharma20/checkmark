@@ -56,13 +56,6 @@ function addDays(dateStr: string, deltaDays: number): string {
   return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10);
 }
 
-function startOfWeekMonday(dateStr: string): string {
-  // Monday=0, Sunday=6
-  const dow = weekdayFromDateStr(dateStr); // 0=Sun..6=Sat
-  const daysSinceMonday = (dow + 6) % 7;
-  return addDays(dateStr, -daysSinceMonday);
-}
-
 /** Sum session hours for completed events */
 function sessionHours(
   events: { checkin_at: string; checkout_at: string | null }[],
@@ -132,6 +125,10 @@ export async function GET(request: NextRequest, { params }: Props) {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
+
+  const workingDayNums: number[] = (() => {
+    try { return JSON.parse(ctx.workspace.working_days ?? '[1,2,3,4,5]') } catch { return [1, 2, 3, 4, 5] }
+  })()
 
   // Compute date range and bucket definitions based on interval
   let startDate: string;
@@ -226,33 +223,34 @@ export async function GET(request: NextRequest, { params }: Props) {
       });
     }
   } else if (interval === "week") {
-    const weekStart = startOfWeekMonday(todayStr);
-    startDate = weekStart + "T00:00:00Z";
-    endDate = todayStr + "T23:59:59Z";
+    // Start from Sunday of the current week so any work-week config fits in the 7-day window
+    const dow = weekdayFromDateStr(todayStr)  // 0=Sun..6=Sat
+    const sundayStr = addDays(todayStr, -dow)
+    startDate = sundayStr + 'T00:00:00Z'
+    endDate = todayStr + 'T23:59:59Z'
 
-    // Always generate all 5 Mon–Fri buckets so the full work week is visible.
-    // Future days (after today) will simply have 0 events.
-    for (let i = 0; i < 5; i++) {
-      const dayStr = addDays(weekStart, i);
-      const label = new Date(dayStr + "T12:00:00Z").toLocaleDateString(
-        "en-US",
-        {
-          weekday: "short",
-          month: "short",
-          day: "numeric",
-        },
-      );
+    // Generate one bucket per configured working day in this calendar week (Sun–Sat)
+    for (let i = 0; i < 7; i++) {
+      const dayStr = addDays(sundayStr, i)
+      // Simpler: just compute day of week for each date
+      const actualDow = new Date(dayStr + 'T12:00:00Z').getUTCDay()
+      if (!workingDayNums.includes(actualDow)) continue
+      const label = new Date(dayStr + 'T12:00:00Z').toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })
       bucketDefs.push({
         key: dayStr,
         label,
         match: (dt) =>
-          new Intl.DateTimeFormat("en-CA", {
+          new Intl.DateTimeFormat('en-CA', {
             timeZone: tz,
-            year: "numeric",
-            month: "2-digit",
-            day: "2-digit",
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
           }).format(dt) === dayStr,
-      });
+      })
     }
   } else if (interval === "month") {
     const [y, m, d] = todayStr.split("-").map(Number);
@@ -260,9 +258,11 @@ export async function GET(request: NextRequest, { params }: Props) {
     startDate = monthStart + "T00:00:00Z";
     endDate = todayStr + "T23:59:59Z";
 
-    // Daily buckets 1..today (workspace timezone)
+    // Daily buckets 1..today (workspace timezone), working days only
     for (let day = 1; day <= d; day++) {
       const dayStr = isoDate(y, m, day);
+      const dayDow = new Date(dayStr + 'T12:00:00Z').getUTCDay()
+      if (!workingDayNums.includes(dayDow)) continue
       bucketDefs.push({
         key: dayStr,
         label: String(day),
@@ -348,10 +348,15 @@ export async function GET(request: NextRequest, { params }: Props) {
     const daysDiff = (toD.getTime() - fromD.getTime()) / (1000 * 60 * 60 * 24);
 
     if (daysDiff <= 31) {
-      // Daily buckets
+      // Daily buckets, working days only
       const cur = new Date(fromD);
       while (cur <= toD) {
-        const dayStr = cur.toISOString().slice(0, 10);
+        const dayStr = cur.toISOString().slice(0, 10)
+        const dayDow = new Date(dayStr + 'T12:00:00Z').getUTCDay()
+        if (!workingDayNums.includes(dayDow)) {
+          cur.setUTCDate(cur.getUTCDate() + 1)
+          continue
+        }
         const label = cur.toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
@@ -511,7 +516,7 @@ export async function GET(request: NextRequest, { params }: Props) {
       : interval === "custom"
         ? inclusiveDayCount(startDate, endDate)
         : interval === "week"
-          ? 5
+          ? workingDayNums.length
           : inclusiveDayCount(
               // month/3month/6month/year all end "today" effectively (no future days)
               startDate,

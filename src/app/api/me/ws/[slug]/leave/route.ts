@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsMember } from '@/lib/ws-admin'
-import { MS_PER_DAY } from '@/lib/constants'
+import { countWorkdays } from '@/lib/attendance-summary'
 import { getHolidaysInRange } from '@/lib/db/queries/holidays'
 import {
   getLeaveTypeById,
@@ -8,6 +8,11 @@ import {
   hasOverlappingLeaveRequest,
   createLeaveRequest,
 } from '@/lib/db/queries/leaves'
+import { getUserById } from '@/lib/db/queries/users'
+import { getActiveWorkspaceAdmins } from '@/lib/db/queries/workspaces'
+import { createNotification } from '@/lib/db/queries/notifications'
+import { sendPushToUser } from '@/lib/push'
+import { en } from '@/locales/en'
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -64,6 +69,18 @@ export async function POST(req: NextRequest, { params }: Props) {
     )
   }
 
+  const workingDayNums: number[] = (() => {
+    try { return JSON.parse(workspace.working_days ?? '[1,2,3,4,5]') } catch { return [1, 2, 3, 4, 5] }
+  })()
+
+  const workingDaysInRange = countWorkdays(startDate, endDate, undefined, workingDayNums)
+  if (workingDaysInRange === 0) {
+    return NextResponse.json(
+      { error: 'Cannot apply leave on non-working days.', code: 'WEEKOFF_DATES' },
+      { status: 400 },
+    )
+  }
+
   const conflictingHolidays = await getHolidaysInRange(workspace.id, startDate, endDate)
   if (conflictingHolidays.length > 0) {
     const names = conflictingHolidays.map((h) => h.name).join(', ')
@@ -81,14 +98,9 @@ export async function POST(req: NextRequest, { params }: Props) {
     return NextResponse.json({ error: 'Leave type not found', code: 'NOT_FOUND' }, { status: 404 })
   }
 
-  const typesWithBalance = await getLeaveTypesWithBalance(workspace.id, userId, member.added_at)
+  const typesWithBalance = await getLeaveTypesWithBalance(workspace.id, userId, member.added_at, workingDayNums, workspace.leave_cutover_date)
   const typeBalance = typesWithBalance.find((t) => t.id === leaveTypeId)
-  const requestedDays =
-    Math.floor(
-      (new Date(endDate + 'T00:00:00Z').getTime() -
-        new Date(startDate + 'T00:00:00Z').getTime()) /
-        MS_PER_DAY,
-    ) + 1
+  const requestedDays = workingDaysInRange
 
   if (!typeBalance || requestedDays > typeBalance.available_days) {
     return NextResponse.json(
@@ -110,6 +122,24 @@ export async function POST(req: NextRequest, { params }: Props) {
     endDate,
     reason,
   })
+
+  // Notify all active workspace admins
+  try {
+    const [employee, admins] = await Promise.all([
+      getUserById(userId),
+      getActiveWorkspaceAdmins(workspace.id, userId),
+    ])
+    const employeeName = employee?.full_name ?? employee?.email ?? 'Someone'
+    const title = en.notifications.leaveSubmittedTitle
+    const body = en.notifications.leaveSubmittedBody(employeeName, requestedDays, leaveType.name)
+    await Promise.allSettled(
+      admins
+        .flatMap((a) => [
+          createNotification({ userId: a.user_id, workspaceId: workspace.id, type: 'leave_submitted', title, body, refId: leaveRequest.id, refType: 'leave_request' }),
+          sendPushToUser(a.user_id, { title, body, tag: `leave-submitted-${leaveRequest.id}` }),
+        ]),
+    )
+  } catch { /* notification failure must not block the response */ }
 
   return NextResponse.json({ leaveRequest }, { status: 201 })
 }

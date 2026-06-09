@@ -12,6 +12,8 @@ export interface Workspace {
   archived_at: string | null
   allow_remote: number
   leaves_enabled: number
+  working_days: string   // JSON array e.g. '[1,2,3,4,5]'
+  leave_cutover_date: string | null
   created_at: string
   updated_at: string
 }
@@ -93,7 +95,7 @@ export async function getWorkspaceById(id: string): Promise<Workspace | null> {
 
 export async function updateWorkspace(
   workspaceId: string,
-  updates: Partial<Pick<Workspace, 'name' | 'display_timezone' | 'allow_remote' | 'leaves_enabled'>>
+  updates: Partial<Pick<Workspace, 'name' | 'display_timezone' | 'allow_remote' | 'leaves_enabled' | 'working_days' | 'leave_cutover_date'>>
 ): Promise<void> {
   const fields = Object.keys(updates).map((k) => `${k} = ?`)
   const values = Object.values(updates)
@@ -166,6 +168,16 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Workspac
   return db.query<WorkspaceMember>(
     'SELECT * FROM workspace_members WHERE workspace_id = ? ORDER BY added_at ASC',
     [workspaceId]
+  )
+}
+
+export async function getActiveWorkspaceAdmins(workspaceId: string, excludeUserId?: string): Promise<{ user_id: string }[]> {
+  return db.query<{ user_id: string }>(
+    `SELECT wm.user_id FROM workspace_members wm
+     JOIN users u ON u.id = wm.user_id
+     WHERE wm.workspace_id = ? AND wm.role = 'admin' AND wm.status = 'active' AND u.deleted_at IS NULL
+     ${excludeUserId ? 'AND wm.user_id != ?' : ''}`,
+    excludeUserId ? [workspaceId, excludeUserId] : [workspaceId],
   )
 }
 

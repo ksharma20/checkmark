@@ -30,10 +30,10 @@ export function dateKeyInTimezone(utcString: string, timezone: string): string {
   }).format(date)
 }
 
-export function isWorkday(dateStr: string): boolean {
+export function isWorkday(dateStr: string, workingDays: number[] = [1, 2, 3, 4, 5]): boolean {
   const date = new Date(`${dateStr}T12:00:00Z`)
   const day = date.getUTCDay()
-  return day >= 1 && day <= 5
+  return workingDays.includes(day)
 }
 
 export function nextDateKey(dateStr: string): string {
@@ -46,10 +46,16 @@ export function nextDateKey(dateStr: string): string {
   ].join('-')
 }
 
-export function countWorkdays(startDate: string, endDate: string, holidayDates?: Set<string>): number {
+export function countWorkdays(
+  startDate: string,
+  endDate: string,
+  holidayDates?: Set<string> | string[],
+  workingDays: number[] = [1, 2, 3, 4, 5],
+): number {
+  const holidays = holidayDates instanceof Set ? holidayDates : new Set(holidayDates ?? [])
   let count = 0
   for (let date = startDate; date <= endDate; date = nextDateKey(date)) {
-    if (isWorkday(date) && !holidayDates?.has(date)) count++
+    if (isWorkday(date, workingDays) && !holidays.has(date)) count++
   }
   return count
 }
@@ -60,8 +66,14 @@ export function summarizeAttendanceDays(params: {
   endDate: string
   timezone: string
   todayDate?: string
-  holidayDates?: Set<string>
+  holidayDates?: Set<string> | string[]
+  workingDays?: number[]
 }): AttendanceSummary {
+  const workingDays = params.workingDays ?? [1, 2, 3, 4, 5]
+  const holidayDates =
+    params.holidayDates instanceof Set
+      ? params.holidayDates
+      : new Set(params.holidayDates ?? [])
   const todayDate = params.todayDate ?? params.endDate
   const eventsByDay = new Map<string, PresenceEventWithMatch[]>()
 
@@ -78,7 +90,7 @@ export function summarizeAttendanceDays(params: {
   let remoteDays = 0
   let absentDays = 0
   let holidayDays = 0
-  let workingDays = 0
+  let workingDaysCount = 0
 
   for (let date = params.startDate; date <= params.endDate; date = nextDateKey(date)) {
     if (date > todayDate) {
@@ -86,15 +98,15 @@ export function summarizeAttendanceDays(params: {
       continue
     }
 
-    if (!isWorkday(date)) continue
+    if (!isWorkday(date, workingDays)) continue
 
-    if (params.holidayDates?.has(date)) {
+    if (holidayDates.has(date)) {
       days[date] = 'holiday'
       holidayDays++
       continue
     }
 
-    workingDays++
+    workingDaysCount++
     const dayEvents = eventsByDay.get(date) ?? []
 
     if (dayEvents.length === 0) {
@@ -109,5 +121,5 @@ export function summarizeAttendanceDays(params: {
     }
   }
 
-  return { days, officeDays, remoteDays, absentDays, holidayDays, workingDays }
+  return { days, officeDays, remoteDays, absentDays, holidayDays, workingDays: workingDaysCount }
 }

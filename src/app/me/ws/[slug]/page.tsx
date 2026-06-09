@@ -48,6 +48,7 @@ interface LeaveRequestWithType {
   end_date: string
   reason: string | null
   status: string
+  rejection_reason: string | null
   created_at: string
 }
 
@@ -295,6 +296,49 @@ function LeaveRow({ request: leaveRequest, todayKey }: { request: LeaveRequestWi
           {leaveRequest.reason}
         </div>
       )}
+      {leaveRequest.status === "rejected" && leaveRequest.rejection_reason && (
+        <div
+          style={{
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "12px",
+            color: "var(--danger)",
+            marginTop: "2px",
+            fontStyle: "italic",
+          }}
+        >
+          {en.meWsToday.leaveRejectedPrefix} {leaveRequest.rejection_reason}
+        </div>
+      )}
+      <div style={{ marginTop: "4px" }}>
+        <span
+          style={{
+            display: "inline-block",
+            fontSize: "11px",
+            fontFamily: "DM Sans, sans-serif",
+            fontWeight: 600,
+            padding: "1px 7px",
+            borderRadius: "20px",
+            color:
+              leaveRequest.status === "approved"
+                ? "var(--teal)"
+                : leaveRequest.status === "rejected"
+                  ? "var(--danger)"
+                  : "var(--amber)",
+            background:
+              leaveRequest.status === "approved"
+                ? "rgba(0,212,170,0.12)"
+                : leaveRequest.status === "rejected"
+                  ? "rgba(239,68,68,0.1)"
+                  : "rgba(245,158,11,0.12)",
+          }}
+        >
+          {leaveRequest.status === "approved"
+            ? en.meWsToday.leaveStatusApproved
+            : leaveRequest.status === "rejected"
+              ? en.meWsToday.leaveStatusRejected
+              : en.meWsToday.leaveStatusPending}
+        </span>
+      </div>
     </div>
   );
 }
