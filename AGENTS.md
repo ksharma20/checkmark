@@ -128,6 +128,7 @@ Query files and their domains:
 - `push.ts` — push subscriptions
 - `holidays.ts` — workspace holiday calendar
 - `leaves.ts` — workspace leave types (`workspace_leave_types`) and leave requests (`leave_requests`); exports `getLeaveTypesWithBalance()` which computes balance from join date using calendar month/quarter arithmetic
+- `employees.ts` — employee records (personal, contact, employment, lifecycle, identity, bank, emergency contact); sensitive fields AES-256-GCM encrypted; exports `listEmployees`, `getEmployee`, `createEmployee`, `updateEmployee`, `softDeleteEmployee`
 
 ---
 

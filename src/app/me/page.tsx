@@ -48,6 +48,7 @@ export default async function MePage() {
   let wfoDays = 0;
   let wfhDays = 0;
   let leaveDays = 0;
+  let monthEvents: Awaited<ReturnType<typeof queryWorkspaceEvents>> = [];
 
   if (primaryMembership && primaryWorkspace) {
     const timezone = primaryWorkspace.display_timezone;
@@ -58,7 +59,7 @@ export default async function MePage() {
     const summaryStart =
       joinedLocal > monthStartLocal ? joinedLocal : monthStartLocal;
     const bounds = monthBoundsUtc(year, month, timezone);
-    const [monthEvents, holidayDates] = await Promise.all([
+    const [fetchedMonthEvents, holidayDates] = await Promise.all([
       queryWorkspaceEvents(primaryWorkspace.id, primaryWorkspace.plan, {
         startDate: bounds.start,
         endDate: bounds.end,
@@ -66,6 +67,7 @@ export default async function MePage() {
       }),
       listHolidayDatesInRange(primaryWorkspace.id, summaryStart, todayLocal),
     ]);
+    monthEvents = fetchedMonthEvents;
     const summary = summarizeAttendanceDays({
       events: monthEvents,
       startDate: summaryStart,
@@ -79,6 +81,12 @@ export default async function MePage() {
     wfhDays = summary.remoteDays;
     leaveDays = summary.absentDays;
   }
+
+  // Use workspace-matched events for today when available (shows verified/partial/none badges)
+  const displayTodayEvents =
+    primaryMembership && primaryWorkspace
+      ? monthEvents.filter((e) => e.checkin_at.slice(0, 10) === todayUtcStr)
+      : todayEvents;
 
   return (
     <div
@@ -176,7 +184,7 @@ export default async function MePage() {
       </div>
 
       {/* Today's events */}
-      {todayEvents.length > 0 && (
+      {displayTodayEvents.length > 0 && (
         <section style={{ marginBottom: "24px" }}>
           <h2
             style={{
@@ -191,7 +199,7 @@ export default async function MePage() {
           >
             Today
           </h2>
-          {todayEvents.map((event) => (
+          {displayTodayEvents.map((event) => (
             <EventCard key={event.id} event={event} />
           ))}
         </section>
@@ -207,7 +215,7 @@ export default async function MePage() {
       />
 
       {/* Empty state - no activity yet */}
-      {todayEvents.length === 0 && memberships.length === 0 && (
+      {displayTodayEvents.length === 0 && memberships.length === 0 && (
         <div
           style={{
             marginTop: "32px",

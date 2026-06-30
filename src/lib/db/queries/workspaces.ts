@@ -434,13 +434,19 @@ export interface MemberWithUser {
   role: string
   full_name: string | null
   added_at: string
+  employee_record_id: string | null
+  designation: string | null
+  department: string | null
 }
 
 export async function getActiveMembersWithDetails(workspaceId: string): Promise<MemberWithUser[]> {
   return db.query<MemberWithUser>(
-    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name, wm.added_at
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name, wm.added_at,
+            e.id as employee_record_id, ed.designation, ed.department
      FROM workspace_members wm
      LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     LEFT JOIN employees e ON e.workspace_id = wm.workspace_id AND e.user_id = wm.user_id AND e.deleted_at IS NULL
+     LEFT JOIN employment_details ed ON ed.employee_id = e.id
      WHERE wm.workspace_id = ? AND wm.status = 'active' AND wm.user_id IS NOT NULL
      ORDER BY u.full_name ASC, wm.email ASC`,
     [workspaceId]
@@ -452,9 +458,12 @@ export async function getActiveMemberWithDetails(
   userId: string,
 ): Promise<MemberWithUser | null> {
   return db.queryOne<MemberWithUser>(
-    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name, wm.added_at
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, u.full_name, wm.added_at,
+            e.id as employee_record_id, ed.designation, ed.department
      FROM workspace_members wm
      LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     LEFT JOIN employees e ON e.workspace_id = wm.workspace_id AND e.user_id = wm.user_id AND e.deleted_at IS NULL
+     LEFT JOIN employment_details ed ON ed.employee_id = e.id
      WHERE wm.workspace_id = ? AND wm.status = 'active' AND wm.user_id = ?
      LIMIT 1`,
     [workspaceId, userId],
@@ -528,13 +537,29 @@ export interface MemberWithUserFull {
   status: string
   full_name: string | null
   added_at: string
+  employee_record_id: string | null
+  employee_id: string | null
+  designation: string | null
+  department: string | null
+  work_mode: string | null
+  date_of_joining: string | null
+  probation_end_date: string | null
 }
+
+const MEMBER_EMPLOYEE_JOIN = `
+  LEFT JOIN employees e ON e.workspace_id = wm.workspace_id AND e.user_id = wm.user_id AND e.deleted_at IS NULL
+  LEFT JOIN employment_details ed ON ed.employee_id = e.id`
+
+const MEMBER_EMPLOYEE_COLS = `, e.id as employee_record_id, e.employee_id, ed.designation, ed.department, ed.work_mode, ed.date_of_joining, ed.probation_end_date`
+
+const FULL_NAME_EXPR = `COALESCE(NULLIF(TRIM(COALESCE(e.first_name,'') || ' ' || COALESCE(e.last_name,'')), ''), u.full_name)`
 
 export async function getAllMembersWithDetails(workspaceId: string): Promise<MemberWithUserFull[]> {
   return db.query<MemberWithUserFull>(
-    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, wm.status, wm.added_at, u.full_name
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, wm.status, wm.added_at, ${FULL_NAME_EXPR} as full_name${MEMBER_EMPLOYEE_COLS}
      FROM workspace_members wm
      LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     ${MEMBER_EMPLOYEE_JOIN}
      WHERE wm.workspace_id = ?
      ORDER BY wm.added_at DESC`,
     [workspaceId]
@@ -550,7 +575,7 @@ export async function getAllMembersWithDetailsPaged(params: {
   const q = (params.search ?? "").trim().toLowerCase();
   const hasSearch = q.length > 0;
   const where = hasSearch
-    ? `WHERE wm.workspace_id = ? AND (lower(wm.email) LIKE ? OR lower(COALESCE(u.full_name,'')) LIKE ?)`
+    ? `WHERE wm.workspace_id = ? AND (lower(wm.email) LIKE ? OR lower(COALESCE(${FULL_NAME_EXPR},'')) LIKE ?)`
     : `WHERE wm.workspace_id = ?`;
   const args = hasSearch
     ? [params.workspaceId, `%${q}%`, `%${q}%`]
@@ -560,14 +585,16 @@ export async function getAllMembersWithDetailsPaged(params: {
     `SELECT COUNT(*) as total
      FROM workspace_members wm
      LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     ${MEMBER_EMPLOYEE_JOIN}
      ${where}`,
     args,
   );
   const total = totalRow?.total ?? 0;
   const members = await db.query<MemberWithUserFull>(
-    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, wm.status, wm.added_at, u.full_name
+    `SELECT wm.id as member_id, wm.workspace_id, wm.user_id, wm.email, wm.role, wm.status, wm.added_at, ${FULL_NAME_EXPR} as full_name${MEMBER_EMPLOYEE_COLS}
      FROM workspace_members wm
      LEFT JOIN users u ON u.id = wm.user_id AND u.deleted_at IS NULL
+     ${MEMBER_EMPLOYEE_JOIN}
      ${where}
      ORDER BY wm.added_at DESC
      LIMIT ? OFFSET ?`,

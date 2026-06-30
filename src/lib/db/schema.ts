@@ -220,4 +220,78 @@ CREATE TABLE IF NOT EXISTS notifications (
 CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read_at, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_list ON notifications(user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_workspace ON notifications(workspace_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS employees (
+  id                             TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id                   TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id                        TEXT REFERENCES users(id),
+
+  first_name                     TEXT NOT NULL,
+  last_name                      TEXT NOT NULL,
+  gender                         TEXT CHECK(gender IN ('male','female','non_binary','prefer_not_to_say')),
+  date_of_birth                  TEXT,
+  marital_status                 TEXT CHECK(marital_status IN ('single','married','divorced','widowed','separated')),
+  number_of_children             INTEGER,
+  photo_url                      TEXT,
+  blood_group                    TEXT CHECK(blood_group IN ('A+','A-','B+','B-','AB+','AB-','O+','O-')),
+
+  personal_email                 TEXT,
+  work_email                     TEXT NOT NULL,
+  phone                          TEXT,
+  alternate_phone                TEXT,
+  current_address                TEXT,
+  permanent_address              TEXT,
+
+  employee_id                    TEXT,
+  designation                    TEXT,
+  department                     TEXT,
+  work_location                  TEXT,
+  work_mode                      TEXT CHECK(work_mode IN ('office','remote','hybrid')),
+  reporting_manager_id           TEXT REFERENCES employees(id),
+  total_work_experience          REAL,
+  employment_type                TEXT NOT NULL CHECK(employment_type IN ('full_time','part_time','contract','intern','consultant')),
+  employee_status                TEXT NOT NULL DEFAULT 'active' CHECK(employee_status IN ('active','terminated','suspended','on_leave','notice_period')),
+  source_of_hire                 TEXT CHECK(source_of_hire IN ('direct','referral','job_portal','consultancy','campus')),
+
+  date_of_joining                TEXT,
+  confirmation_date              TEXT,
+  probation_end_date             TEXT,
+  exit_date                      TEXT,
+  exit_reason                    TEXT,
+
+  pan_encrypted                  TEXT,
+  aadhaar_encrypted              TEXT,
+  uan                            TEXT,
+  passport_number                TEXT,
+
+  bank_account_encrypted         TEXT,
+  bank_ifsc                      TEXT,
+  bank_name                      TEXT,
+
+  emergency_contact_name         TEXT,
+  emergency_contact_relationship TEXT,
+  emergency_contact_phone        TEXT,
+
+  deleted_at                     TEXT,
+  created_at                     TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at                     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_ws_emp_id
+  ON employees(workspace_id, employee_id)
+  WHERE employee_id IS NOT NULL AND deleted_at IS NULL;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_employees_ws_work_email
+  ON employees(workspace_id, work_email)
+  WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_employees_workspace        ON employees(workspace_id, deleted_at);
+CREATE INDEX IF NOT EXISTS idx_employees_department       ON employees(workspace_id, department);
+CREATE INDEX IF NOT EXISTS idx_employees_work_location    ON employees(workspace_id, work_location);
+CREATE INDEX IF NOT EXISTS idx_employees_doj              ON employees(workspace_id, date_of_joining);
+CREATE INDEX IF NOT EXISTS idx_employees_exit_date        ON employees(workspace_id, exit_date);
+CREATE INDEX IF NOT EXISTS idx_employees_status           ON employees(workspace_id, employee_status);
+CREATE INDEX IF NOT EXISTS idx_employees_employment_type  ON employees(workspace_id, employment_type);
+CREATE INDEX IF NOT EXISTS idx_employees_manager          ON employees(workspace_id, reporting_manager_id);
+CREATE INDEX IF NOT EXISTS idx_employees_user             ON employees(user_id);
 `;

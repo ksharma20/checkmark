@@ -48,7 +48,15 @@ function createSQLiteDB(): DB {
       };
     },
     async transaction<T>(fn: (db: DB) => Promise<T>): Promise<T> {
-      return fn(this);
+      sqlite.exec('BEGIN');
+      try {
+        const result = await fn(this);
+        sqlite.exec('COMMIT');
+        return result;
+      } catch (err) {
+        sqlite.exec('ROLLBACK');
+        throw err;
+      }
     },
   };
 }

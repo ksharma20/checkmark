@@ -141,6 +141,7 @@ import { db } from '@/lib/db'
 - `push.ts` - push subscriptions
 - `holidays.ts` - workspace holiday calendar
 - `leaves.ts` - workspace leave types + leave requests (balance computed from member join date)
+- `employees.ts` - employee records; sensitive fields (PAN, Aadhaar, bank account) AES-256-GCM encrypted via `src/lib/encryption.ts`
 
 ### Migration
 `scripts/migrate.js` - **single migration script** and must always be **fully up-to-date**.
@@ -279,6 +280,7 @@ Enforce in `queryWorkspaceEvents()` - plan gate applied before signal matching.
 | `VAPID_PRIVATE_KEY` | Push | VAPID private key for web-push |
 | `VAPID_EMAIL` | Push | Contact email for VAPID (`mailto:...`), defaults to kabir.innovate@gmail.com |
 | `CRON_SECRET` | Push | 32+ char secret for `/api/push/cron` auth; must match GitHub Actions secret |
+| `FIELD_ENCRYPTION_KEY` | **Yes** | 64-char hex string (32 bytes) for AES-256-GCM employee field encryption. Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
 
 ---
 

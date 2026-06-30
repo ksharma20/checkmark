@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import Link from "next/link";
 import { KeyRound, Search, Trash2 } from "lucide-react";
 import { en } from "@/locales/en";
 
@@ -11,6 +12,34 @@ interface Member {
   role: string
   status: string
   added_at: string
+  user_id: string | null
+  employee_record_id: string | null
+  employee_id: string | null
+  designation: string | null
+  department: string | null
+  work_mode: string | null
+  date_of_joining: string | null
+  probation_end_date: string | null
+}
+
+const AVATAR_COLORS = ['#4F46E5','#0EA5E9','#10B981','#F59E0B','#EF4444','#8B5CF6','#EC4899','#06B6D4']
+function avatarColor(s: string) {
+  let h = 0; for (let i = 0; i < s.length; i++) h = s.charCodeAt(i) + ((h << 5) - h)
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
+}
+
+const WM_LABEL: Record<string, string> = { office: 'On-site', remote: 'Remote', hybrid: 'Hybrid' }
+
+function empStatus(doj: string | null, probEnd: string | null) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  if (doj && new Date(doj) > today) return { label: 'Onboarding', color: '#6366F1', bg: 'rgba(99,102,241,0.1)' }
+  if (probEnd && new Date(probEnd) >= today) return { label: 'Probation', color: 'var(--amber)', bg: 'color-mix(in srgb, var(--amber) 12%, transparent)' }
+  return { label: 'Active', color: 'var(--teal)', bg: 'color-mix(in srgb, var(--teal) 12%, transparent)' }
+}
+
+function formatDateOfJoining(d: string | null) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
 interface Props {
@@ -29,45 +58,6 @@ const inputStyle: React.CSSProperties = {
   color: 'var(--text-primary)',
   outline: 'none',
   boxSizing: 'border-box',
-}
-
-function statusBadge(status: string) {
-  const styles: Record<string, React.CSSProperties> = {
-    active: {
-      color: 'var(--teal)',
-      background: 'color-mix(in srgb, var(--teal) 12%, transparent)',
-      border: '1px solid var(--teal)',
-    },
-    pending_consent: {
-      color: 'var(--amber)',
-      background: 'color-mix(in srgb, var(--amber) 12%, transparent)',
-      border: '1px solid var(--amber)',
-    },
-    declined: {
-      color: 'var(--danger)',
-      background: 'color-mix(in srgb, var(--danger) 12%, transparent)',
-      border: '1px solid var(--danger)',
-    },
-  }
-  const label: Record<string, string> = {
-    active: 'Active',
-    pending_consent: 'Invite sent',
-    declined: 'Declined',
-  }
-  return (
-    <span
-      style={{
-        fontSize: '11px',
-        fontFamily: 'DM Sans, sans-serif',
-        fontWeight: 600,
-        borderRadius: '4px',
-        padding: '2px 7px',
-        ...(styles[status] ?? { color: 'var(--text-muted)', border: '1px solid var(--border)' }),
-      }}
-    >
-      {label[status] ?? status}
-    </span>
-  )
 }
 
 // ─── Transfer Ownership Modal ─────────────────────────────────────────────────
@@ -463,380 +453,150 @@ export default function PeopleClient({ slug }: Props) {
         )}
       </div>
 
-      {/* Member list */}
-      <div
-        style={{
-          background: "var(--surface-0)",
-          border: "1px solid var(--border)",
-          borderRadius: "var(--radius-lg)",
-          overflow: "hidden",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            flexWrap: "wrap",
-            padding: "16px 20px",
-            borderBottom: "1px solid var(--border)",
-          }}
-        >
-          <h2
-            style={{
-              fontFamily: "Syne, sans-serif",
-              fontSize: "15px",
-              fontWeight: 600,
-              color: "var(--navy)",
-            }}
-          >
-            Members ({pagination?.total ?? members.length})
+      {/* Unified people table */}
+      <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+        {/* Header: title + search */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: '15px', fontWeight: 600, color: 'var(--navy)' }}>
+            People ({pagination?.total ?? members.length})
           </h2>
-          <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <input
               type="search"
               placeholder="Search name or email"
               value={searchDraft}
               onChange={(e) => setSearchDraft(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && applySearch()}
-              style={{
-                height: "36px",
-                padding: "0 10px",
-                border: "1px solid var(--border)",
-                borderRadius: "var(--radius-md)",
-                fontSize: "13px",
-                fontFamily: "DM Sans, sans-serif",
-                background: "var(--surface-0)",
-                color: "var(--text-primary)",
-                outline: "none",
-                minWidth: "220px",
-                flex: "0 1 260px",
-              }}
+              onKeyDown={(e) => e.key === 'Enter' && applySearch()}
+              style={{ height: '36px', padding: '0 10px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontSize: '13px', fontFamily: 'DM Sans, sans-serif', background: 'var(--surface-0)', color: 'var(--text-primary)', outline: 'none', minWidth: '220px' }}
             />
-            <button
-              type="button"
-              onClick={applySearch}
-              title="Apply search"
-              style={{
-                height: "36px",
-                width: "36px",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border)",
-                background: "var(--surface-0)",
-                color: "var(--text-secondary)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                flexShrink: 0,
-              }}
-            >
+            <button type="button" onClick={applySearch} title="Search" style={{ height: '36px', width: '36px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface-0)', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
               <Search size={16} />
             </button>
           </div>
         </div>
 
         {loading ? (
-          <div style={{ padding: "16px 20px" }}>
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "14px 0",
-                  borderBottom: i < 3 ? "1px solid var(--border)" : "none",
-                }}
-              >
-                <div
-                  style={{
-                    ...skBase,
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "50%",
-                    flexShrink: 0,
-                  }}
-                />
+          <div style={{ padding: '16px 20px' }}>
+            {[1,2,3].map(i => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '14px 0', borderBottom: i < 3 ? '1px solid var(--border)' : 'none' }}>
+                <div style={{ ...skBase, width: '36px', height: '36px', borderRadius: '50%', flexShrink: 0 }} />
                 <div style={{ flex: 1 }}>
-                  <div
-                    style={{
-                      ...skBase,
-                      height: "13px",
-                      width: "140px",
-                      marginBottom: "6px",
-                    }}
-                  />
-                  <div style={{ ...skBase, height: "11px", width: "180px" }} />
+                  <div style={{ ...skBase, height: '13px', width: '160px', marginBottom: '6px' }} />
+                  <div style={{ ...skBase, height: '11px', width: '120px' }} />
                 </div>
-                <div
-                  style={{
-                    ...skBase,
-                    height: "20px",
-                    width: "48px",
-                    borderRadius: "4px",
-                  }}
-                />
+                <div style={{ ...skBase, height: '11px', width: '100px' }} />
+                <div style={{ ...skBase, height: '11px', width: '80px' }} />
+                <div style={{ ...skBase, height: '20px', width: '60px', borderRadius: '4px' }} />
               </div>
             ))}
           </div>
         ) : members.length === 0 ? (
-          <div style={{ padding: "40px 24px", textAlign: "center" }}>
-            <p
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: "15px",
-                color: "var(--text-secondary)",
-                marginBottom: "4px",
-              }}
-            >
-              No members yet.
-            </p>
-            <p
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: "13px",
-                color: "var(--text-muted)",
-              }}
-            >
-              Use the invite form above to add your team.
-            </p>
+          <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>No members yet.</p>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>Use the invite form above to add your team.</p>
           </div>
         ) : (
-          <>
-            {members.map((m, i) => (
-              <div
-                key={m.member_id}
-                className="member-row"
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  padding: "14px 20px",
-                  borderBottom:
-                    i < members.length - 1 || loadingMore
-                      ? "1px solid var(--border)"
-                      : "none",
-                }}
-              >
-                {/* Avatar */}
-                <div
-                  style={{
-                    width: "36px",
-                    height: "36px",
-                    borderRadius: "50%",
-                    background:
-                      "color-mix(in srgb, var(--brand) 15%, transparent)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "14px",
-                    fontFamily: "DM Sans, sans-serif",
-                    fontWeight: 600,
-                    color: "var(--brand)",
-                    flexShrink: 0,
-                  }}
-                >
-                  {(m.full_name ?? m.email)[0].toUpperCase()}
-                </div>
-
-                {/* Info */}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    style={{
-                      fontFamily: "DM Sans, sans-serif",
-                      fontSize: "14px",
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {m.full_name ?? m.email}
-                  </div>
-                  {m.full_name && (
-                    <div
-                      style={{
-                        fontFamily: "DM Sans, sans-serif",
-                        fontSize: "12px",
-                        color: "var(--text-muted)",
-                        whiteSpace: "nowrap",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                      }}
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['Employee', 'Designation', 'Department', 'Work mode', 'Joined', 'Status', ''].map((h, idx) => (
+                    <th key={idx} style={{ padding: '10px 16px', textAlign: idx === 6 ? 'right' : 'left', fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {members.map((m, i) => {
+                  const name = m.full_name ?? m.email
+                  const initials = name.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase()
+                  const color = avatarColor(m.user_id ?? m.email)
+                  const st = m.employee_record_id
+                    ? empStatus(m.date_of_joining, m.probation_end_date)
+                    : m.status === 'pending_consent'
+                      ? { label: 'Invite sent', color: 'var(--amber)', bg: 'color-mix(in srgb, var(--amber) 12%, transparent)' }
+                      : m.status === 'declined'
+                        ? { label: 'Declined', color: 'var(--danger)', bg: 'color-mix(in srgb, var(--danger) 12%, transparent)' }
+                        : { label: 'Active', color: 'var(--teal)', bg: 'color-mix(in srgb, var(--teal) 12%, transparent)' }
+                  return (
+                    <tr key={m.member_id} style={{ borderBottom: i < members.length - 1 || loadingMore ? '1px solid var(--border)' : 'none' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-1)')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '')}
                     >
-                      {m.email}
-                    </div>
-                  )}
-                </div>
-
-                {/* Role + Status + Actions - wraps below name on mobile */}
-                <div
-                  className="member-meta"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: "12px",
-                      fontFamily: "DM Sans, sans-serif",
-                      color: "var(--text-muted)",
-                    }}
-                  >
-                    {m.role}
-                  </span>
-
-                  <span className="member-status-badge">
-                    {statusBadge(m.status)}
-                  </span>
-                  <span
-                    className="member-status-dot"
-                    title={
-                      m.status === "active"
-                        ? "Active"
-                        : m.status === "pending_consent"
-                          ? "Invite sent"
-                          : "Declined"
-                    }
-                    style={{
-                      width: "8px",
-                      height: "8px",
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      background:
-                        m.status === "active"
-                          ? "var(--teal)"
-                          : m.status === "pending_consent"
-                            ? "var(--amber)"
-                            : "var(--danger)",
-                      display: "none",
-                    }}
-                  />
-
-                  {m.role !== "admin" && m.status === "active" && (
-                    <button
-                      onClick={() => setTransferTarget(m)}
-                      title="Make owner"
-                      style={{
-                        background: "none",
-                        border: "1px solid var(--border)",
-                        borderRadius: "var(--radius-sm)",
-                        color: "var(--text-secondary)",
-                        fontSize: "11px",
-                        fontFamily: "DM Sans, sans-serif",
-                        cursor: "pointer",
-                        padding: "3px 8px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      <KeyRound className="member-btn-icon" size={14} />
-                      <span className="member-btn-label">Make owner</span>
-                    </button>
-                  )}
-
-                  {m.role !== "admin" && (
-                    <button
-                      onClick={() => remove(m.member_id)}
-                      disabled={removingId === m.member_id}
-                      title="Remove member"
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--danger)",
-                        fontSize: "12px",
-                        fontFamily: "DM Sans, sans-serif",
-                        cursor:
-                          removingId === m.member_id
-                            ? "not-allowed"
-                            : "pointer",
-                        padding: "0 4px",
-                        opacity: removingId === m.member_id ? 0.5 : 1,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "4px",
-                      }}
-                    >
-                      <Trash2 className="member-btn-icon" size={13} />
-                      <span className="member-btn-label">Remove</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-            {loadingMore &&
-              [1, 2, 3].map((k) => (
-                <div
-                  key={`sk-more-${k}`}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "12px",
-                    padding: "14px 20px",
-                    borderBottom: k < 3 ? "1px solid var(--border)" : "none",
-                  }}
-                >
-                  <div
-                    style={{
-                      ...skBase,
-                      width: "36px",
-                      height: "36px",
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <div
-                      style={{
-                        ...skBase,
-                        height: "13px",
-                        width: "140px",
-                        marginBottom: "6px",
-                      }}
-                    />
-                    <div
-                      style={{ ...skBase, height: "11px", width: "180px" }}
-                    />
-                  </div>
-                  <div
-                    style={{
-                      ...skBase,
-                      height: "20px",
-                      width: "48px",
-                      borderRadius: "4px",
-                    }}
-                  />
-                </div>
-              ))}
-          </>
+                      {/* Employee column — takes remaining space */}
+                      <td style={{ padding: '12px 16px', width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <div style={{ width: '34px', height: '34px', borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 600, color: '#fff', flexShrink: 0, fontFamily: 'DM Sans, sans-serif' }}>
+                            {initials}
+                          </div>
+                          <div>
+                            <Link
+                              href={m.user_id ? `/ws/${slug}/members/${m.user_id}` : '#'}
+                              style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', fontWeight: 500, color: 'var(--text-primary)', textDecoration: 'none', display: 'block' }}
+                            >
+                              {name}
+                            </Link>
+                            <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
+                              {m.employee_id ?? m.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      {/* Designation */}
+                      <td style={{ padding: '12px 16px', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', }}>{m.designation ?? '—'}</td>
+                      {/* Department */}
+                      <td style={{ padding: '12px 16px', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)' }}>{m.department ?? '—'}</td>
+                      {/* Work mode */}
+                      <td style={{ padding: '12px 16px', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)' }}>{m.work_mode ? (WM_LABEL[m.work_mode] ?? m.work_mode) : '—'}</td>
+                      {/* Joined */}
+                      <td style={{ padding: '12px 16px', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)' }}>{formatDateOfJoining(m.date_of_joining)}</td>
+                      {/* Status */}
+                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', fontFamily: 'DM Sans, sans-serif', fontWeight: 500, color: st.color, background: st.bg, border: `1px solid ${st.color}`, borderRadius: '4px', padding: '2px 8px' }}>
+                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: st.color, flexShrink: 0 }} />
+                          {st.label}
+                        </span>
+                      </td>
+                      {/* Actions */}
+                      <td style={{ padding: '12px 16px', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '8px' }}>
+                          {m.user_id && m.status === 'active' && !m.employee_record_id && (
+                            <Link href={`/ws/${slug}/people/${m.user_id}/details`} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--brand)', textDecoration: 'none' }}>+ Set up</Link>
+                          )}
+                          {m.user_id && m.status === 'active' && m.employee_record_id && (
+                            <Link href={`/ws/${slug}/people/${m.user_id}/details`} style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-secondary)', textDecoration: 'none' }}>Edit</Link>
+                          )}
+                          {m.role !== 'admin' && m.status === 'active' && (
+                            <button onClick={() => setTransferTarget(m)} title="Make owner" style={{ background: 'none', border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)', color: 'var(--text-secondary)', fontSize: '11px', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer', padding: '3px 8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <KeyRound size={13} /> Owner
+                            </button>
+                          )}
+                          {m.role !== 'admin' && (
+                            <button onClick={() => remove(m.member_id)} disabled={removingId === m.member_id} title="Remove" style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: removingId === m.member_id ? 'not-allowed' : 'pointer', opacity: removingId === m.member_id ? 0.5 : 1, padding: '0 2px', display: 'flex', alignItems: 'center' }}>
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {loadingMore && [1,2,3].map(k => (
+                  <tr key={`sk-${k}`}>
+                    <td colSpan={7} style={{ padding: '14px 16px', borderBottom: k < 3 ? '1px solid var(--border)' : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ ...skBase, width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0 }} />
+                        <div style={{ ...skBase, height: '13px', width: '160px' }} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
         )}
       </div>
 
       {canViewMore && (
-        <div style={{ marginTop: "12px" }}>
-          <button
-            type="button"
-            onClick={() => loadMembers({ append: true })}
-            disabled={loadingMore}
-            style={{
-              height: "44px",
-              width: "100%",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border)",
-              background: "var(--surface-0)",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "13px",
-              fontWeight: 600,
-              cursor: loadingMore ? "default" : "pointer",
-            }}
-          >
+        <div style={{ marginTop: '12px' }}>
+          <button type="button" onClick={() => loadMembers({ append: true })} disabled={loadingMore} style={{ height: '44px', width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', background: 'var(--surface-0)', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600, cursor: loadingMore ? 'default' : 'pointer' }}>
             {loadingMore ? en.wsPeople.loadingMore : en.wsPeople.viewMore}
           </button>
         </div>

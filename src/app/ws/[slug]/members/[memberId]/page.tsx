@@ -5,7 +5,6 @@ import { en } from "@/locales/en";
 import { useParams } from "next/navigation";
 import { fmtTime, durationLabel } from "@/lib/client/format-time";
 import type { MatchedBy } from "@/lib/signals";
-// MatchedBy is kept for the EventWithMatch type below
 
 const SIGNAL_BADGE: Record<MatchedBy, { label: string; color: string }> = {
   verified: { label: "Verified", color: "var(--teal)" },
@@ -25,6 +24,20 @@ const TRUST_LABELS: Record<string, string> = {
     "Checkout outside office - location was beyond the configured office radius",
 };
 
+const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
+  full_time: "Full-time",
+  part_time: "Part-time",
+  contract: "Contract",
+  intern: "Intern",
+  consultant: "Consultant",
+};
+
+const WORK_MODE_LABELS: Record<string, string> = {
+  office: "Office",
+  remote: "Remote",
+  hybrid: "Hybrid",
+};
+
 interface MemberInfo {
   user_id: string;
   full_name: string | null;
@@ -33,6 +46,30 @@ interface MemberInfo {
   added_at: string;
   current_streak: number;
   total_checkins: number;
+  employee_record_id: string | null;
+  designation: string | null;
+  department: string | null;
+}
+
+interface EmployeeProfile {
+  id: string;
+  first_name: string;
+  last_name: string;
+  work_email: string;
+  employee_id: string | null;
+  phone: string | null;
+  employment: {
+    designation: string | null;
+    department: string | null;
+    employment_type: string | null;
+    work_mode: string | null;
+    work_location: string | null;
+    date_of_joining: string | null;
+    confirmation_date: string | null;
+    probation_end_date: string | null;
+    exit_date: string | null;
+    exit_reason: string | null;
+  };
 }
 
 interface EventWithMatch {
@@ -65,6 +102,378 @@ interface TimelineResponse {
     nextOffset: number | null;
   };
 }
+
+// ─── Shared styles ────────────────────────────────────────────────────────────
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  height: "40px",
+  padding: "0 12px",
+  border: "1px solid var(--border)",
+  borderRadius: "6px",
+  fontSize: "14px",
+  fontFamily: "DM Sans, sans-serif",
+  background: "var(--surface-2)",
+  color: "var(--text-primary)",
+  outline: "none",
+  boxSizing: "border-box",
+};
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: "DM Sans, sans-serif",
+  fontSize: "11px",
+  fontWeight: 600,
+  color: "var(--text-muted)",
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  marginBottom: "4px",
+};
+
+// ─── Employee profile components ──────────────────────────────────────────────
+
+interface CreateEmployeeFormProps {
+  slug: string;
+  userId: string;
+  memberEmail: string;
+  memberName: string | null;
+  onCreated: (emp: EmployeeProfile) => void;
+}
+
+function CreateEmployeeForm({ slug, userId, memberEmail, memberName, onCreated }: CreateEmployeeFormProps) {
+  const parts = (memberName ?? "").trim().split(/\s+/);
+  const [form, setForm] = useState({
+    first_name: parts[0] ?? "",
+    last_name: parts.slice(1).join(" "),
+    work_email: memberEmail,
+    designation: "",
+    department: "",
+    employment_type: "",
+    date_of_joining: "",
+    employee_id: "",
+    phone: "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function handleSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const body: Record<string, string> = {
+        first_name: form.first_name.trim(),
+        last_name: form.last_name.trim(),
+        work_email: form.work_email.trim(),
+      };
+      if (form.designation.trim()) body.designation = form.designation.trim();
+      if (form.department.trim()) body.department = form.department.trim();
+      if (form.employment_type) body.employment_type = form.employment_type;
+      if (form.date_of_joining) body.date_of_joining = form.date_of_joining;
+      if (form.employee_id.trim()) body.employee_id = form.employee_id.trim();
+      if (form.phone.trim()) body.phone = form.phone.trim();
+
+      const res = await fetch(`/api/ws/${slug}/members/${userId}/employee`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onCreated(data.employee);
+      } else {
+        setError(data.error ?? "Failed to create profile");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>First name *</p>
+          <input style={inputStyle} value={form.first_name} onChange={set("first_name")} required />
+        </div>
+        <div>
+          <p style={labelStyle}>Last name *</p>
+          <input style={inputStyle} value={form.last_name} onChange={set("last_name")} required />
+        </div>
+      </div>
+      <div>
+        <p style={labelStyle}>Work email *</p>
+        <input style={inputStyle} type="email" value={form.work_email} onChange={set("work_email")} required />
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>Designation</p>
+          <input style={inputStyle} value={form.designation} onChange={set("designation")} placeholder="e.g. Software Engineer" />
+        </div>
+        <div>
+          <p style={labelStyle}>Department</p>
+          <input style={inputStyle} value={form.department} onChange={set("department")} placeholder="e.g. Engineering" />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>Employment type</p>
+          <select style={{ ...inputStyle }} value={form.employment_type} onChange={set("employment_type")}>
+            <option value="">Select</option>
+            <option value="full_time">Full-time</option>
+            <option value="part_time">Part-time</option>
+            <option value="contract">Contract</option>
+            <option value="intern">Intern</option>
+            <option value="consultant">Consultant</option>
+          </select>
+        </div>
+        <div>
+          <p style={labelStyle}>Date of joining</p>
+          <input style={inputStyle} type="date" value={form.date_of_joining} onChange={set("date_of_joining")} />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>Employee ID</p>
+          <input style={inputStyle} value={form.employee_id} onChange={set("employee_id")} placeholder="e.g. EMP-001" />
+        </div>
+        <div>
+          <p style={labelStyle}>Phone</p>
+          <input style={inputStyle} type="tel" value={form.phone} onChange={set("phone")} placeholder="+91 98765 43210" />
+        </div>
+      </div>
+      {error && (
+        <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: "13px", color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
+      <button
+        type="submit"
+        disabled={saving}
+        style={{
+          height: "40px",
+          background: "var(--brand)",
+          color: "#fff",
+          border: "none",
+          borderRadius: "6px",
+          fontFamily: "DM Sans, sans-serif",
+          fontSize: "14px",
+          fontWeight: 500,
+          cursor: saving ? "not-allowed" : "pointer",
+          opacity: saving ? 0.7 : 1,
+        }}
+      >
+        {saving ? "Creating…" : "Create employee profile"}
+      </button>
+    </form>
+  );
+}
+
+interface EmployeeProfileViewProps {
+  slug: string;
+  userId: string;
+  employee: EmployeeProfile;
+  onUpdated: (emp: EmployeeProfile) => void;
+}
+
+function EmployeeProfileView({ slug, userId, employee, onUpdated }: EmployeeProfileViewProps) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    designation: employee.employment.designation ?? "",
+    department: employee.employment.department ?? "",
+    employment_type: employee.employment.employment_type ?? "",
+    work_mode: employee.employment.work_mode ?? "",
+    work_location: employee.employment.work_location ?? "",
+    date_of_joining: employee.employment.date_of_joining ?? "",
+    phone: employee.phone ?? "",
+    employee_id: employee.employee_id ?? "",
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function handleSave(ev: React.FormEvent) {
+    ev.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const body: Record<string, string | null> = {
+        designation: form.designation.trim() || null,
+        department: form.department.trim() || null,
+        employment_type: form.employment_type || null,
+        work_mode: form.work_mode || null,
+        work_location: form.work_location.trim() || null,
+        date_of_joining: form.date_of_joining || null,
+        phone: form.phone.trim() || null,
+        employee_id: form.employee_id.trim() || null,
+      };
+      const res = await fetch(`/api/ws/${slug}/members/${userId}/employee`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onUpdated(data.employee);
+        setEditing(false);
+      } else {
+        setError(data.error ?? "Failed to save");
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const field = (label: string, value: string | null) => (
+    <div>
+      <p style={labelStyle}>{label}</p>
+      <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: "14px", color: value ? "var(--text-primary)" : "var(--text-muted)" }}>
+        {value ?? "—"}
+      </p>
+    </div>
+  );
+
+  if (!editing) {
+    return (
+      <div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+          {field("Employee ID", employee.employee_id)}
+          {field("Designation", employee.employment.designation)}
+          {field("Department", employee.employment.department)}
+          {field("Employment type", employee.employment.employment_type ? EMPLOYMENT_TYPE_LABELS[employee.employment.employment_type] ?? employee.employment.employment_type : null)}
+          {field("Work mode", employee.employment.work_mode ? WORK_MODE_LABELS[employee.employment.work_mode] ?? employee.employment.work_mode : null)}
+          {field("Work location", employee.employment.work_location)}
+          {field("Date of joining", employee.employment.date_of_joining)}
+          {field("Phone", employee.phone)}
+        </div>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          style={{
+            height: "36px",
+            padding: "0 14px",
+            background: "transparent",
+            color: "var(--brand)",
+            border: "1px solid var(--brand)",
+            borderRadius: "6px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "13px",
+            fontWeight: 500,
+            cursor: "pointer",
+          }}
+        >
+          Edit profile
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>Designation</p>
+          <input style={inputStyle} value={form.designation} onChange={set("designation")} />
+        </div>
+        <div>
+          <p style={labelStyle}>Department</p>
+          <input style={inputStyle} value={form.department} onChange={set("department")} />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>Employment type</p>
+          <select style={{ ...inputStyle }} value={form.employment_type} onChange={set("employment_type")}>
+            <option value="">Select</option>
+            <option value="full_time">Full-time</option>
+            <option value="part_time">Part-time</option>
+            <option value="contract">Contract</option>
+            <option value="intern">Intern</option>
+            <option value="consultant">Consultant</option>
+          </select>
+        </div>
+        <div>
+          <p style={labelStyle}>Work mode</p>
+          <select style={{ ...inputStyle }} value={form.work_mode} onChange={set("work_mode")}>
+            <option value="">Select</option>
+            <option value="office">Office</option>
+            <option value="remote">Remote</option>
+            <option value="hybrid">Hybrid</option>
+          </select>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>Date of joining</p>
+          <input style={inputStyle} type="date" value={form.date_of_joining} onChange={set("date_of_joining")} />
+        </div>
+        <div>
+          <p style={labelStyle}>Work location</p>
+          <input style={inputStyle} value={form.work_location} onChange={set("work_location")} placeholder="e.g. Mumbai HQ" />
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+        <div>
+          <p style={labelStyle}>Employee ID</p>
+          <input style={inputStyle} value={form.employee_id} onChange={set("employee_id")} />
+        </div>
+        <div>
+          <p style={labelStyle}>Phone</p>
+          <input style={inputStyle} type="tel" value={form.phone} onChange={set("phone")} />
+        </div>
+      </div>
+      {error && (
+        <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: "13px", color: "var(--danger)" }}>
+          {error}
+        </p>
+      )}
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button
+          type="submit"
+          disabled={saving}
+          style={{
+            height: "36px",
+            padding: "0 14px",
+            background: "var(--brand)",
+            color: "#fff",
+            border: "none",
+            borderRadius: "6px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "13px",
+            fontWeight: 500,
+            cursor: saving ? "not-allowed" : "pointer",
+            opacity: saving ? 0.7 : 1,
+          }}
+        >
+          {saving ? "Saving…" : "Save changes"}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setEditing(false); setError(null); }}
+          style={{
+            height: "36px",
+            padding: "0 14px",
+            background: "transparent",
+            color: "var(--text-secondary)",
+            border: "1px solid var(--border)",
+            borderRadius: "6px",
+            fontFamily: "DM Sans, sans-serif",
+            fontSize: "13px",
+            cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ─── Timeline components ──────────────────────────────────────────────────────
 
 function TrustPopover({ flags }: { flags: string[] }) {
   const [open, setOpen] = useState(false);
@@ -400,7 +809,7 @@ function formatDayHeading(isoDate: string): string {
 function groupByDay(events: EventWithMatch[]): { date: string; label: string; items: EventWithMatch[] }[] {
   const map = new Map<string, EventWithMatch[]>();
   for (const ev of events) {
-    const day = ev.checkin_at.slice(0, 10); // YYYY-MM-DD
+    const day = ev.checkin_at.slice(0, 10);
     if (!map.has(day)) map.set(day, []);
     map.get(day)!.push(ev);
   }
@@ -408,6 +817,10 @@ function groupByDay(events: EventWithMatch[]): { date: string; label: string; it
     .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([date, items]) => ({ date, label: formatDayHeading(date + 'T00:00:00'), items }));
 }
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
+type Tab = "timeline" | "profile";
 
 export default function MemberDetailPage() {
   const { slug, memberId } = useParams<{ slug: string; memberId: string }>();
@@ -420,6 +833,10 @@ export default function MemberDetailPage() {
   const nextOffsetRef = useRef<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("timeline");
+  const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
+  const [employeeFetched, setEmployeeFetched] = useState(false);
+  const [loadingEmployee, setLoadingEmployee] = useState(false);
 
   const load = useCallback(
     async (opts?: { append?: boolean }) => {
@@ -461,6 +878,20 @@ export default function MemberDetailPage() {
     [slug, memberId],
   );
 
+  const loadEmployee = useCallback(async () => {
+    setLoadingEmployee(true);
+    try {
+      const res = await fetch(`/api/ws/${slug}/members/${memberId}/employee`);
+      if (res.ok) {
+        const data = await res.json();
+        setEmployee(data.employee ?? null);
+      }
+    } finally {
+      setLoadingEmployee(false);
+      setEmployeeFetched(true);
+    }
+  }, [slug, memberId]);
+
   useEffect(() => {
     nextOffsetRef.current = null;
     setMember(null);
@@ -468,6 +899,12 @@ export default function MemberDetailPage() {
     setPagination(null);
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (activeTab === "profile" && !employeeFetched) {
+      loadEmployee();
+    }
+  }, [activeTab, employeeFetched, loadEmployee]);
 
   if (!member && loading)
     return (
@@ -501,7 +938,7 @@ export default function MemberDetailPage() {
           border: "1px solid var(--border)",
           borderRadius: "var(--radius-lg)",
           padding: "20px",
-          marginBottom: "24px",
+          marginBottom: "16px",
         }}
       >
         <div
@@ -554,6 +991,18 @@ export default function MemberDetailPage() {
             >
               {member.email}
             </p>
+            {(member.designation || member.department) && (
+              <p
+                style={{
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "12px",
+                  color: "var(--text-muted)",
+                  marginTop: "2px",
+                }}
+              >
+                {[member.designation, member.department].filter(Boolean).join(" · ")}
+              </p>
+            )}
           </div>
           <span
             style={{
@@ -624,145 +1073,233 @@ export default function MemberDetailPage() {
         </div>
       </div>
 
-      {/* Timeline */}
+      {/* Tabs */}
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "12px",
+          borderBottom: "1px solid var(--border)",
+          marginBottom: "20px",
+          gap: "4px",
         }}
       >
-        <h2
-          style={{
-            fontFamily: "Syne, sans-serif",
-            fontSize: "15px",
-            fontWeight: 600,
-            color: "var(--navy)",
-          }}
-        >
-          Timeline
-        </h2>
-        <span
-          style={{
-            fontFamily: "DM Sans, sans-serif",
-            fontSize: "12px",
-            color: "var(--text-muted)",
-          }}
-        >
-          {pagination?.total ?? 0} events
-        </span>
+        {(["timeline", "profile"] as Tab[]).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            style={{
+              background: "none",
+              border: "none",
+              borderBottom: activeTab === tab ? "2px solid var(--brand)" : "2px solid transparent",
+              padding: "10px 14px",
+              fontFamily: "DM Sans, sans-serif",
+              fontSize: "13px",
+              fontWeight: activeTab === tab ? 600 : 500,
+              color: activeTab === tab ? "var(--brand)" : "var(--text-secondary)",
+              cursor: "pointer",
+              textTransform: "capitalize",
+              marginBottom: "-1px",
+            }}
+          >
+            {tab === "timeline" ? "Timeline" : "Employee Profile"}
+          </button>
+        ))}
       </div>
 
-      {events.length === 0 && !loading && (
-        <p
-          style={{
-            textAlign: "center",
-            color: "var(--text-muted)",
-            fontFamily: "DM Sans, sans-serif",
-            padding: "40px 0",
-          }}
-        >
-          No events found.
-        </p>
-      )}
-
-      {groupByDay(events).map(({ date, label, items }) => (
-        <div key={date} style={{ marginBottom: "8px" }}>
-          {/* Day heading */}
+      {/* Timeline tab */}
+      {activeTab === "timeline" && (
+        <>
           <div
             style={{
               display: "flex",
+              justifyContent: "space-between",
               alignItems: "center",
-              gap: "10px",
-              marginBottom: "10px",
-              marginTop: "20px",
+              marginBottom: "12px",
             }}
           >
-            <div
+            <h2
               style={{
-                width: "3px",
-                height: "16px",
-                borderRadius: "2px",
-                background: "var(--brand)",
-                flexShrink: 0,
-              }}
-            />
-            <span
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: "13px",
-                fontWeight: 700,
-                color: "var(--text-secondary)",
-                whiteSpace: "nowrap",
+                fontFamily: "Syne, sans-serif",
+                fontSize: "15px",
+                fontWeight: 600,
+                color: "var(--navy)",
               }}
             >
-              {label}
-            </span>
-            <div
-              style={{
-                flex: 1,
-                height: "1px",
-                background: "rgba(27,77,255,0.3)",
-              }}
-            />
+              Timeline
+            </h2>
             <span
               style={{
                 fontFamily: "DM Sans, sans-serif",
-                fontSize: "11px",
+                fontSize: "12px",
                 color: "var(--text-muted)",
-                whiteSpace: "nowrap",
               }}
             >
-              {items.length} {items.length === 1 ? "event" : "events"}
+              {pagination?.total ?? 0} events
             </span>
           </div>
-          {items.map((ev) => (
-            <EventRow key={ev.id} ev={ev} />
-          ))}
-        </div>
-      ))}
 
-      {loadingMore && (
-        <div style={{ marginTop: "8px" }}>
-          {[1, 2, 3].map((i) => (
-            <div
-              key={`tl-sk-${i}`}
+          {events.length === 0 && !loading && (
+            <p
               style={{
-                height: "72px",
-                background: "var(--surface-2)",
-                borderRadius: "var(--radius-md)",
-                marginBottom: "8px",
-                animation: "cm-pulse 1.5s ease-in-out infinite",
+                textAlign: "center",
+                color: "var(--text-muted)",
+                fontFamily: "DM Sans, sans-serif",
+                padding: "40px 0",
               }}
-            />
+            >
+              No events found.
+            </p>
+          )}
+
+          {groupByDay(events).map(({ date, label, items }) => (
+            <div key={date} style={{ marginBottom: "8px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                  marginBottom: "10px",
+                  marginTop: "20px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "3px",
+                    height: "16px",
+                    borderRadius: "2px",
+                    background: "var(--brand)",
+                    flexShrink: 0,
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: "13px",
+                    fontWeight: 700,
+                    color: "var(--text-secondary)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {label}
+                </span>
+                <div
+                  style={{
+                    flex: 1,
+                    height: "1px",
+                    background: "rgba(27,77,255,0.3)",
+                  }}
+                />
+                <span
+                  style={{
+                    fontFamily: "DM Sans, sans-serif",
+                    fontSize: "11px",
+                    color: "var(--text-muted)",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {items.length} {items.length === 1 ? "event" : "events"}
+                </span>
+              </div>
+              {items.map((ev) => (
+                <EventRow key={ev.id} ev={ev} />
+              ))}
+            </div>
           ))}
-        </div>
+
+          {loadingMore && (
+            <div style={{ marginTop: "8px" }}>
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={`tl-sk-${i}`}
+                  style={{
+                    height: "72px",
+                    background: "var(--surface-2)",
+                    borderRadius: "var(--radius-md)",
+                    marginBottom: "8px",
+                    animation: "cm-pulse 1.5s ease-in-out infinite",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+
+          {(pagination?.nextOffset ?? null) !== null && (
+            <div style={{ marginTop: "16px" }}>
+              <button
+                type="button"
+                onClick={() => load({ append: true })}
+                disabled={loadingMore}
+                style={{
+                  width: "100%",
+                  height: "44px",
+                  borderRadius: "var(--radius-md)",
+                  border: "1px solid var(--border)",
+                  background: "var(--surface-0)",
+                  fontFamily: "DM Sans, sans-serif",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  cursor: loadingMore ? "default" : "pointer",
+                }}
+              >
+                {loadingMore
+                  ? en.wsMemberTimeline.loadingMore
+                  : en.wsMemberTimeline.viewMore}
+              </button>
+            </div>
+          )}
+        </>
       )}
 
-      {(pagination?.nextOffset ?? null) !== null && (
-        <div style={{ marginTop: "16px" }}>
-          <button
-            type="button"
-            onClick={() => load({ append: true })}
-            disabled={loadingMore}
+      {/* Employee Profile tab */}
+      {activeTab === "profile" && (
+        <div
+          style={{
+            background: "var(--surface-0)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-lg)",
+            padding: "20px",
+          }}
+        >
+          <h2
             style={{
-              width: "100%",
-              height: "44px",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border)",
-              background: "var(--surface-0)",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "13px",
+              fontFamily: "Syne, sans-serif",
+              fontSize: "15px",
               fontWeight: 600,
-              color: "var(--text-primary)",
-              cursor: loadingMore ? "default" : "pointer",
+              color: "var(--navy)",
+              marginBottom: "16px",
             }}
           >
-            {loadingMore
-              ? en.wsMemberTimeline.loadingMore
-              : en.wsMemberTimeline.viewMore}
-          </button>
+            Employee Profile
+          </h2>
+
+          {loadingEmployee ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {[1, 2, 3].map((i) => (
+                <div key={i} style={{ height: "40px", background: "var(--surface-2)", borderRadius: "6px", animation: "cm-pulse 1.5s ease-in-out infinite" }} />
+              ))}
+            </div>
+          ) : employee ? (
+            <EmployeeProfileView
+              slug={slug}
+              userId={memberId}
+              employee={employee}
+              onUpdated={setEmployee}
+            />
+          ) : (
+            <div>
+              <p style={{ fontFamily: "DM Sans, sans-serif", fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
+                No employee profile yet. Create one to store HR details like designation, department, and employment info.
+              </p>
+              <CreateEmployeeForm
+                slug={slug}
+                userId={memberId}
+                memberEmail={member.email}
+                memberName={member.full_name}
+                onCreated={setEmployee}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
