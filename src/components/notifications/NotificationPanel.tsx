@@ -48,12 +48,13 @@ export default function NotificationPanel({ slug, onClose }: { slug: string; onC
   return (
     <div ref={ref} style={{
       width: '320px', maxHeight: '440px', background: 'var(--surface-0)',
-      border: '1px solid var(--border)', borderRadius: '10px',
+      border: '1px solid rgba(27,77,255,0.18)', borderRadius: '14px',
+      boxShadow: '0 18px 50px rgba(13,27,42,0.22)',
       overflow: 'hidden', display: 'flex', flexDirection: 'column',
     }}>
       {/* Sticky header — does not scroll with the list */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '14px', fontWeight: 600, color: 'var(--navy)' }}>{en.notifications.bellAriaLabel}</span>
+        <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', fontWeight: 600, color: 'var(--navy)' }}>{en.notifications.bellAriaLabel}</span>
         {unreadCount > 0 && (
           <button type="button" onClick={markAll} style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: '12px', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer', padding: 0 }}>
             {en.notifications.markAllRead}

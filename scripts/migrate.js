@@ -412,6 +412,29 @@ const ADDITIVE_MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read_at, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_notifications_user_list ON notifications(user_id, created_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_notifications_workspace ON notifications(workspace_id, created_at DESC)`,
+
+  // regularization_requests - employee-initiated attendance correction requests
+  `CREATE TABLE IF NOT EXISTS regularization_requests (
+  id                         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id               TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  user_id                    TEXT NOT NULL REFERENCES users(id),
+  target_date                TEXT NOT NULL,
+  presence_event_id          TEXT REFERENCES presence_events(id),
+  requested_type             TEXT NOT NULL CHECK(requested_type IN ('office','remote')),
+  reason                     TEXT NOT NULL,
+  status                     TEXT NOT NULL DEFAULT 'pending',
+  rejection_reason           TEXT,
+  actioned_by_user_id        TEXT REFERENCES users(id),
+  resulting_presence_event_id TEXT REFERENCES presence_events(id),
+  created_at                 TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_regularization_ws_user ON regularization_requests(workspace_id, user_id)`,
+  `CREATE INDEX IF NOT EXISTS idx_regularization_ws_status ON regularization_requests(workspace_id, status)`,
+  // Superseded by idx_regularization_ws_user_date_active below, which also covers 'approved'
+  // so a second request can't be inserted for a date that's already approved.
+  `DROP INDEX IF EXISTS idx_regularization_ws_user_date_pending`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_regularization_ws_user_date_active
+   ON regularization_requests(workspace_id, user_id, target_date) WHERE status IN ('pending','approved')`,
 ];
 
 // ─── SQLite runner (local dev) ────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { useParams, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { resolvePresenceTag, PRESENCE_TAG_CONFIG } from "@/lib/client/presence";
 import type { MemberTodaySummary } from "@/app/api/me/ws/[slug]/today/route";
+import RegularizationRequestModal from "@/components/user/RegularizationRequestModal";
 import { en } from "@/locales/en";
 
 interface WorkspaceTodayResponse {
@@ -48,6 +49,16 @@ interface LeaveRequestWithType {
   end_date: string
   reason: string | null
   status: string
+  rejection_reason: string | null
+  created_at: string
+}
+
+interface RegularizationRequest {
+  id: string
+  target_date: string
+  requested_type: "office" | "remote"
+  reason: string
+  status: "pending" | "approved" | "rejected"
   rejection_reason: string | null
   created_at: string
 }
@@ -150,7 +161,7 @@ function formatDate(dateStr: string): { display: string; dayName: string } {
   };
 }
 
-type AccordionTab = "office" | "remote" | "leave" | "onLeave" | "holidays" | "myLeaves";
+type AccordionTab = "office" | "remote" | "leave" | "onLeave" | "holidays" | "myLeaves" | "regularizations";
 
 const TABS: { key: AccordionTab; label: string; accentColor: string }[] = [
   {
@@ -182,6 +193,11 @@ const TABS: { key: AccordionTab; label: string; accentColor: string }[] = [
     key: "myLeaves",
     label: en.meWsToday.tabMyLeaves,
     accentColor: "var(--brand)",
+  },
+  {
+    key: "regularizations",
+    label: en.meWsRegularization.tabLabel,
+    accentColor: "var(--amber)",
   },
 ];
 
@@ -440,6 +456,70 @@ function MyLeavesBody({
   );
 }
 
+function RegularizationRow({ request }: { request: RegularizationRequest }) {
+  const statusColor = request.status === "approved" ? "var(--brand)" : request.status === "rejected" ? "var(--danger)" : "var(--amber)";
+  const statusLabel = request.status === "approved" ? en.meWsRegularization.statusApproved : request.status === "rejected" ? en.meWsRegularization.statusRejected : en.meWsRegularization.statusPending;
+  return (
+    <div style={{ padding: "11px 16px", borderBottom: "1px solid var(--border)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px" }}>
+        <span style={{ fontFamily: "DM Sans, sans-serif", fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
+          {request.requested_type === "office" ? en.meWsRegularization.typeOffice : en.meWsRegularization.typeRemote} · {request.target_date}
+        </span>
+        <span style={{ fontSize: "11px", fontFamily: "DM Sans, sans-serif", fontWeight: 600, color: statusColor, background: `color-mix(in srgb, ${statusColor} 12%, transparent)`, padding: "1px 7px", borderRadius: "20px" }}>
+          {statusLabel}
+        </span>
+      </div>
+      <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "12px", color: "var(--text-muted)", marginTop: "2px", fontStyle: "italic" }}>
+        {request.reason}
+      </div>
+      {request.status === "rejected" && request.rejection_reason && (
+        <div style={{ fontFamily: "DM Sans, sans-serif", fontSize: "12px", color: "var(--danger)", marginTop: "2px" }}>
+          {en.meWsToday.leaveRejectedPrefix} {request.rejection_reason}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MyRegularizationsBody({
+  requests, loading, onNewRequest,
+}: {
+  requests: RegularizationRequest[];
+  loading: boolean;
+  onNewRequest: () => void;
+}) {
+  return (
+    <div>
+      <div style={{ padding: "12px 16px" }}>
+        <button
+          type="button"
+          onClick={onNewRequest}
+          style={{
+            width: "100%", height: "40px", borderRadius: "var(--radius-md)", border: "1px solid var(--brand)",
+            background: "var(--surface-0)", color: "var(--brand)", fontFamily: "DM Sans, sans-serif",
+            fontSize: "13px", fontWeight: 600, cursor: "pointer",
+          }}
+        >
+          {en.meWsRegularization.newRequestButton}
+        </button>
+      </div>
+      {loading ? (
+        <div style={{ padding: "0 16px 12px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          {[1, 2].map((i) => (
+            <div key={i} style={{ height: "52px", borderRadius: "var(--radius-md)", background: "var(--surface-2)", animation: "cm-pulse 1.5s ease-in-out infinite" }} />
+          ))}
+        </div>
+      ) : requests.length === 0 ? (
+        <p style={{ padding: "0 16px 16px", fontFamily: "DM Sans, sans-serif", fontSize: "13px", color: "var(--text-muted)", textAlign: "center" }}>
+          {en.meWsRegularization.myRequestsEmpty}
+        </p>
+      ) : (
+        requests.map((r) => <RegularizationRow key={r.id} request={r} />)
+      )}
+    </div>
+  );
+}
+
 export default function WorkspaceTodayPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
@@ -473,6 +553,16 @@ export default function WorkspaceTodayPage() {
 
   const [myLeavesState, setMyLeavesState] = useState<{ data: LeaveRequestWithType[]; loading: boolean }>({ data: [], loading: true });
   const [onLeaveTodayState, setOnLeaveTodayState] = useState<{ data: MemberOnLeaveToday[]; loading: boolean }>({ data: [], loading: true });
+  const [myRegularizationsState, setMyRegularizationsState] = useState<{ data: RegularizationRequest[]; loading: boolean; minRequestDate: string | null }>({ data: [], loading: true, minRequestDate: null });
+  const [regModalOpen, setRegModalOpen] = useState(false);
+
+  function fetchMyRegularizations() {
+    fetch(`/api/me/ws/${slug}/regularizations`)
+      .then((r) => r.json())
+      .then((d: { regularizationRequests: RegularizationRequest[]; minRequestDate: string | null }) =>
+        setMyRegularizationsState({ data: d.regularizationRequests ?? [], loading: false, minRequestDate: d.minRequestDate ?? null }))
+      .catch(() => setMyRegularizationsState((prev) => ({ ...prev, loading: false })));
+  }
 
   useEffect(() => {
     setModalPortalReady(true);
@@ -505,6 +595,9 @@ export default function WorkspaceTodayPage() {
       .then((r) => r.json())
       .then((d: { members: MemberOnLeaveToday[] }) => setOnLeaveTodayState({ data: d.members ?? [], loading: false }))
       .catch(() => setOnLeaveTodayState((prev) => ({ ...prev, loading: false })));
+
+    fetchMyRegularizations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slug]);
 
   function toggleTab(tab: AccordionTab) {
@@ -641,6 +734,7 @@ export default function WorkspaceTodayPage() {
     onLeave:  [],
     holidays: [],
     myLeaves: [],
+    regularizations: [],
   };
 
   const todayKey = todayStr();
@@ -763,7 +857,9 @@ export default function WorkspaceTodayPage() {
                 ? myLeavesState.data.length
                 : tab.key === "onLeave"
                   ? onLeaveTodayFiltered.length
-                  : tabMembers[tab.key as Exclude<AccordionTab, "holidays" | "myLeaves" | "onLeave">].length;
+                  : tab.key === "regularizations"
+                    ? myRegularizationsState.data.length
+                    : tabMembers[tab.key as Exclude<AccordionTab, "holidays" | "myLeaves" | "onLeave" | "regularizations">].length;
 
           return (
             <div
@@ -1033,7 +1129,13 @@ export default function WorkspaceTodayPage() {
                     )
                   ) : tab.key === "myLeaves" ? (
                     <MyLeavesBody leaves={myLeavesState.data} loading={myLeavesState.loading} todayKey={todayKey} />
-                  ) : tabMembers[tab.key as Exclude<AccordionTab, "holidays" | "myLeaves" | "onLeave">].length === 0 ? (
+                  ) : tab.key === "regularizations" ? (
+                    <MyRegularizationsBody
+                      requests={myRegularizationsState.data}
+                      loading={myRegularizationsState.loading}
+                      onNewRequest={() => setRegModalOpen(true)}
+                    />
+                  ) : tabMembers[tab.key as Exclude<AccordionTab, "holidays" | "myLeaves" | "onLeave" | "regularizations">].length === 0 ? (
                     <p
                       style={{
                         padding: "16px",
@@ -1047,7 +1149,7 @@ export default function WorkspaceTodayPage() {
                     </p>
                   ) : (
                     <div>
-                      {tabMembers[tab.key as Exclude<AccordionTab, "holidays" | "myLeaves" | "onLeave">].map((m) => (
+                      {tabMembers[tab.key as Exclude<AccordionTab, "holidays" | "myLeaves" | "onLeave" | "regularizations">].map((m) => (
                         <MemberRow key={m.user_id} m={m} />
                       ))}
                     </div>
@@ -1507,6 +1609,16 @@ export default function WorkspaceTodayPage() {
           </div>,
           document.body,
         )}
+
+      {regModalOpen && (
+        <RegularizationRequestModal
+          slug={slug}
+          minDate={myRegularizationsState.minRequestDate ?? (() => { const d = new Date(); d.setDate(d.getDate() - 90); return d.toISOString().slice(0, 10); })()}
+          maxDate={todayStr()}
+          onClose={() => setRegModalOpen(false)}
+          onSuccess={fetchMyRegularizations}
+        />
+      )}
 
       <style>{`@keyframes cm-pulse{0%,100%{opacity:1}50%{opacity:.5}}`}</style>
     </div>

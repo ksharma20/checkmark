@@ -5,16 +5,17 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import type { DashboardMember, DashboardResponse } from '@/app/api/ws/[slug]/dashboard/route'
 import type { InsightsResponse, InsightBucket } from '@/app/api/ws/[slug]/insights/route'
-import type { MemberStatsResponse, StatsInterval } from '@/app/api/ws/[slug]/member-stats/route'
 import type { RealtimeResponse } from '@/app/api/ws/[slug]/realtime/route'
-import { fmtHours } from '@/lib/client/format-time'
+import type { OverviewWidgetsResponse } from '@/app/api/ws/[slug]/overview/route'
+import type { ApprovalItem } from '@/lib/approvals'
 import { resolvePresenceTag, PRESENCE_TAG_CONFIG } from '@/lib/client/presence'
+import { en } from '@/locales/en'
 import { Users, Monitor, Home, Activity } from 'lucide-react'
 
 interface Props {
   slug: string
   planLimitBanner?: React.ReactNode
-  workspaceCreatedAt: string
+  adminFirstName: string
 }
 
 
@@ -291,346 +292,6 @@ function MembersModal({
   )
 }
 
-// ─── Stat Bar ─────────────────────────────────────────────────────────────────
-
-function StatBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.min(100, Math.round((value / max) * 100)) : 0
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-      <div style={{ flex: 1, height: '6px', background: 'var(--surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '3px', transition: 'width 0.3s' }} />
-      </div>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '12px', color: 'var(--text-secondary)', textAlign: 'right', flexShrink: 0 }}>
-        {value}
-      </span>
-    </div>
-  )
-}
-
-// ─── Member Stats Table (HEAD) ────────────────────────────────────────────────
-
-const STATS_INTERVALS: { key: StatsInterval; label: string }[] = [
-  { key: 'week',   label: 'Week' },
-  { key: 'month',  label: 'Month' },
-  { key: '3month', label: '3 Months' },
-  { key: 'custom', label: 'Custom' },
-]
-
-function MemberStatsTable({ slug, statsData, loading, interval, onIntervalChange, customRange, onCustomApply, minDate }: {
-  slug: string
-  statsData: MemberStatsResponse | null
-  loading: boolean
-  interval: StatsInterval
-  onIntervalChange: (iv: StatsInterval) => void
-  customRange: { start: string; end: string }
-  onCustomApply: (range: { start: string; end: string }) => void
-  minDate: string
-}) {
-  const today = new Date().toISOString().split('T')[0]
-  const [localStart, setLocalStart] = useState(customRange.start)
-  const [localEnd, setLocalEnd]     = useState(customRange.end)
-  const [search, setSearch] = useState('')
-
-  const th: React.CSSProperties = {
-    fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 700,
-    color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em',
-  }
-  const sk: React.CSSProperties = {
-    background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
-    backgroundSize: '600px 100%', animation: 'shimmer 1.4s ease-in-out infinite', borderRadius: '5px',
-  }
-
-  const allMembers = statsData?.members ?? []
-  const members = search.trim()
-    ? allMembers.filter((m) => {
-        const q = search.toLowerCase()
-        return (m.full_name ?? '').toLowerCase().includes(q) || m.email.toLowerCase().includes(q)
-      })
-    : allMembers
-  const totalDays = statsData?.total_working_days ?? 1
-
-  return (
-    <div style={{
-      background: 'var(--surface-0)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-lg)', overflow: 'hidden',
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '14px 16px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap',
-      }}>
-        <h2 style={{
-          fontFamily: 'DM Sans, sans-serif', fontSize: '15px', fontWeight: 700,
-          color: 'var(--text-primary)', margin: 0, flex: 1,
-        }}>
-          Employee{' '}
-          <em style={{ fontFamily: 'Syne, sans-serif', fontStyle: 'italic', fontWeight: 700, color: 'var(--brand)' }}>
-            Attendance
-          </em>
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <input
-            type="search"
-            placeholder="Search by name or email…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              height: '30px', padding: '0 10px',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-              fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
-              background: 'var(--surface-1)', color: 'var(--text-primary)',
-              outline: 'none', width: '200px',
-            }}
-          />
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', alignItems: 'center' }}>
-            {STATS_INTERVALS.map((iv) => (
-              <button
-                key={iv.key}
-                type="button"
-                onClick={() => onIntervalChange(iv.key)}
-                style={{
-                  height: '30px', padding: '0 12px',
-                  background: interval === iv.key ? 'var(--brand)' : 'var(--surface-0)',
-                  color: interval === iv.key ? '#fff' : 'var(--text-secondary)',
-                  border: `1px solid ${interval === iv.key ? 'var(--brand)' : 'var(--border)'}`,
-                  borderRadius: 'var(--radius-md)',
-                  fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
-                  fontWeight: interval === iv.key ? 600 : 400,
-                  cursor: 'pointer', transition: 'background 0.15s',
-                }}
-              >
-                {iv.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Custom date range row */}
-      {interval === 'custom' && (
-        <div style={{
-          padding: '12px 16px', borderBottom: '1px solid var(--border)',
-          background: 'var(--surface-0)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'flex-end', gap: '12px', flexWrap: 'wrap',
-        }}>
-          {/* From */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{
-              fontFamily: 'DM Sans, sans-serif', fontSize: '10px', fontWeight: 700,
-              color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em',
-            }}>
-              From
-            </label>
-            <input
-              type="date"
-              value={localStart}
-              min={minDate}
-              max={localEnd || today}
-              onChange={(e) => setLocalStart(e.target.value)}
-              style={{
-                height: '34px', padding: '0 10px',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-                background: 'var(--surface-1)', color: 'var(--text-primary)',
-                outline: 'none', minWidth: '140px',
-              }}
-            />
-          </div>
-
-          {/* Arrow separator */}
-          <div style={{
-            height: '34px', display: 'flex', alignItems: 'center',
-            color: 'var(--text-muted)', fontSize: '16px', paddingBottom: '0',
-          }}>→</div>
-
-          {/* To */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <label style={{
-              fontFamily: 'DM Sans, sans-serif', fontSize: '10px', fontWeight: 700,
-              color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em',
-            }}>
-              To
-            </label>
-            <input
-              type="date"
-              value={localEnd}
-              min={minDate}
-              max={today}
-              onChange={(e) => setLocalEnd(e.target.value)}
-              style={{
-                height: '34px', padding: '0 10px',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-                fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-                background: 'var(--surface-1)', color: 'var(--text-primary)',
-                outline: 'none', minWidth: '140px',
-              }}
-            />
-          </div>
-
-          {/* Apply */}
-          <button
-            type="button"
-            onClick={() => { if (localStart && localEnd) onCustomApply({ start: localStart, end: localEnd }) }}
-            disabled={!localStart || !localEnd}
-            style={{
-              height: '34px', padding: '0 20px',
-              background: localStart && localEnd ? 'var(--brand)' : 'var(--surface-2)',
-              color: localStart && localEnd ? '#fff' : 'var(--text-muted)',
-              border: 'none', borderRadius: 'var(--radius-md)',
-              fontSize: '12px', fontFamily: 'DM Sans, sans-serif', fontWeight: 600,
-              cursor: localStart && localEnd ? 'pointer' : 'not-allowed',
-              transition: 'background 0.15s',
-            }}
-          >
-            Apply
-          </button>
-        </div>
-      )}
-
-      <div className="dash-table-scroll"><div className="dash-table-min">
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '2fr 90px 1.4fr 1.4fr 1.4fr 100px 100px',
-        gap: '12px', padding: '10px 16px',
-        borderBottom: '1px solid var(--border)', background: 'var(--surface-1)',
-      }}>
-        <span style={th}>Member</span>
-        <span style={th}>Joined</span>
-        <span style={th}>Office</span>
-        <span style={th}>Remote</span>
-        <span style={th}>Absent</span>
-        <span style={{ ...th, textAlign: 'right' }}>Total Hrs</span>
-        <span style={{ ...th, textAlign: 'right' }}>Avg/Day</span>
-      </div>
-
-      {loading ? (
-        [1, 2, 3, 4, 5].map((i) => (
-          <div key={i} style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 90px 1.4fr 1.4fr 1.4fr 100px 100px',
-            gap: '12px', alignItems: 'center', padding: '14px 16px',
-            borderBottom: '1px solid var(--border)',
-          }}>
-            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-              <div style={{ ...sk, width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0 }} />
-              <div>
-                <div style={{ ...sk, height: '12px', width: '90px', marginBottom: '5px' }} />
-                <div style={{ ...sk, height: '10px', width: '120px' }} />
-              </div>
-            </div>
-            <div style={{ ...sk, height: '12px', width: '60px' }} />
-            <div style={{ ...sk, height: '8px', width: '100%' }} />
-            <div style={{ ...sk, height: '8px', width: '100%' }} />
-            <div style={{ ...sk, height: '8px', width: '100%' }} />
-            <div style={{ ...sk, height: '12px', width: '60px', marginLeft: 'auto' }} />
-            <div style={{ ...sk, height: '12px', width: '60px', marginLeft: 'auto' }} />
-          </div>
-        ))
-      ) : members.length === 0 ? (
-        <div style={{ padding: '48px 24px', textAlign: 'center' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
-            {search.trim() ? 'No members match your search.' : 'No attendance data for this period.'}
-          </p>
-        </div>
-      ) : (
-        <div className="no-scrollbar" style={{ maxHeight: '580px', overflowY: 'auto', scrollbarWidth: 'none' } as React.CSSProperties}>
-        {members.map((m) => {
-          const name = m.full_name ?? m.email
-          return (
-            <Link key={m.member_id} href={`/ws/${slug}/members/${m.user_id}`} style={{ textDecoration: 'none' }}>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '2fr 90px 1.4fr 1.4fr 1.4fr 100px 100px',
-                  gap: '12px', alignItems: 'center',
-                  padding: '12px 16px', borderBottom: '1px solid var(--border)',
-                  cursor: 'pointer', transition: 'background 0.12s',
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--surface-1)' }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = '' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-                  <div style={{
-                    width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-                    background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
-                    color: 'var(--brand)',
-                    fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 700,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  }}>
-                    {getInitials(name)}
-                  </div>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{
-                      fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
-                      color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {name}
-                    </div>
-                    <div style={{
-                      fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)',
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    }}>
-                      {m.full_name ? m.email : m.role}
-                    </div>
-                  </div>
-                </div>
-                {/* Joined date */}
-                <div>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 500, color: 'var(--text-primary)' }}>
-                    {m.joined_at.slice(8, 10)}{' '}
-                    {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.joined_at.slice(5, 7)) - 1]}
-                  </div>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)' }}>
-                    {m.joined_at.slice(0, 4)}
-                  </div>
-                </div>
-                <div>
-                  <StatBar value={m.office_days} max={totalDays} color="var(--teal)" />
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>office</div>
-                </div>
-                <div>
-                  <StatBar value={m.remote_days} max={totalDays} color="var(--amber)" />
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>remote</div>
-                </div>
-                <div>
-                  <StatBar value={m.absent_days} max={totalDays} color="var(--danger)" />
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>absent</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {fmtHours(m.total_hours)}
-                  </div>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>total</div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                    {fmtHours(m.avg_hours_per_day)}
-                  </div>
-                  <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)', marginTop: '2px' }}>avg/day</div>
-                  {m.multi_loc_days > 0 && (
-                    <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--amber)', marginTop: '2px' }}>
-                      {m.multi_loc_days} multi-loc
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Link>
-          )
-        })}
-        </div>
-      )}
-
-      {members.length > 0 && (
-        <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border)' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>
-            Multi-loc: days where checkout was recorded more than 1km from check-in location (field force / site visits).
-          </p>
-        </div>
-      )}
-      </div></div>
-    </div>
-  )
-}
-
 // ─── Realtime Widget (HEAD) ───────────────────────────────────────────────────
 
 function RealtimeWidget({ data, loading, activeCount, locationCounts }: {
@@ -840,7 +501,7 @@ function OfficePresenceGraph({ buckets, loading }: { buckets: InsightBucket[]; l
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt }: Props) {
+export default function TodayClient({ slug, planLimitBanner, adminFirstName }: Props) {
   const [data, setData] = useState<DashboardResponse | null>(null)
   const [modal, setModal] = useState<{ title: string; members: DashboardMember[] } | null>(null)
 
@@ -852,12 +513,6 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
 
   const [dashLoading, setDashLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-
-  const [statsInterval, setStatsInterval] = useState<StatsInterval>('month')
-  const [statsData, setStatsData] = useState<MemberStatsResponse | null>(null)
-  const [statsLoading, setStatsLoading] = useState(true)
-  const [customRange, setCustomRange] = useState({ start: '', end: '' })
-
 
   const fetchDash = useCallback(async (isSilent = false) => {
     if (!isSilent) setDashLoading(true)
@@ -884,27 +539,24 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
     }
   }, [slug])
 
+  const [overview, setOverview] = useState<OverviewWidgetsResponse | null>(null)
+
+  const fetchOverview = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/ws/${slug}/overview`, { cache: 'no-store' })
+      if (res.ok) setOverview(await res.json())
+    } catch {
+      // best-effort widget data; page still works without it
+    }
+  }, [slug])
+
   const refreshAll = useCallback(async () => {
     await Promise.all([
       fetchDash(),
       fetchTodayHourly(),
-      // fetchStats(statsInterval), // maybe too heavy for auto-poll
+      fetchOverview(),
     ])
-  }, [fetchDash, fetchTodayHourly])
-
-  const fetchStats = useCallback(async (iv: StatsInterval, custom?: { start: string; end: string }) => {
-    setStatsLoading(true)
-    try {
-      let url = `/api/ws/${slug}/member-stats?interval=${iv}`
-      if (iv === 'custom' && custom?.start && custom?.end) {
-        url += `&start=${custom.start}&end=${custom.end}`
-      }
-      const res = await fetch(url)
-      if (res.ok) setStatsData(await res.json())
-    } finally {
-      setStatsLoading(false)
-    }
-  }, [slug])
+  }, [fetchDash, fetchTodayHourly, fetchOverview])
 
   useEffect(() => {
     refreshAll()
@@ -915,10 +567,6 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
       clearInterval(graphId)
     }
   }, [refreshAll, fetchDash, fetchTodayHourly])
-
-  useEffect(() => {
-    if (statsInterval !== 'custom') fetchStats(statsInterval)
-  }, [fetchStats, statsInterval])
 
   useEffect(() => {
     async function fetchRealtime() {
@@ -937,30 +585,46 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
 
   const counts = data?.counts ?? { present: 0, visited: 0, notIn: 0, total: 0, office: 0, remote: 0 }
 
+  const [approvingId, setApprovingId] = useState<string | null>(null)
+
+  async function approveItem(item: ApprovalItem) {
+    setApprovingId(item.id)
+    try {
+      const res = await fetch(`/api/ws/${slug}/approvals/${item.kind}/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'approve' }),
+      })
+      if (res.ok) await fetchOverview()
+    } finally {
+      setApprovingId(null)
+    }
+  }
 
   return (
     <div className="dash-page" style={{ padding: '24px', minHeight: '100%' }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+      <div className="fx-spring" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
         <div>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '2px' }}>
+            {en.wsOverview.greeting}, {adminFirstName}
+          </p>
           <h1 style={{
             fontFamily: 'DM Sans, sans-serif', fontSize: '20px', fontWeight: 700,
             color: 'var(--text-primary)', margin: 0, lineHeight: 1.2,
           }}>
             {data?.workspace_name ?? slug}
           </h1>
-          <span style={{
-            fontFamily: 'DM Sans, sans-serif', fontSize: '12px',
-            color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '8px'
-          }}>
-            Dashboard
-            {lastUpdated && (
-              <>
-                <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--border)' }} />
-                Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-              </>
-            )}
-          </span>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)' }}>
+            {overview
+              ? overview.pendingApprovalsTotal === 0
+                ? en.wsOverview.subtitleAllClear
+                : overview.pendingApprovalsTotal === 1
+                  ? en.wsOverview.subtitlePendingSingular
+                  : en.wsOverview.subtitlePendingPlural.replace('{count}', String(overview.pendingApprovalsTotal))
+              : ' '}
+            {lastUpdated ? ` · Updated ${lastUpdated.toLocaleTimeString()}` : ''}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '10px' }}>
           <button
@@ -1013,7 +677,7 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
       {planLimitBanner}
 
       {/* ── Stat cards ── */}
-      <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+      <div className="fx-spring-stagger" style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
         <StatCard
           className="dash-stat-card"
           title="Total Employees"
@@ -1038,15 +702,126 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
           onClick={() => setModal({ title: 'Remote', members: (data?.all_members ?? []).filter(m => resolvePresenceTag(m.presence_status, m.latest_event?.matched_by, m.latest_event?.event_type) === 'remote') })}
           icon={<Home size={16} />}
         />
+        <StatCard
+          className="dash-stat-card"
+          title={en.wsOverview.onLeaveTitle}
+          value={overview?.onLeaveToday ?? '—'}
+          sub={en.wsOverview.onLeaveSub}
+          icon={<Users size={16} />}
+        />
       </div>
 
       {/* ── Graphs row ── */}
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'stretch', flexWrap: 'wrap' }}>
+      <div className="fx-spring" style={{ display: 'flex', gap: '16px', marginBottom: '24px', alignItems: 'stretch', flexWrap: 'wrap' }}>
         <div className="dash-graph-item" style={{ flex: 2, minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
           <OfficePresenceGraph buckets={todayHourlyData?.buckets ?? []} loading={todayHourlyLoading} />
         </div>
         <div className="dash-graph-item" style={{ flex: 1, minWidth: '220px', display: 'flex', flexDirection: 'column' }}>
           <RealtimeWidget data={realtimeData} loading={realtimeLoading} activeCount={counts.present} locationCounts={data?.location_counts} />
+        </div>
+      </div>
+
+      <div className="fx-spring" style={{ display: 'grid', gridTemplateColumns: '1.15fr 1fr', gap: '14px', marginTop: '14px' }}>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '15px' }}>{en.wsOverview.pendingApprovalsTitle}</p>
+            {!!overview?.pendingApprovalsTotal && (
+              <span style={{ background: 'color-mix(in srgb, var(--amber) 16%, transparent)', color: '#9a6200', fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: '999px' }}>
+                {overview.pendingApprovalsTotal}
+              </span>
+            )}
+          </div>
+          {overview && overview.pendingApprovals.length === 0 && (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>{en.wsOverview.pendingApprovalsEmpty}</div>
+          )}
+          {overview?.pendingApprovals.map((item) => (
+            <div key={`${item.kind}-${item.id}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 20px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: '13px' }}>{item.user_full_name ?? item.user_email}</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '11.5px' }}>
+                  {item.kind === 'leave'
+                    ? `${item.leave_type_name} · ${item.start_date} – ${item.end_date} · ${item.days}d`
+                    : `${item.requested_type === 'office' ? en.wsApprovals.markWfo : en.wsApprovals.markWfh} · ${item.target_date}`}
+                </p>
+              </div>
+              <button
+                onClick={() => approveItem(item)}
+                disabled={approvingId === item.id}
+                style={{ height: '30px', padding: '0 12px', borderRadius: 'var(--radius-sm)', background: 'var(--brand)', color: '#fff', fontSize: '12px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
+              >
+                {approvingId === item.id ? '…' : 'Approve'}
+              </button>
+              <Link
+                href={`/ws/${slug}/approvals`}
+                style={{ height: '30px', padding: '0 12px', display: 'inline-flex', alignItems: 'center', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, textDecoration: 'none' }}
+              >
+                {en.wsOverview.reviewAction}
+              </Link>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', padding: '20px' }}>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '15px', marginBottom: '14px' }}>{en.wsOverview.departmentTitle}</p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            {overview?.departmentBreakdown.map((b) => {
+              const max = overview.departmentBreakdown[0]?.count || 1
+              return (
+                <div key={b.department}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px', fontSize: '12px' }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{b.department}</span>
+                    <span style={{ fontFamily: 'JetBrains Mono, monospace', fontWeight: 600 }}>{b.count}</span>
+                  </div>
+                  <div style={{ height: '7px', background: 'var(--surface-2)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.round((b.count / max) * 100)}%`, background: 'var(--brand)', borderRadius: '4px' }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="fx-spring" style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '14px', marginTop: '14px' }}>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '15px', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>{en.wsOverview.recentActivityTitle}</p>
+          {(data?.all_members ?? [])
+            .filter((m) => m.latest_event)
+            .sort((a, b) => (b.latest_event!.checkin_at).localeCompare(a.latest_event!.checkin_at))
+            .slice(0, 6)
+            .map((m) => (
+              <div key={m.member_id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 20px', borderTop: '1px solid var(--border)' }}>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', background: 'color-mix(in srgb, var(--brand) 16%, transparent)', color: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '11px', flexShrink: 0 }}>
+                  {getInitials(m.full_name ?? m.email)}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 600, fontSize: '13px' }}>{m.full_name ?? m.email}</p>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>{new Date(m.latest_event!.checkin_at.includes('T') ? m.latest_event!.checkin_at : m.latest_event!.checkin_at.replace(' ', 'T') + 'Z').toLocaleTimeString()}</p>
+                </div>
+                <StatusBadge member={m} />
+              </div>
+            ))}
+          {data && (data.all_members ?? []).filter((m) => m.latest_event).length === 0 && (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>{en.wsOverview.recentActivityEmpty}</div>
+          )}
+        </div>
+        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '15px', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>{en.wsOverview.celebrationsTitle}</p>
+          {overview?.celebrations.map((c) => (
+            <div key={`${c.employeeId}-${c.kind}`} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 20px', borderTop: '1px solid var(--border)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ fontWeight: 600, fontSize: '12.5px' }}>{c.name}</p>
+                <p style={{ color: 'var(--text-muted)', fontSize: '11px' }}>
+                  {c.kind === 'birthday' ? en.wsOverview.birthdayLabel : `${c.yearsCount}-year ${en.wsOverview.anniversaryLabel}`}
+                </p>
+              </div>
+              <span style={{ color: 'var(--text-muted)', fontFamily: 'JetBrains Mono, monospace', fontSize: '11px' }}>
+                {new Date(`${c.occursOn}T00:00:00Z`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+              </span>
+            </div>
+          ))}
+          {overview && overview.celebrations.length === 0 && (
+            <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px' }}>{en.wsOverview.celebrationsEmpty}</div>
+          )}
         </div>
       </div>
 
@@ -1100,23 +875,6 @@ export default function TodayClient({ slug, planLimitBanner, workspaceCreatedAt 
           )}
         </>
       )} */}
-
-      {/* ── Attendance stats table ── */}
-      <div style={{ marginTop: '32px' }}>
-        <MemberStatsTable
-          slug={slug}
-          statsData={statsData}
-          loading={statsLoading}
-          interval={statsInterval}
-          onIntervalChange={setStatsInterval}
-          customRange={customRange}
-          onCustomApply={(range) => {
-            setCustomRange(range)
-            fetchStats('custom', range)
-          }}
-          minDate={workspaceCreatedAt}
-        />
-      </div>
 
       {/* ── Members modal ── */}
       {modal && (

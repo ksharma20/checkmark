@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { KeyRound, Search, Trash2 } from "lucide-react";
+import type { ApprovalItem } from "@/lib/approvals";
+import { ApprovalRow } from "@/components/ws/ApprovalRow";
 import { en } from "@/locales/en";
 
 interface Member {
@@ -601,6 +603,82 @@ export default function PeopleClient({ slug }: Props) {
           </button>
         </div>
       )}
+
+      <RegularizationRequestsSection slug={slug} />
     </div>
   );
+}
+
+// ─── Regularization requests (pending queue, echoed from the Approvals page) ──
+
+function RegularizationRequestsSection({ slug }: { slug: string }) {
+  const [items, setItems] = useState<ApprovalItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [busyId, setBusyId] = useState<string | null>(null)
+  const [decliningId, setDecliningId] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/ws/${slug}/approvals?type=regularization`)
+      if (res.ok) {
+        const data = await res.json()
+        setItems((data.items ?? []) as ApprovalItem[])
+      }
+    } finally {
+      setLoading(false)
+    }
+  }, [slug])
+
+  useEffect(() => { load() }, [load])
+
+  async function action(id: string, act: 'approve' | 'reject', rejectionReason?: string) {
+    setBusyId(id)
+    try {
+      const res = await fetch(`/api/ws/${slug}/approvals/regularization/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: act, rejection_reason: rejectionReason }),
+      })
+      if (res.ok) {
+        setItems((prev) => prev.filter((i) => i.id !== id))
+        setDecliningId(null)
+      }
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  if (!loading && items.length === 0) return null
+
+  return (
+    <div style={{ marginTop: '20px', background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+        <p style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '15px', margin: 0 }}>{en.wsPeople.regularizationSectionTitle}</p>
+        {!!items.length && (
+          <span style={{ background: 'color-mix(in srgb, var(--amber) 16%, transparent)', color: '#9a6200', fontSize: '11px', fontWeight: 700, padding: '3px 9px', borderRadius: '999px' }}>
+            {items.length}
+          </span>
+        )}
+      </div>
+      {loading ? (
+        <div style={{ padding: '16px 20px' }}>
+          <div style={{ height: '52px', borderRadius: 'var(--radius-md)', background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)', backgroundSize: '400px 100%', animation: 'shimmer 1.4s ease-in-out infinite' }} />
+        </div>
+      ) : (
+        items.map((item) => (
+          <ApprovalRow
+            key={item.id}
+            item={item}
+            busy={busyId === item.id}
+            declining={decliningId === item.id}
+            onApprove={() => action(item.id, 'approve')}
+            onDeclineStart={() => setDecliningId(item.id)}
+            onDeclineCancel={() => setDecliningId(null)}
+            onDeclineConfirm={(reason) => action(item.id, 'reject', reason)}
+          />
+        ))
+      )}
+    </div>
+  )
 }

@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
 import type { MatchedBy } from '@/lib/signals'
+import type { RegularizationStatus } from '@/lib/db/queries/regularizations'
 import { fmtTime, durationLabel } from '@/lib/client/format-time'
+import RegularizationRequestModal from './RegularizationRequestModal'
 import { en } from '@/locales/en'
 
 
@@ -13,14 +15,22 @@ interface EventCardProps {
     matched_signals?: string[]
   }
   onNoteUpdate?: (id: string, note: string) => void
+  /** Workspace slug - only set when a specific workspace (not "All workspaces") is selected. */
+  workspaceSlug?: string | null
+  /** This event's own regularization status, if a request already exists for it. */
+  regularizationStatus?: RegularizationStatus
+  onRegularizationSubmitted?: () => void
 }
 
-export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
+export default function EventCard({ event, onNoteUpdate, workspaceSlug, regularizationStatus, onRegularizationSubmitted }: EventCardProps) {
   const geoLabel = event.location_label ?? null
   const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(event.note ?? '')
   const [saving, setSaving] = useState(false)
+  const [regModalOpen, setRegModalOpen] = useState(false)
   const isRemote = event.event_type === "remote_checkin";
+  const eventDate = event.checkin_at.slice(0, 10)
+  const canRequestCorrection = !!workspaceSlug && (event.matched_by === 'partial' || event.matched_by === 'none')
 
   const trustFlags: string[] = (() => {
     try { return event.trust_flags ? JSON.parse(event.trust_flags) as string[] : [] }
@@ -153,6 +163,43 @@ export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
             </span>
           )}
         </div>
+      )}
+
+      {canRequestCorrection && (
+        <div style={{ marginBottom: "8px" }}>
+          {regularizationStatus ? (
+            <span style={{
+              fontSize: "11px", fontFamily: "DM Sans, sans-serif", fontWeight: 600,
+              color: regularizationStatus === "approved" ? "var(--brand)" : regularizationStatus === "rejected" ? "var(--danger)" : "var(--amber)",
+            }}>
+              {en.meTimeline.correctionRequested}{" "}
+              {regularizationStatus === "approved" ? en.meWsRegularization.statusApproved : regularizationStatus === "rejected" ? en.meWsRegularization.statusRejected : en.meWsRegularization.statusPending}
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setRegModalOpen(true)}
+              style={{
+                height: "30px", padding: "0 12px", borderRadius: "var(--radius-sm)",
+                background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)",
+                fontFamily: "DM Sans, sans-serif", fontSize: "12px", fontWeight: 600, cursor: "pointer",
+              }}
+            >
+              {en.meTimeline.requestCorrection}
+            </button>
+          )}
+        </div>
+      )}
+
+      {regModalOpen && workspaceSlug && (
+        <RegularizationRequestModal
+          slug={workspaceSlug}
+          minDate={eventDate}
+          maxDate={eventDate}
+          prefillDate={eventDate}
+          onClose={() => setRegModalOpen(false)}
+          onSuccess={() => { setRegModalOpen(false); onRegularizationSubmitted?.() }}
+        />
       )}
 
       {/* Checkout distance badge */}

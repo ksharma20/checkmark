@@ -7,7 +7,11 @@ import { getServerUser } from "@/lib/auth";
 import {
   getWorkspaceBySlug,
   getWorkspaceMember,
+  getActiveMemberIds,
 } from "@/lib/db/queries/workspaces";
+import { getUserById } from "@/lib/db/queries/users";
+import { getPendingLeaveCount } from "@/lib/db/queries/leaves";
+import { getPendingRegularizationCount } from "@/lib/db/queries/regularizations";
 
 interface Props {
   children: React.ReactNode;
@@ -39,6 +43,13 @@ export default async function WsSlugLayout({ children, params }: Props) {
     redirect("/me");
   }
 
+  const [dbUser, activeMemberIds, pendingLeaveCount, pendingRegularizationCount] = await Promise.all([
+    getUserById(user.userId),
+    getActiveMemberIds(workspace.id),
+    workspace.leaves_enabled ? getPendingLeaveCount(workspace.id) : Promise.resolve(0),
+    getPendingRegularizationCount(workspace.id),
+  ]);
+
   return (
     <>
       <link rel="manifest" href="/manifest-ws.json" />
@@ -46,7 +57,18 @@ export default async function WsSlugLayout({ children, params }: Props) {
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <meta name="apple-mobile-web-app-title" content={`${en.brand.shortName} WS`} />
-      <WsLayoutClient slug={slug} leavesEnabled={!!workspace.leaves_enabled}>{children}</WsLayoutClient>
+      <WsLayoutClient
+        slug={slug}
+        leavesEnabled={!!workspace.leaves_enabled}
+        workspaceName={workspace.name}
+        memberCount={activeMemberIds.length}
+        pendingLeaveCount={pendingLeaveCount}
+        pendingApprovalsCount={pendingLeaveCount + pendingRegularizationCount}
+        userName={dbUser?.full_name?.trim() || user.email}
+        userRole={membership.role}
+      >
+        {children}
+      </WsLayoutClient>
     </>
   );
 }

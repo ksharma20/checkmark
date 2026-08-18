@@ -120,6 +120,28 @@ export const en = {
     leaveRejectedPrefix: "Rejected:",
   },
 
+  /** Member regularization ("request correction") tab + modal (/me/ws/[slug], /me/timeline) */
+  meWsRegularization: {
+    tabLabel: "My Corrections",
+    newRequestButton: "+ Request correction",
+    myRequestsEmpty: "No correction requests yet.",
+    modalTitle: "Request a correction",
+    fieldDate: "Date",
+    fieldType: "Should count as",
+    typeOffice: "Office",
+    typeRemote: "Remote",
+    fieldReason: "Reason",
+    fieldReasonPlaceholder: "Explain what happened…",
+    cancel: "Cancel",
+    submit: "Submit request",
+    submitting: "Submitting…",
+    submitSuccess: "Correction request submitted — awaiting admin review.",
+    submitErrorGeneric: "Could not submit request. Try again.",
+    statusPending: "Pending",
+    statusApproved: "Approved",
+    statusRejected: "Declined",
+  },
+
   /** Workspace admin leave requests (/ws/[slug]/leaves) */
   wsLeaves: {
     title: "Leave Requests",
@@ -271,9 +293,14 @@ export const en = {
     restoreConfirmBtn: "Confirm restore",
     archiveError: "Archive failed",
     restoreError: "Restore failed",
-    // Session
-    sessionTitle: "Session",
-    signOutBtn: "Sign out",
+  },
+
+  /** Workspace admin sidebar shell (src/components/ws/WsSidebar.tsx) */
+  wsSidebar: {
+    signOutTitle: "Sign out?",
+    signOutBody: "You'll be returned to the login screen and will need to sign in again to access this workspace.",
+    cancelBtn: "Cancel",
+    signOutConfirmBtn: "Sign out",
     signingOutBtn: "Signing out…",
   },
 
@@ -293,16 +320,52 @@ export const en = {
     loadingMore: "Loading more…",
     emptyNoCheckinsTitle: "No check-ins in this date range.",
     emptyNoCheckinsBody: "Try expanding the date range above.",
-  },
-
-  wsDisputes: {
-    viewMore: "View more",
-    loadingMore: "Loading more…",
+    requestCorrection: "Request correction",
+    correctionRequested: "Correction requested —",
   },
 
   wsPeople: {
     viewMore: "View more",
     loadingMore: "Loading more…",
+    regularizationSectionTitle: "Regularization requests",
+  },
+
+  /** Shared admin approval row (Overview widget, /ws/[slug]/approvals, People page section) */
+  wsApprovals: {
+    pageTitle: "Pending Approvals",
+    pageSubtitle: "Leave and attendance correction requests waiting on your review.",
+    filterAll: "All",
+    filterLeave: "Leave",
+    filterRegularization: "Regularization",
+    searchPlaceholder: "Search by employee name",
+    declineReasonPlaceholder: "Reason for declining…",
+    cancel: "Cancel",
+    confirmDecline: "Confirm decline",
+    decline: "Decline",
+    approve: "Approve",
+    emptyTitle: "Inbox zero 🎉",
+    emptyBody: "Every request has been actioned.",
+    markWfo: "Mark WFO",
+    markWfh: "Mark WFH",
+  },
+
+  wsOverview: {
+    greeting: "Good morning",
+    subtitlePendingSingular: "1 item needs your attention",
+    subtitlePendingPlural: "{count} items need your attention",
+    subtitleAllClear: "All caught up",
+    onLeaveTitle: "On leave today",
+    onLeaveSub: "away from the office",
+    pendingApprovalsTitle: "Pending approvals",
+    pendingApprovalsEmpty: "No requests waiting on you.",
+    reviewAction: "Review",
+    departmentTitle: "Headcount by department",
+    recentActivityTitle: "Recent activity",
+    recentActivityEmpty: "No check-ins yet today.",
+    celebrationsTitle: "Upcoming celebrations",
+    celebrationsEmpty: "Nothing in the next two weeks.",
+    birthdayLabel: "Birthday",
+    anniversaryLabel: "work anniversary",
   },
 
   /** /ws/:slug/members/:userId member timeline */
@@ -407,5 +470,14 @@ export const en = {
       `Your ${type} from ${start} to ${end} has been approved`,
     leaveRejectedBody: (type: string, start: string, end: string) =>
       `Your ${type} from ${start} to ${end} was rejected`,
+    regularizationSubmittedTitle: 'New correction request',
+    regularizationApprovedTitle: 'Correction approved',
+    regularizationRejectedTitle: 'Correction declined',
+    regularizationSubmittedBody: (name: string, date: string) =>
+      `${name} requested a correction for ${date}`,
+    regularizationApprovedBody: (date: string) =>
+      `Your correction request for ${date} has been approved`,
+    regularizationRejectedBody: (date: string) =>
+      `Your correction request for ${date} was declined`,
   },
 };

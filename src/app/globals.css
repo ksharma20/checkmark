@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Syne:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -175,6 +175,11 @@ code, pre, .mono {
   50% { opacity: 0.4; transform: scale(0.7); }
 }
 
+@keyframes vzToastIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes lineReveal {
   to { transform: scaleX(1); }
 }
@@ -272,6 +277,39 @@ code, pre, .mono {
 
 .page-enter {
   animation: page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Spring entrance (dashboard sections) ─────────────── */
+
+@keyframes fxSpring {
+  0%   { opacity: 0; transform: scale(0.82) translateY(6px); }
+  60%  { opacity: 1; transform: scale(1.035) translateY(0); }
+  100% { transform: scale(1) translateY(0); }
+}
+
+.fx-spring {
+  animation: fxSpring 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.fx-spring-stagger > * {
+  animation: fxSpring 420ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.fx-spring-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.fx-spring-stagger > *:nth-child(2) { animation-delay: 40ms; }
+.fx-spring-stagger > *:nth-child(3) { animation-delay: 80ms; }
+.fx-spring-stagger > *:nth-child(4) { animation-delay: 120ms; }
+.fx-spring-stagger > *:nth-child(5) { animation-delay: 160ms; }
+.fx-spring-stagger > *:nth-child(6) { animation-delay: 200ms; }
+.fx-spring-stagger > *:nth-child(7) { animation-delay: 240ms; }
+.fx-spring-stagger > *:nth-child(8) { animation-delay: 280ms; }
+.fx-spring-stagger > *:nth-child(n+9) { animation-delay: 320ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .fx-spring, .fx-spring-stagger > * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 }
 
 /* ── Button click effects ─────────────────────────────── */

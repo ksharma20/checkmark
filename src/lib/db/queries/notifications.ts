@@ -1,6 +1,8 @@
 import { db } from '../index'
 
-export type NotificationType = 'leave_submitted' | 'leave_approved' | 'leave_rejected'
+export type NotificationType =
+  | 'leave_submitted' | 'leave_approved' | 'leave_rejected'
+  | 'regularization_submitted' | 'regularization_approved' | 'regularization_rejected'
 
 export interface Notification {
   id: string

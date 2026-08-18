@@ -92,6 +92,39 @@ export async function createEvent(params: {
   return db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [id])
 }
 
+/**
+ * Synthesizes a presence_events row for a regularization approval on a day
+ * that had zero check-ins. No GPS/WiFi/IP signals - source/ip_address are
+ * marked 'regularization' so these rows are always identifiable as synthetic.
+ */
+export async function createRegularizedEvent(params: {
+  userId: string
+  eventType: 'office_checkin' | 'remote_checkin'
+  checkinAt: string
+  checkoutAt: string
+  note?: string | null
+}): Promise<PresenceEvent> {
+  const id = crypto.randomUUID().replace(/-/g, '')
+  await db.execute(
+    `INSERT INTO presence_events
+       (id, user_id, event_type, checkin_at, checkout_at, note, ip_address, source)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      params.userId,
+      params.eventType,
+      toSqliteDt(params.checkinAt),
+      toSqliteDt(params.checkoutAt),
+      params.note ?? null,
+      'regularization',
+      'regularization',
+    ]
+  )
+  const row = await db.queryOne<PresenceEvent>('SELECT * FROM presence_events WHERE id = ?', [id])
+  if (!row) throw new Error('Regularized event insert succeeded but row not found')
+  return row
+}
+
 export async function checkoutEvent(
   eventId: string,
   userId: string,

@@ -349,6 +349,15 @@ export async function hasOverlappingLeaveRequest(
   return (row?.cnt ?? 0) > 0
 }
 
+export async function getPendingLeaveCount(workspaceId: string): Promise<number> {
+  const row = await db.queryOne<{ cnt: number }>(
+    `SELECT COUNT(*) AS cnt FROM leave_requests
+     WHERE workspace_id = ? AND status = 'pending'`,
+    [workspaceId],
+  )
+  return row?.cnt ?? 0
+}
+
 export async function getLeaveRequestsInRange(
   workspaceId: string,
   startDate: string,
@@ -384,6 +393,34 @@ export async function getMembersOnLeaveToday(workspaceId: string, date: string):
        AND u.deleted_at IS NULL
      ORDER BY u.full_name ASC`,
     [workspaceId, date, date],
+  )
+}
+
+export interface PendingLeaveSummary {
+  id: string
+  user_full_name: string | null
+  user_email: string
+  leave_type_name: string
+  start_date: string
+  end_date: string
+  days: number
+}
+
+export async function getPendingLeaveRequests(
+  workspaceId: string,
+  limit = 5,
+): Promise<PendingLeaveSummary[]> {
+  return db.query<PendingLeaveSummary>(
+    `SELECT lr.id, u.full_name AS user_full_name, u.email AS user_email,
+            wlt.name AS leave_type_name, lr.start_date, lr.end_date,
+            CAST(julianday(lr.end_date) - julianday(lr.start_date) + 1 AS INTEGER) AS days
+     FROM leave_requests lr
+     JOIN users u ON u.id = lr.user_id
+     JOIN workspace_leave_types wlt ON wlt.id = lr.leave_type_id
+     WHERE lr.workspace_id = ? AND lr.status = 'pending'
+     ORDER BY lr.created_at ASC
+     LIMIT ?`,
+    [workspaceId, limit],
   )
 }
 

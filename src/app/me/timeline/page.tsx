@@ -51,7 +51,25 @@ export default function TimelinePage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [workspaces, setWorkspaces] = useState<{ slug: string; name: string }[]>([])
   const [workspaceSlug, setWorkspaceSlug] = useState<string | null>(null)
+  const [regularizationByEventId, setRegularizationByEventId] = useState<Record<string, 'pending' | 'approved' | 'rejected'>>({})
   const nextOffsetRef = useRef(0);
+
+  const fetchRegularizations = useCallback(async () => {
+    if (!workspaceSlug) { setRegularizationByEventId({}); return }
+    try {
+      const res = await fetch(`/api/me/ws/${encodeURIComponent(workspaceSlug)}/regularizations`)
+      const data = await res.json()
+      const map: Record<string, 'pending' | 'approved' | 'rejected'> = {}
+      for (const r of data.regularizationRequests ?? []) {
+        if (r.presence_event_id) map[r.presence_event_id] = r.status
+      }
+      setRegularizationByEventId(map)
+    } catch {
+      // silent - the "Request correction" button just won't reflect existing requests
+    }
+  }, [workspaceSlug])
+
+  useEffect(() => { fetchRegularizations() }, [fetchRegularizations])
 
   useEffect(() => {
     fetch('/api/me')
@@ -333,6 +351,9 @@ export default function TimelinePage() {
                 key={event.id}
                 event={event}
                 onNoteUpdate={handleNoteUpdate}
+                workspaceSlug={workspaceSlug}
+                regularizationStatus={regularizationByEventId[event.id]}
+                onRegularizationSubmitted={fetchRegularizations}
               />
             ))}
           </section>

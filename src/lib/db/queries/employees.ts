@@ -433,3 +433,92 @@ export async function restoreEmployee(
 
   return restored
 }
+
+// ─── Overview aggregates ────────────────────────────────────────────────────
+
+export interface DepartmentBreakdown {
+  department: string
+  count: number
+}
+
+export async function getDepartmentBreakdown(workspaceId: string): Promise<DepartmentBreakdown[]> {
+  return db.query<DepartmentBreakdown>(
+    `SELECT COALESCE(ed.department, 'Unassigned') AS department, COUNT(*) AS count
+     FROM employees e
+     LEFT JOIN employment_details ed ON ed.employee_id = e.id
+     WHERE e.workspace_id = ? AND e.deleted_at IS NULL
+     GROUP BY COALESCE(ed.department, 'Unassigned')
+     ORDER BY count DESC`,
+    [workspaceId],
+  )
+}
+
+export interface UpcomingCelebration {
+  employeeId: string
+  name: string
+  kind: 'birthday' | 'anniversary'
+  occursOn: string // YYYY-MM-DD of the next occurrence
+  yearsCount?: number // anniversary only: years since date_of_joining
+}
+
+function stripTime(d: Date): Date {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+}
+
+function nextOccurrence(originalIso: string, today: Date): { iso: string; daysUntil: number } {
+  const month = Number(originalIso.slice(5, 7))
+  const day = Number(originalIso.slice(8, 10))
+  const todayMidnight = stripTime(today)
+  let candidate = new Date(Date.UTC(today.getUTCFullYear(), month - 1, day))
+  if (candidate < todayMidnight) candidate = new Date(Date.UTC(today.getUTCFullYear() + 1, month - 1, day))
+  const daysUntil = Math.round((candidate.getTime() - todayMidnight.getTime()) / 86400000)
+  return { iso: candidate.toISOString().slice(0, 10), daysUntil }
+}
+
+export async function getUpcomingCelebrations(
+  workspaceId: string,
+  todayIso: string,
+  withinDays = 14,
+): Promise<UpcomingCelebration[]> {
+  const rows = await db.query<{
+    id: string
+    first_name: string
+    last_name: string
+    date_of_birth: string | null
+    date_of_joining: string | null
+  }>(
+    `SELECT e.id, e.first_name, e.last_name, e.date_of_birth, ed.date_of_joining
+     FROM employees e
+     LEFT JOIN employment_details ed ON ed.employee_id = e.id
+     WHERE e.workspace_id = ? AND e.deleted_at IS NULL
+       AND (e.date_of_birth IS NOT NULL OR ed.date_of_joining IS NOT NULL)`,
+    [workspaceId],
+  )
+
+  const today = new Date(`${todayIso}T00:00:00Z`)
+  const out: UpcomingCelebration[] = []
+
+  for (const r of rows) {
+    const name = `${r.first_name} ${r.last_name}`.trim()
+
+    if (r.date_of_birth) {
+      const occurs = nextOccurrence(r.date_of_birth, today)
+      if (occurs.daysUntil >= 0 && occurs.daysUntil <= withinDays) {
+        out.push({ employeeId: r.id, name, kind: 'birthday', occursOn: occurs.iso })
+      }
+    }
+
+    if (r.date_of_joining) {
+      const occurs = nextOccurrence(r.date_of_joining, today)
+      if (occurs.daysUntil >= 0 && occurs.daysUntil <= withinDays) {
+        const joinYear = Number(r.date_of_joining.slice(0, 4))
+        const occurYear = Number(occurs.iso.slice(0, 4))
+        if (occurYear > joinYear) {
+          out.push({ employeeId: r.id, name, kind: 'anniversary', occursOn: occurs.iso, yearsCount: occurYear - joinYear })
+        }
+      }
+    }
+  }
+
+  return out.sort((a, b) => a.occursOn.localeCompare(b.occursOn))
+}

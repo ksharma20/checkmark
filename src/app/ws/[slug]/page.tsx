@@ -1,5 +1,7 @@
 import { notFound } from 'next/navigation'
 import { getWorkspaceBySlug, getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
+import { getServerUser } from '@/lib/auth'
+import { getUserById } from '@/lib/db/queries/users'
 import { getPlanLimits } from '@/lib/plans'
 import TodayClient from './TodayClient'
 
@@ -12,8 +14,14 @@ export default async function WsDashboardPage({ params }: Props) {
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
+  const [members, sessionUser] = await Promise.all([
+    getActiveMembersWithDetails(workspace.id),
+    getServerUser(),
+  ])
+  const dbUser = sessionUser ? await getUserById(sessionUser.userId) : null
+  const adminFirstName = (dbUser?.full_name?.trim().split(' ')[0]) || 'there'
+
   // Plan limit banner
-  const members = await getActiveMembersWithDetails(workspace.id)
   const planLimits = getPlanLimits(workspace.plan)
   const memberCount = members.length
   const atLimit = planLimits.maxUsers !== null && memberCount >= planLimits.maxUsers
@@ -39,7 +47,7 @@ export default async function WsDashboardPage({ params }: Props) {
     <TodayClient
       slug={slug}
       planLimitBanner={planLimitBanner}
-      workspaceCreatedAt={workspace.created_at.slice(0, 10)}
+      adminFirstName={adminFirstName}
     />
   )
 }
