@@ -843,6 +843,7 @@ function DomainsSection({ slug }: { slug: string }) {
 function ArchiveSection({ slug }: { slug: string }) {
   const router = useRouter()
   const [isArchived, setIsArchived] = useState<boolean | null>(null)
+  const [canManageOwnership, setCanManageOwnership] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -851,7 +852,10 @@ function ArchiveSection({ slug }: { slug: string }) {
     fetch(`/api/ws/${slug}`)
       .then((r) => r.ok ? r.json() : null)
       .then((data) => {
-        if (data) setIsArchived(!!data.archived_at)
+        if (data) {
+          setIsArchived(!!data.archived_at)
+          setCanManageOwnership(!!data.can_manage_ownership)
+        }
       })
   }, [slug])
 
@@ -892,6 +896,10 @@ function ArchiveSection({ slug }: { slug: string }) {
   }
 
   if (isArchived === null) return null
+  // Archiving and restoring are ownership-level actions. Admins can open
+  // Settings, so the section must hide itself rather than rely on the page
+  // gate. The archive/restore routes 403 for non-owners independently.
+  if (!canManageOwnership) return null
 
   return (
     <SectionCard title={isArchived ? t.restoreTitle : t.archiveTitle}>

@@ -7,6 +7,7 @@ import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import NotificationBell from '@/components/notifications/NotificationBell'
 import NotificationPanel from '@/components/notifications/NotificationPanel'
 import { ToastProvider } from '@/components/shared/Toast'
+import type { Resource } from '@/lib/permissions/catalogue'
 
 interface Props {
   slug: string
@@ -16,12 +17,14 @@ interface Props {
   pendingLeaveCount: number
   pendingApprovalsCount: number
   userName: string
-  userRole: string
+  userRoleName: string
+  /** Resources this role can read - the screen registry filters the nav on it. */
+  readableResources: Resource[]
   children: React.ReactNode
 }
 
 export default function WsLayoutClient({
-  slug, leavesEnabled, workspaceName, memberCount, pendingLeaveCount, pendingApprovalsCount, userName, userRole, children,
+  slug, leavesEnabled, workspaceName, memberCount, pendingLeaveCount, pendingApprovalsCount, userName, userRoleName, readableResources, children,
 }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
   const [todayLabel, setTodayLabel] = useState<string | null>(null)
@@ -39,7 +42,8 @@ export default function WsLayoutClient({
         pendingLeaveCount={pendingLeaveCount}
         pendingApprovalsCount={pendingApprovalsCount}
         userName={userName}
-        userRole={userRole}
+        userRoleName={userRoleName}
+        readableResources={readableResources}
       />
 
       {/* Right column */}

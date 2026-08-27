@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireWsAdmin } from '@/lib/ws-admin'
+import { requireWsAccess } from '@/lib/ws-access'
 import { updateWorkspace } from '@/lib/db/queries/workspaces'
+import { can } from '@/lib/permissions/can'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
 interface Props { params: Promise<{ slug: string }> }
 
 export async function GET(request: NextRequest, { params }: Props) {
   const { slug } = await params
-  const ctx = await requireWsAdmin(request, slug)
+  const ctx = await requireWsAccess(request, slug, Resource.Settings, Action.Read)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const rawDays = ctx.workspace.working_days ?? '[1,2,3,4,5]'
@@ -21,12 +23,16 @@ export async function GET(request: NextRequest, { params }: Props) {
     leaves_enabled: !!ctx.workspace.leaves_enabled,
     working_days,
     leave_cutover_date: ctx.workspace.leave_cutover_date,
+    // Archive / restore are ownership-level, so only the owner should see the
+    // control. The routes enforce this independently - this flag only stops us
+    // showing a button we would immediately 403 on.
+    can_manage_ownership: can(ctx.role.permissions, Resource.Ownership, Action.Write),
   })
 }
 
 export async function PATCH(request: NextRequest, { params }: Props) {
   const { slug } = await params
-  const ctx = await requireWsAdmin(request, slug)
+  const ctx = await requireWsAccess(request, slug, Resource.Settings, Action.Write)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   let body: {

@@ -3,15 +3,10 @@ import { getUserByEmailIncludeDeleted, getRateLimitCount, recordRateLimitHit } f
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
 import { verifyPassword, createJwt, setSessionCookie } from '@/lib/auth'
 import { extractIp } from '@/lib/geo'
+import { getRedirectAfterLogin } from '@/lib/permissions/ranks'
 
 function apiError(message: string, code: string, status: number) {
   return NextResponse.json({ error: message, code }, { status })
-}
-
-function getRedirectAfterLogin(adminWorkspaces: { slug: string }[]): string {
-  if (adminWorkspaces.length === 0) return '/me'
-  if (adminWorkspaces.length === 1) return `/ws/${adminWorkspaces[0].slug}`
-  return '/ws'
 }
 
 export async function POST(request: NextRequest) {

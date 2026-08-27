@@ -210,22 +210,38 @@ flowchart LR
 
 ```mermaid
 sequenceDiagram
-  participant OA as Original Admin
+  participant OO as Original Owner
   participant API as /api/ws/:slug/transfer-ownership
   participant DB as Database
 
-  OA->>API: POST /api/ws/:slug/transfer-ownership\n{ newAdminUserId, currentPassword }
+  Note over OO,DB: Step 1 - re-authenticate, then request the code
+  OO->>API: POST\n{ action: 'request', targetMemberId, password }
+  API->>API: requireWsAccess(slug, 'ownership', 'write')
+  API->>DB: getWorkspaceMemberByRecordId - must be active, not already owner
+  API->>DB: getRateLimitCount(userId, 'transfer_ownership_password', 15m) - max 5
+  API->>API: verifyPassword(password, user.password_hash) - else 401
+  API->>DB: countRecentOtps(email, 15m) - max 3
+  API->>DB: createOtp(purpose='transfer_ownership')
+  API-->>OO: { sent: true, email }
 
-  API->>API: requireWsAdmin (validates original admin)
-  API->>API: verifyOtpCookie(email) - OTP required for sensitive op
-  API->>DB: getUser(originalAdminId) - verify current password via bcrypt
-  API->>DB: getMember(workspaceId, newAdminUserId) - must be active member
-  API->>DB: updateMember(newAdminUserId, role='admin')
-  API->>DB: updateMember(originalAdminId, role='member')
-  API-->>OA: { success: true }
+  Note over OO,DB: Step 2 - confirm with the code
+  OO->>API: POST\n{ action: 'confirm', targetMemberId, code }
+  API->>DB: getValidOtp(email, code, 'transfer_ownership')
+  API->>DB: markOtpUsed(otp.id)
+  API->>DB: updateMember(target, role='owner')
+  API->>DB: updateMember(originalOwner, role='member')
+  API-->>OO: { ok: true, new_admin }
 ```
 
-**Security:** Requires both current password verification AND a valid OTP cookie. Prevents account takeover via CSRF or session hijacking.
+**Entry point:** the Role dropdown on `/ws/:slug/people`. `owner` is listed there for anyone holding `ownership:write`, but it is NOT a grantable role — `canGrant` refuses owner→owner because rank must be strictly greater, and `PATCH .../members/:id/role` rejects `owner` with `USE_TRANSFER`. Picking it opens the OTP flow above instead of the role-change modal.
+
+**Targets:** any active member OR admin. Promoting your most trusted admin is the normal path; only the sitting owner is rejected (`409 ALREADY_OWNER`), as is transferring to yourself (`400 SELF_TRANSFER`).
+
+**Security:** Gated on the `ownership:write` permission, which only the owner's role grid holds — admins deliberately lack it. Beyond that it takes **two factors in sequence**: the account password (verified with `verifyPassword` against `users.password_hash`) before any code is issued, then a fresh emailed OTP to complete the swap. A hijacked session with access to the same inbox therefore is not sufficient on its own.
+
+Two independent rate limits back this, both in `rate_limit_log`: 5 password attempts per 15 minutes keyed on the acting user (`transfer_ownership_password`) to stop brute force, and the existing 3 OTPs per 15 minutes keyed on their email to stop the endpoint being used as an email bomb. The password is deliberately not re-checked at step 2 — the code is single-use, short-lived, and only exists because the password already passed.
+
+**Aftermath:** the outgoing owner becomes a plain `member` and loses `/ws` access immediately; the UI redirects them to `/me`. Only the new owner can restore their access.
 
 ---
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireWsAdmin } from '@/lib/ws-admin'
+import { requireWsAccess } from '@/lib/ws-access'
 import { getWorkspaceLeaveTypes, createLeaveType } from '@/lib/db/queries/leaves'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
 type AcrrualFrequency = 'monthly' | 'quarterly' | 'half-yearly' | 'yearly'
 const VALID_FREQUENCIES: AcrrualFrequency[] = ['monthly', 'quarterly', 'half-yearly', 'yearly']
@@ -9,7 +10,7 @@ interface Props { params: Promise<{ slug: string }> }
 
 export async function GET(req: NextRequest, { params }: Props) {
   const { slug } = await params
-  const ctx = await requireWsAdmin(req, slug)
+  const ctx = await requireWsAccess(req, slug, Resource.Leaves, Action.Read)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const leaveTypes = await getWorkspaceLeaveTypes(ctx.workspace.id)
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
 export async function POST(req: NextRequest, { params }: Props) {
   const { slug } = await params
-  const ctx = await requireWsAdmin(req, slug)
+  const ctx = await requireWsAccess(req, slug, Resource.Leaves, Action.Write)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   let body: { name?: unknown; accrual_frequency?: unknown; accrual_credits?: unknown; credit_timing?: unknown }

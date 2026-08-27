@@ -58,6 +58,25 @@ export const en = {
   workspace: {
     // Used on /ws and /ws/:slug pages
     brandLogo: brand,
+    pageTitle: "Workspace",
+  },
+
+  /** /me/orgs workspace list */
+  meOrgs: {
+    leaveConfirm: (wsName: string) =>
+      `Leave ${wsName}? You will no longer appear in their presence dashboard.`,
+    leaveError: "Could not leave workspace",
+    leaveFallbackName: "this workspace",
+    leavingBtn: "Leaving…",
+    leaveBtn: "Leave",
+    pendingInvitesTitle: "Pending invitations",
+    pendingInviteBody: "Wants to include your presence events in their dashboard.",
+    acceptBtn: "Accept",
+    declineBtn: "Decline",
+    activeTitle: "Active",
+    emptyTitle: "You're not part of any workspace yet.",
+    emptyBody: "Your employer needs to add you, or you'll be auto-enrolled if your email domain matches.",
+    createLink: "Or create your own workspace →",
   },
 
   /** Member workspace Today accordion (/me/ws/[slug]) */
@@ -103,6 +122,8 @@ export const en = {
     applyLeaveErrorOverlap: "You already have a leave request covering these dates.",
     applyLeaveErrorHoliday: (names: string) =>
       `Leave cannot be applied on company holidays: ${names}.`,
+    applyLeaveHolidayWarning: (names: string) =>
+      `⚠ Your dates include company holidays: ${names}. Please adjust your dates.`,
     myLeavesEmpty: "No leave requests yet.",
     myLeavesActive: "Active",
     myLeavesUpcoming: "Upcoming",
@@ -295,6 +316,35 @@ export const en = {
     restoreError: "Restore failed",
   },
 
+  /**
+   * Org-surface navigation labels, keyed by the Screen / ScreenGroup /
+   * SubScreen enums in src/lib/permissions/screens.ts. The sidebar asserts
+   * these against `Record<Screen, string>`, so a screen added to the registry
+   * without a label here is a build error.
+   */
+  wsNav: {
+    groups: {
+      workforce: "Workforce",
+      manage: "Manage",
+    },
+    screens: {
+      overview: "Overview",
+      employees: "Employees",
+      analytics: "Analytics",
+      activity: "Activity",
+      holidays: "Holidays",
+      leave: "Leave",
+      approvals: "Approvals",
+      reports: "Reports",
+      roles: "Roles & Permissions",
+      settings: "Settings",
+    },
+    subScreens: {
+      leaveRequests: "Requests",
+      leaveApplied: "Applied leaves",
+    },
+  },
+
   /** Workspace admin sidebar shell (src/components/ws/WsSidebar.tsx) */
   wsSidebar: {
     signOutTitle: "Sign out?",
@@ -302,6 +352,69 @@ export const en = {
     cancelBtn: "Cancel",
     signOutConfirmBtn: "Sign out",
     signingOutBtn: "Signing out…",
+  },
+
+  /** Roles & Permissions tab (/ws/[slug]/roles) */
+  wsRoles: {
+    pageTitle: "Roles & Permissions",
+    pageSubtitle:
+      "Define what each role can see and change. Roles apply to this workspace only.",
+
+    listHeading: "Roles",
+    newRoleBtn: "+ New role",
+    memberCount: (n: number) => `${n} member${n === 1 ? "" : "s"}`,
+
+    systemLockedBanner: (name: string) =>
+      `${name} is a built-in role and can’t be edited or deleted. Duplicate it to make your own version.`,
+    inUseBanner: (n: number) =>
+      `${n} member${n === 1 ? "" : "s"} ${n === 1 ? "has" : "have"} this role. Changes apply immediately — no re-login.`,
+    unusedBanner: "No one holds this role yet.",
+
+    fieldName: "Role name",
+    fieldNamePlaceholder: "e.g. HR Manager",
+    fieldDescription: "Description",
+    fieldDescriptionPlaceholder: "What is this role for? (optional)",
+
+    colResource: "Resource",
+    colRead: "Read",
+    colWrite: "Write",
+    colDelete: "Delete",
+    colAll: "All",
+    toggleRowAria: (resource: string) => `Toggle every permission on ${resource}`,
+    cellAria: (resource: string, action: string) => `${action} on ${resource}`,
+    notApplicable: "Not available for this resource",
+    impliedRead: "Read is included automatically because Write or Delete is on",
+    beyondYourRole: "You cannot grant a permission you do not hold yourself",
+
+    saveBtn: "Save changes",
+    savingBtn: "Saving…",
+    cancelBtn: "Cancel",
+    duplicateBtn: "Duplicate role",
+    deleteBtn: "Delete role",
+
+    createTitle: "New role",
+    createSubmit: "Create role",
+    creatingSubmit: "Creating…",
+
+    deleteTitle: (name: string) => `Delete the “${name}” role?`,
+    deleteBodyWithMembers: (n: number) =>
+      `${n} member${n === 1 ? "" : "s"} hold${n === 1 ? "s" : ""} this role. They will fall back to Member and immediately lose access to everything this role granted.`,
+    deleteBodyEmpty: "No one currently holds this role.",
+    deleteIrreversible:
+      "This cannot be undone. The role can be recreated, but its permissions will need setting up again.",
+    deleteConfirm: "Delete role",
+    deletingConfirm: "Deleting…",
+
+    emptyStateTitle: "No custom roles yet",
+    emptyStateBody:
+      "Duplicate a built-in role to make your own version, or start from scratch.",
+
+    errorSaveFailed: "Could not save the role. Please try again.",
+    errorCreateFailed: "Could not create the role. Please try again.",
+    errorDeleteFailed: "Could not delete the role. Please try again.",
+    errorNameRequired: "A role name is required.",
+
+    backToRoles: "Roles",
   },
 
   /** /me/timeline workspace filter + per-workspace verification context */
@@ -325,9 +438,111 @@ export const en = {
   },
 
   wsPeople: {
+    pageTitle: "People",
     viewMore: "View more",
     loadingMore: "Loading more…",
     regularizationSectionTitle: "Regularization requests",
+
+    /** Invite panel */
+    inviteSectionTitle: "Invite someone",
+    inviteHelperText:
+      "They'll receive an email with an accept/decline link. Their presence data only flows to this workspace after they accept.",
+    invitePlaceholder: "colleague@company.com",
+    inviteSubmitting: "…",
+    inviteSubmit: "Send invite",
+    inviteSuccess: (email: string) => `Invite sent to ${email}`,
+    inviteError: "Failed to send invite",
+
+    /** People table */
+    peopleCount: (n: number) => `People (${n})`,
+    searchPlaceholder: "Search name or email",
+    searchButtonTitle: "Search",
+    emptyTitle: "No members yet.",
+    emptyBody: "Use the invite form above to add your team.",
+    colEmployee: "Employee",
+    colDesignation: "Designation",
+    colDepartment: "Department",
+    colWorkMode: "Work mode",
+    colJoined: "Joined",
+    colStatus: "Status",
+    workModeOffice: "On-site",
+    workModeRemote: "Remote",
+    workModeHybrid: "Hybrid",
+    statusOnboarding: "Onboarding",
+    statusProbation: "Probation",
+    statusActive: "Active",
+    statusInviteSent: "Invite sent",
+    statusDeclined: "Declined",
+    setUpLink: "+ Set up",
+    editLink: "Edit",
+    makeOwnerTitle: "Make owner",
+    makeOwnerLabel: "Owner",
+    removeTitle: "Remove",
+    removeConfirm: "Remove this member?",
+
+    /** Role assignment (owner only) */
+    roleColumn: "Role",
+    /**
+     * A role that is not a plain assignment - today only Owner, which goes
+     * through the ownership transfer flow. The padlock is a text glyph because
+     * a native <option> cannot host an icon component.
+     */
+    restrictedRoleOption: (name: string) => `🔒 ${name}`,
+    roleSelectAria: "Change this member's role",
+    roleModalTitle: (name: string) => `Change ${name}'s role?`,
+    roleModalTo: (role: string) => `They will become ${role}.`,
+    roleAdminGains:
+      "Can manage members, employee records, holidays, leave, approvals, signals, domains and workspace settings.",
+    roleAdminLimits:
+      "Cannot transfer ownership, archive the workspace, change billing, or assign roles.",
+    roleMemberEffect:
+      "Loses access to the workspace dashboard entirely. They keep their own timeline on /me.",
+    roleAppliesImmediately:
+      "Applies immediately — they do not need to sign in again.",
+    roleConfirmButton: "Change role",
+    roleSavingButton: "Saving…",
+    roleCancelButton: "Cancel",
+    roleChangeFailed: "Could not change the role. Please try again.",
+  },
+
+  /** Transfer ownership modal (src/app/ws/[slug]/people/PeopleClient.tsx) */
+  wsTransferOwnership: {
+    title: "Transfer ownership",
+    confirmBodyPrefix: "You are about to transfer ownership of this workspace to",
+    confirmBodySuffix: "Confirm your password to continue.",
+
+    /** Destructive warning callout - step 1 of the transfer modal. */
+    warningTitle: "This cannot be undone.",
+    warningTheyGain:
+      "They get full control of this workspace, including billing, archiving it, and transferring ownership again.",
+    warningYouLose:
+      "You immediately become a regular member and lose all admin access to this workspace.",
+    warningNoUndo:
+      "Only the new owner can give your access back. There is no way to reverse this yourself.",
+
+    passwordLabel: "Your password",
+    passwordPlaceholder: "Enter your account password",
+    continueBtn: "Verify and send code",
+    continuingBtn: "Verifying…",
+    errorPasswordRequired: "Enter your password to continue",
+
+    otpBodyPrefix: "Enter the 6-digit code sent to",
+    otpBodySuffix: "to confirm the transfer.",
+    otpPlaceholder: "6-digit code",
+    sendCodeBtn: "Send verification code",
+    sendingCodeBtn: "Sending code…",
+    cancelBtn: "Cancel",
+    confirmBtn: "Confirm transfer",
+    transferringBtn: "Transferring…",
+    successMsg: (adminName: string) =>
+      `Ownership transferred to ${adminName}. You are now a member.`,
+    errorRequestFailed: "Failed to send verification code",
+    errorTransferFailed: "Transfer failed",
+  },
+
+  /** Reports placeholder (/ws/[slug]/reports) */
+  wsReports: {
+    comingSoon: "Coming soon",
   },
 
   /** Shared admin approval row (Overview widget, /ws/[slug]/approvals, People page section) */

@@ -1,4 +1,6 @@
 import { db } from '../index'
+import { hasAnyOrgAccess, parsePermissions } from '@/lib/permissions/can'
+import { seedSystemRoles } from './roles'
 
 export interface Workspace {
   id: string
@@ -50,6 +52,20 @@ export interface AdminOverride {
 
 // ─── Workspace CRUD ───────────────────────────────────────────────────────────
 
+/**
+ * Create a workspace and everything required to make it usable.
+ *
+ * The roles are seeded here, in the SAME transaction as the workspace row,
+ * because they are not decoration: permissions are resolved by joining
+ * workspace_members.role to workspace_roles, so a workspace without those rows
+ * grants its own creator nothing - they cannot open it, manage it, or even see
+ * it in the picker. A half-created workspace like that is unrecoverable through
+ * the UI, so it must never be able to exist.
+ *
+ * The creator is the OWNER, not an admin. Only the owner may transfer
+ * ownership, archive the workspace, or manage billing; a workspace whose
+ * creator is merely an admin has nobody who can do any of those things.
+ */
 export async function createWorkspace(params: {
   slug: string
   name: string
@@ -58,31 +74,37 @@ export async function createWorkspace(params: {
   domains?: string[]
 }): Promise<Workspace> {
   const id = crypto.randomUUID().replace(/-/g, '')
-  await db.execute(
-    `INSERT INTO workspaces (id, slug, name) VALUES (?, ?, ?)`,
-    [id, params.slug, params.name]
-  )
 
-  // Add creator as admin
-  const memberId = crypto.randomUUID().replace(/-/g, '')
-  await db.execute(
-    `INSERT INTO workspace_members (id, workspace_id, user_id, email, role, status)
-     VALUES (?, ?, ?, ?, 'admin', 'active')`,
-    [memberId, id, params.creatorUserId, params.creatorEmail]
-  )
+  return db.transaction(async (tx) => {
+    await tx.execute(
+      `INSERT INTO workspaces (id, slug, name) VALUES (?, ?, ?)`,
+      [id, params.slug, params.name]
+    )
 
-  // Add domains if provided
-  if (params.domains) {
-    for (const domain of params.domains) {
-      const domainId = crypto.randomUUID().replace(/-/g, '')
-      await db.execute(
-        `INSERT INTO workspace_domains (id, workspace_id, domain) VALUES (?, ?, ?)`,
-        [domainId, id, domain.toLowerCase()]
-      )
+    // Must precede the member insert: the role below has to resolve to a row.
+    await seedSystemRoles(id, tx)
+
+    // Add creator as owner
+    const memberId = crypto.randomUUID().replace(/-/g, '')
+    await tx.execute(
+      `INSERT INTO workspace_members (id, workspace_id, user_id, email, role, status)
+       VALUES (?, ?, ?, ?, 'owner', 'active')`,
+      [memberId, id, params.creatorUserId, params.creatorEmail]
+    )
+
+    // Add domains if provided
+    if (params.domains) {
+      for (const domain of params.domains) {
+        const domainId = crypto.randomUUID().replace(/-/g, '')
+        await tx.execute(
+          `INSERT INTO workspace_domains (id, workspace_id, domain) VALUES (?, ?, ?)`,
+          [domainId, id, domain.toLowerCase()]
+        )
+      }
     }
-  }
 
-  return db.queryOne<Workspace>('SELECT * FROM workspaces WHERE id = ?', [id]) as Promise<Workspace>
+    return tx.queryOne<Workspace>('SELECT * FROM workspaces WHERE id = ?', [id]) as Promise<Workspace>
+  })
 }
 
 export async function getWorkspaceBySlug(slug: string): Promise<Workspace | null> {
@@ -175,7 +197,7 @@ export async function getActiveWorkspaceAdmins(workspaceId: string, excludeUserI
   return db.query<{ user_id: string }>(
     `SELECT wm.user_id FROM workspace_members wm
      JOIN users u ON u.id = wm.user_id
-     WHERE wm.workspace_id = ? AND wm.role = 'admin' AND wm.status = 'active' AND u.deleted_at IS NULL
+     WHERE wm.workspace_id = ? AND wm.role IN ('owner','admin') AND wm.status = 'active' AND u.deleted_at IS NULL
      ${excludeUserId ? 'AND wm.user_id != ?' : ''}`,
     excludeUserId ? [workspaceId, excludeUserId] : [workspaceId],
   )
@@ -280,19 +302,54 @@ export async function linkMemberToUser(email: string, userId: string): Promise<v
   )
 }
 
-export async function getAdminWorkspacesForUser(userId: string): Promise<Workspace[]> {
-  return db.query<Workspace>(
-    `SELECT w.* FROM workspaces w
+/**
+ * Workspaces where this user can reach the ORG SURFACE at /ws/:slug.
+ *
+ * Membership alone is not enough and holding a built-in role is not the test:
+ * a custom role qualifies as soon as its grid grants read on anything. Filtering
+ * on `role IN ('owner','admin')` here silently excluded every custom role from
+ * the post-login redirect AND the /ws picker, leaving those users with no route
+ * into the dashboard at all.
+ *
+ * The grid lives in a JSON column, so the qualifying test runs in JS rather
+ * than SQL - hasAnyOrgAccess is the same function the workspace layout uses, so
+ * the picker and the layout can never disagree about who belongs there.
+ */
+async function workspacesWithOrgAccess(
+  userId: string,
+  archived: boolean,
+): Promise<Workspace[]> {
+  const rows = await db.query<Workspace & { role_permissions: string | null }>(
+    `SELECT w.*, wr.permissions as role_permissions
+     FROM workspaces w
      JOIN workspace_members wm ON wm.workspace_id = w.id
-     WHERE wm.user_id = ? AND wm.role = 'admin' AND wm.status = 'active' AND w.archived_at IS NULL
-     ORDER BY w.created_at ASC`,
+     LEFT JOIN workspace_roles wr
+       ON wr.workspace_id = w.id AND wr.key = wm.role AND wr.deleted_at IS NULL
+     WHERE wm.user_id = ? AND wm.status = 'active'
+       AND w.archived_at IS ${archived ? 'NOT NULL' : 'NULL'}
+     ORDER BY ${archived ? 'w.archived_at DESC' : 'w.created_at ASC'}`,
     [userId]
   )
+
+  return rows
+    .filter((r) => hasAnyOrgAccess(parsePermissions(r.role_permissions)))
+    .map((row) => {
+      // Drop the joined column so callers get a clean Workspace.
+      const workspace = { ...row } as Partial<typeof row>
+      delete workspace.role_permissions
+      return workspace as Workspace
+    })
+}
+
+export async function getAdminWorkspacesForUser(userId: string): Promise<Workspace[]> {
+  return workspacesWithOrgAccess(userId, false)
 }
 
 /**
- * Returns active (non-archived) workspaces where the given user is the ONLY
- * active admin. Used to block account deactivation.
+ * Returns active (non-archived) workspaces the user OWNS. Used to block
+ * account deactivation - deactivating would leave those workspaces with nobody
+ * who can transfer, archive, or manage billing. Having other admins does not
+ * help: admins deliberately cannot do any of those things.
  *
  * Archived workspaces are excluded - a deactivated account is fine as the
  * owner of an archived workspace since it can't affect any running team.
@@ -301,24 +358,14 @@ export async function getSoleAdminWorkspaces(userId: string): Promise<Workspace[
   return db.query<Workspace>(
     `SELECT w.* FROM workspaces w
      JOIN workspace_members wm ON wm.workspace_id = w.id
-     WHERE wm.user_id = ? AND wm.role = 'admin' AND wm.status = 'active'
-       AND w.archived_at IS NULL
-       AND (
-         SELECT COUNT(*) FROM workspace_members wm2
-         WHERE wm2.workspace_id = w.id AND wm2.role = 'admin' AND wm2.status = 'active'
-       ) = 1`,
+     WHERE wm.user_id = ? AND wm.role = 'owner' AND wm.status = 'active'
+       AND w.archived_at IS NULL`,
     [userId]
   )
 }
 
 export async function getArchivedAdminWorkspacesForUser(userId: string): Promise<Workspace[]> {
-  return db.query<Workspace>(
-    `SELECT w.* FROM workspaces w
-     JOIN workspace_members wm ON wm.workspace_id = w.id
-     WHERE wm.user_id = ? AND wm.role = 'admin' AND wm.status = 'active' AND w.archived_at IS NOT NULL
-     ORDER BY w.archived_at DESC`,
-    [userId]
-  )
+  return workspacesWithOrgAccess(userId, true)
 }
 
 export async function archiveWorkspace(workspaceId: string): Promise<void> {
@@ -356,12 +403,14 @@ export async function getMembershipsByEmail(email: string): Promise<WorkspaceMem
 }
 
 export async function leaveWorkspace(workspaceId: string, userId: string): Promise<boolean> {
-  // Cannot leave if you are the sole admin
-  const admins = await db.query<{ user_id: string }>(
-    `SELECT user_id FROM workspace_members WHERE workspace_id = ? AND role = 'admin' AND status = 'active'`,
-    [workspaceId]
+  // The owner can NEVER leave - a workspace without an owner has no one who can
+  // transfer it, archive it, or manage billing. They must transfer ownership
+  // first. Admins may leave freely; the owner is always still there.
+  const self = await db.queryOne<{ role: string }>(
+    `SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ? AND status = 'active'`,
+    [workspaceId, userId]
   )
-  if (admins.length === 1 && admins[0].user_id === userId) return false
+  if (self?.role === 'owner') return false
   await db.execute(
     `UPDATE workspace_members SET status = 'revoked' WHERE workspace_id = ? AND user_id = ?`,
     [workspaceId, userId]

@@ -1,17 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireWsAdmin } from '@/lib/ws-admin'
+import { requireWsAccess } from '@/lib/ws-access'
 import { actionLeaveRequest, getLeaveTypeById, LeaveAction } from '@/lib/db/queries/leaves'
 import { actionRegularizationRequest, RegularizationAction } from '@/lib/db/queries/regularizations'
 import { getUserById } from '@/lib/db/queries/users'
 import { createNotification } from '@/lib/db/queries/notifications'
 import { sendPushToUser } from '@/lib/push'
 import { en } from '@/locales/en'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
 interface Props { params: Promise<{ slug: string; kind: string; id: string }> }
 
 export async function PATCH(req: NextRequest, { params }: Props) {
   const { slug, kind, id } = await params
-  const ctx = await requireWsAdmin(req, slug)
+  const ctx = await requireWsAccess(req, slug, Resource.Approvals, Action.Write)
   if (!ctx) {
     return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   }

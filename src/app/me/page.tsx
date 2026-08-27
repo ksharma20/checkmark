@@ -16,6 +16,8 @@ import CheckinButtons from "@/components/user/CheckinButtons";
 import EventCard from "@/components/user/EventCard";
 import TimezoneReporter from "@/components/user/TimezoneReporter";
 import WorkspacesStrip from "./WorkspacesStrip";
+import { getRolesForUserWorkspaces } from "@/lib/db/queries/roles";
+import { hasAnyOrgAccess } from "@/lib/permissions/can";
 
 export default async function MePage() {
   const user = await getServerUser();
@@ -23,7 +25,7 @@ export default async function MePage() {
 
   const todayUtcStr = new Date().toISOString().split("T")[0];
 
-  const [activeEvent, todayResult, memberships, profile] = await Promise.all([
+  const [activeEvent, todayResult, memberships, profile, rolesByWorkspace] = await Promise.all([
     getOpenEventToday(user.userId),
     getUserEvents({
       userId: user.userId,
@@ -32,6 +34,9 @@ export default async function MePage() {
     }),
     getUserWorkspaces(user.userId),
     getUserById(user.userId),
+    // Resolves each membership's role so the strip can show the display name
+    // and decide whether to offer a link into the org dashboard.
+    getRolesForUserWorkspaces(user.userId),
   ]);
 
   const todayEvents = todayResult.events;
@@ -210,7 +215,16 @@ export default async function MePage() {
         items={memberships.flatMap((m) => {
           const ws = wsMap.get(m.workspace_id);
           if (!ws) return [];
-          return [{ id: m.id, slug: ws.slug, name: ws.name, role: m.role }];
+          const role = rolesByWorkspace[m.workspace_id];
+          return [{
+            id: m.id,
+            slug: ws.slug,
+            name: ws.name,
+            // Display name, never the raw key - `hr-manager` would otherwise
+            // render as "Hr-manager".
+            role: role?.name ?? m.role,
+            hasOrgAccess: hasAnyOrgAccess(role?.permissions),
+          }];
         })}
       />
 
