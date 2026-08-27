@@ -6,7 +6,15 @@ type WorkspaceItem = {
   id: string;
   slug: string;
   name: string;
+  /** Display name of the role, not the raw key. */
   role: string;
+  /**
+   * Does this person's role grant them the org surface at /ws/:slug?
+   * True for the owner, admins, and any custom role whose grid grants read on
+   * something. The route into the dashboard is the workspace button in the /me
+   * header (see me/layout.tsx), which gates on the same `hasAnyOrgAccess`.
+   */
+  hasOrgAccess: boolean;
 };
 
 export default function WorkspacesStrip({ items }: { items: WorkspaceItem[] }) {
@@ -29,17 +37,26 @@ export default function WorkspacesStrip({ items }: { items: WorkspaceItem[] }) {
       </h2>
 
       {items.map((item) => (
-        <Link
+        <div
           key={item.id}
+          style={{
+            display: "flex",
+            alignItems: "stretch",
+            background: "var(--surface-0)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-md)",
+            marginBottom: "8px",
+            overflow: "hidden",
+          }}
+        >
+        <Link
           href={`/me/ws/${item.slug}`}
           style={{
             display: "flex",
             alignItems: "center",
-            background: "var(--surface-0)",
-            border: "1px solid var(--border)",
-            borderRadius: "var(--radius-md)",
+            flex: 1,
+            minWidth: 0,
             padding: "12px 14px",
-            marginBottom: "8px",
             textDecoration: "none",
             cursor: "pointer",
           }}
@@ -81,6 +98,8 @@ export default function WorkspacesStrip({ items }: { items: WorkspaceItem[] }) {
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </Link>
+
+        </div>
       ))}
     </section>
   );

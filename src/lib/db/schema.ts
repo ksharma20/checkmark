@@ -123,6 +123,24 @@ CREATE TABLE IF NOT EXISTS workspace_members (
   UNIQUE(workspace_id, email)
 );
 
+CREATE TABLE IF NOT EXISTS workspace_roles (
+  id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  key          TEXT NOT NULL,
+  name         TEXT NOT NULL,
+  description  TEXT,
+  permissions  TEXT NOT NULL DEFAULT '{}',
+  scope        TEXT NOT NULL DEFAULT 'self',
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at   TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_roles_key
+  ON workspace_roles(workspace_id, key) WHERE deleted_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_workspace_roles_ws ON workspace_roles(workspace_id);
+
 CREATE TABLE IF NOT EXISTS workspace_signal_config (
   id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   workspace_id    TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,

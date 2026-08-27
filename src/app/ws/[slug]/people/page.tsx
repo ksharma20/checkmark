@@ -1,7 +1,11 @@
 import { notFound, redirect } from 'next/navigation'
 import { getSessionFromCookies } from '@/lib/auth'
-import { getWorkspaceBySlug, getWorkspaceMember } from '@/lib/db/queries/workspaces'
+import { getWorkspaceBySlug } from '@/lib/db/queries/workspaces'
 import PeopleClient from './PeopleClient'
+import { getWsRole } from '@/lib/ws-access'
+import { can } from '@/lib/permissions/can'
+import { en } from '@/locales/en'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -16,8 +20,11 @@ export default async function PeoplePage({ params }: Props) {
   const workspace = await getWorkspaceBySlug(slug)
   if (!workspace) notFound()
 
-  const membership = await getWorkspaceMember(workspace.id, session.sub)
-  if (!membership || membership.role !== 'admin' || membership.status !== 'active') {
+  // Gate on the PERMISSION, not on holding a built-in role. A custom role with
+  // members:read must reach this page - checking isWorkspaceAdmin here would
+  // silently bounce every custom role no matter what its grid says.
+  const role = await getWsRole(workspace.id, session.sub)
+  if (!role || !can(role.permissions, Resource.Members, Action.Read)) {
     redirect('/me')
   }
 
@@ -33,9 +40,9 @@ export default async function PeoplePage({ params }: Props) {
           marginBottom: '20px',
         }}
       >
-        People
+        {en.wsPeople.pageTitle}
       </h1>
-      <PeopleClient slug={slug} />
+      <PeopleClient slug={slug} viewerUserId={session.sub} />
     </div>
     </div>
   )

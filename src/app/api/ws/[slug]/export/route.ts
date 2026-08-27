@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import ExcelJS from 'exceljs'
-import { requireWsAdmin } from '@/lib/ws-admin'
+import { requireWsAccess } from '@/lib/ws-access'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { getWorkspaceSignals } from '@/lib/db/queries/signals'
@@ -14,6 +14,7 @@ import {
   nextDateKey,
 } from '@/lib/attendance-summary'
 import { localMidnightToUtc, todayInTz } from '@/lib/timezone'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
 interface Props { params: Promise<{ slug: string }> }
 
@@ -58,7 +59,7 @@ function cellFill(status: string | undefined, isWeekend: boolean): ExcelJS.Fill 
 
 export async function GET(request: NextRequest, { params }: Props) {
   const { slug } = await params
-  const ctx = await requireWsAdmin(request, slug)
+  const ctx = await requireWsAccess(request, slug, Resource.Export, Action.Read)
   if (!ctx) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const { workspace } = ctx

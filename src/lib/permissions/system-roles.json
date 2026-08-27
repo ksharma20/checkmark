@@ -1,0 +1,54 @@
+[
+  {
+    "key": "owner",
+    "name": "Owner",
+    "description": "Full control, including ownership, billing and deleting the workspace.",
+    "scope": "all",
+    "permissions": {
+      "dashboard": ["read"],
+      "analytics": ["read"],
+      "activity": ["read"],
+      "export": ["read"],
+      "members": ["read", "write", "delete"],
+      "employees": ["read", "write", "delete"],
+      "holidays": ["read", "write", "delete"],
+      "leaves": ["read", "write", "delete"],
+      "approvals": ["read", "write"],
+      "signals": ["read", "write", "delete"],
+      "domains": ["read", "write", "delete"],
+      "settings": ["read", "write"],
+      "members.role": ["write"],
+      "roles": ["read", "write", "delete"],
+      "ownership": ["write", "delete"]
+    }
+  },
+  {
+    "key": "admin",
+    "name": "Admin",
+    "description": "Runs the workspace day to day, including creating roles and assigning them. Cannot transfer ownership, archive the workspace, or change billing.",
+    "scope": "all",
+    "permissions": {
+      "dashboard": ["read"],
+      "analytics": ["read"],
+      "activity": ["read"],
+      "export": ["read"],
+      "members": ["read", "write", "delete"],
+      "employees": ["read", "write", "delete"],
+      "holidays": ["read", "write", "delete"],
+      "leaves": ["read", "write", "delete"],
+      "approvals": ["read", "write"],
+      "signals": ["read", "write", "delete"],
+      "domains": ["read", "write", "delete"],
+      "settings": ["read", "write"],
+      "roles": ["read", "write", "delete"],
+      "members.role": ["write"]
+    }
+  },
+  {
+    "key": "member",
+    "name": "Member",
+    "description": "Records their own presence. No access to the org dashboard.",
+    "scope": "self",
+    "permissions": {}
+  }
+]

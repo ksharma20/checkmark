@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
-import { requireWsAdmin } from '@/lib/ws-admin'
+import { requireWsAccess } from '@/lib/ws-access'
 import { queryWorkspaceEvents } from '@/lib/signals'
 import type { PresenceEventWithMatch, MatchedBy } from '@/lib/signals'
 import type { MemberWithUser } from '@/lib/db/queries/workspaces'
 import { todayInTz, localMidnightToUtc } from '@/lib/timezone'
 import { isOfficeMatched } from '@/lib/attendance-summary'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
 export interface DashboardMember {
   member_id: string
@@ -60,7 +61,7 @@ export async function GET(
   { params }: { params: Promise<{ slug: string }> }
 ) {
   const { slug } = await params
-  const ctx = await requireWsAdmin(request, slug)
+  const ctx = await requireWsAccess(request, slug, Resource.Dashboard, Action.Read)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
   const { workspace } = ctx
 

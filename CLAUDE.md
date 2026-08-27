@@ -250,6 +250,11 @@ Enforce in `queryWorkspaceEvents()` - plan gate applied before signal matching.
 7. **Admin overrides** - stored in `admin_overrides` table, never modify original `presence_events` row
 8. **Rate limiting** - `rate_limit_log` table: IP-keyed for login (10 attempts per 15 min), user-keyed for checkin (10 per hr). Use `getRateLimitCount` + `recordRateLimitHit` from `lib/db/queries/users.ts`.
 9. **API token O(1) lookup** - `token_prefix` column stores first 8 chars of the raw token. Always use prefix lookup in `POST /api/v1/checkin`. Never skip it.
+10. **Every workspace has its system roles** - permissions resolve by joining `workspace_members.role` → `workspace_roles`, so a workspace with no rows in `workspace_roles` grants *nobody* anything, its creator included. `createWorkspace()` seeds owner/admin/member via `seedSystemRoles()` in the same transaction as the workspace row. Never insert a workspace by any other path.
+11. **The workspace creator is the `owner`** - not an `admin`. Only `owner` holds the `ownership` resource (transfer, archive, billing), so a workspace whose creator is an admin has nobody who can do those things.
+12. **One definition of the seeded grids** - `src/lib/permissions/system-roles.json`, read by both the app (`system-roles.ts`) and `scripts/migrate.js`. Never write a second copy: the app and the migration drifting apart is exactly what shipped every new workspace with no roles.
+13. **You can only hand out permissions you hold** - `guardEscalation()` runs on role *create*, role *edit* AND role *assignment* (`PATCH /members/[id]/role`). Rank is not a ceiling on its own: every custom role shares `CUSTOM_ROLE_RANK`, so rank alone lets any custom role with `members.role:write` assign any other custom role, however powerful. Never gate an assignment on rank alone.
+14. **Data scope is the surface, not the role** - `/me/*` is always self-only, for every role, decided by the session user ID with no role lookup. So `Scope.Self` means "no org surface at all" (only the seeded `member` role carries it) and every `/ws` role is `Scope.All`. The roles builder offers no choice, and routes set scope server-side rather than accepting one from the client.
 
 ---
 

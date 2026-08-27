@@ -819,7 +819,9 @@ export default function WorkspaceTodayPage() {
           </svg>
           {en.meWsToday.applyLeaveButtonText}
         </button>
-        {data.viewerRole !== "admin" && (
+        {/* The owner can never leave - they must transfer ownership first.
+            Admins and members may leave. */}
+        {data.viewerRole !== "owner" && (
           <button
             type="button"
             aria-label={en.meWsToday.leaveWorkspaceButtonAria}
@@ -1508,7 +1510,7 @@ export default function WorkspaceTodayPage() {
                         lineHeight: 1.5,
                       }}
                     >
-                      {`⚠ Your dates include company holidays: ${holidayWarning.map((h) => h.name).join(", ")}. Please adjust your dates.`}
+                      {en.meWsToday.applyLeaveHolidayWarning(holidayWarning.map((h) => h.name).join(", "))}
                     </div>
                   )}
 

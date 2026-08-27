@@ -1,14 +1,16 @@
 import { getServerUser } from '@/lib/auth'
 import { getUserWorkspaces, getMembershipsByEmail, getWorkspacesByIds } from '@/lib/db/queries/workspaces'
+import { getRoleNamesForUser } from '@/lib/db/queries/roles'
 import OrgsClient from './OrgsClient'
 
 export default async function OrgsPage() {
   const user = await getServerUser()
   if (!user) return null
 
-  const [activeMemberships, allMemberships] = await Promise.all([
+  const [activeMemberships, allMemberships, roleNames] = await Promise.all([
     getUserWorkspaces(user.userId),
     getMembershipsByEmail(user.email),
+    getRoleNamesForUser(user.userId),
   ])
 
   const pendingMemberships = allMemberships.filter((m) => m.status === 'pending_consent')
@@ -41,6 +43,7 @@ export default async function OrgsPage() {
         activeMemberships={activeMemberships}
         pendingMemberships={pendingMemberships}
         wsMap={Object.fromEntries(wsMap)}
+        roleNames={roleNames}
       />
     </div>
   )

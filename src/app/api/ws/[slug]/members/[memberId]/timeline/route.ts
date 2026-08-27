@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireWsAdmin } from "@/lib/ws-admin";
+import { requireWsAccess } from '@/lib/ws-access';
+import { Action, Resource } from '@/lib/permissions/catalogue'
 import {
   getWorkspaceBySlug,
   getActiveMemberWithDetails,
@@ -15,7 +16,7 @@ export async function GET(
 ) {
   const { slug, memberId: targetUserId } = await params;
 
-  const ctx = await requireWsAdmin(request, slug);
+  const ctx = await requireWsAccess(request, slug, Resource.Members, Action.Read);
   if (!ctx) {
     return NextResponse.json(
       { error: "Forbidden", code: "FORBIDDEN" },

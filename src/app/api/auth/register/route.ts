@@ -13,15 +13,10 @@ import {
 import { hashPassword, createJwt, setSessionCookie, verifyOtpCookie, clearOtpCookie } from '@/lib/auth'
 import { validateSlug } from '@/lib/slug'
 import { validatePassword } from '@/lib/password'
+import { getRedirectAfterLogin } from '@/lib/permissions/ranks'
 
 function apiError(message: string, code: string, status: number) {
   return NextResponse.json({ error: message, code }, { status })
-}
-
-function getRedirectAfterLogin(adminWorkspaces: { slug: string }[]): string {
-  if (adminWorkspaces.length === 0) return '/me'
-  if (adminWorkspaces.length === 1) return `/ws/${adminWorkspaces[0].slug}`
-  return '/ws'
 }
 
 function slugify(text: string): string {

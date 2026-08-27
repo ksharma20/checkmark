@@ -129,6 +129,36 @@ Query files and their domains:
 - `holidays.ts` — workspace holiday calendar
 - `leaves.ts` — workspace leave types (`workspace_leave_types`) and leave requests (`leave_requests`); exports `getLeaveTypesWithBalance()` which computes balance from join date using calendar month/quarter arithmetic
 - `employees.ts` — employee records (personal, contact, employment, lifecycle, identity, bank, emergency contact); sensitive fields AES-256-GCM encrypted; exports `listEmployees`, `getEmployee`, `createEmployee`, `updateEmployee`, `softDeleteEmployee`
+- `roles.ts` — workspace roles and permission grids; exports `seedSystemRoles`, `getMembershipWithRole`, `listWorkspaceRoles`
+
+### Creating a workspace
+
+Permissions resolve by joining `workspace_members.role` → `workspace_roles`. A workspace with no rows in `workspace_roles` therefore grants **nobody** anything — its own creator cannot open it, manage it, or see it in the picker, and there is no way back through the UI.
+
+So `createWorkspace()` must, in a single transaction:
+1. insert the `workspaces` row,
+2. call `seedSystemRoles(id, tx)` to create owner/admin/member,
+3. insert the creator as **`owner`** (not `admin` — only `owner` holds the `ownership` resource, i.e. transfer, archive and billing).
+
+The seeded grids live in **`src/lib/permissions/system-roles.json`**, read by both `src/lib/permissions/system-roles.ts` and `scripts/migrate.js`. Do not create a second copy of them anywhere — the app and the migration holding separate definitions is what shipped every new workspace with no roles at all.
+
+`seedSystemRoles` is idempotent (`INSERT OR IGNORE` against the partial unique index), so `npm run migrate` also repairs any workspace already missing its roles.
+
+### Assigning a role
+
+`PATCH /api/ws/[slug]/members/[memberId]/role` checks **three** things, all required:
+
+1. `can(ctx.role.permissions, 'members.role', 'write')` — may the caller assign roles at all?
+2. `canManage` / `canGrant` — rank of the target, and rank of the role being granted.
+3. `guardEscalation(ctx.role.permissions, newRole.permissions)` — is the granted grid a subset of the caller's?
+
+Step 3 is not optional. Rank cannot substitute for it: all custom roles share `CUSTOM_ROLE_RANK`, so `canGrant` is satisfied for every custom-to-custom assignment, and an admin outranks a custom role holding `ownership` (which no admin has). Without step 3, the roles builder's escalation check is bypassed by assigning a role instead of writing one.
+
+### Data scope
+
+`workspace_roles.scope` is **not** a user-editable field. Both roles routes set `Scope.All` server-side and ignore any `scope` in the body.
+
+`Scope.Self` does not mean "org surface, own rows only" — that is `/me`, which every user already has from being logged in, whatever their role (no `/me` route consults a role). It means "no org surface at all", and only the seeded `member` role carries it. When the reporting hierarchy lands, the real choice is all-vs-subtree and the control comes back to the roles builder then.
 
 ---
 

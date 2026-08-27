@@ -6,50 +6,48 @@ import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Users, BarChart2, Calendar, CalendarDays, CalendarOff, ClipboardCheck,
   FileText, SlidersHorizontal, PanelLeftOpen, PanelLeftClose, LayoutGrid, User, LogOut,
-  ChevronDown,
+  ChevronDown, ShieldCheck,
 } from 'lucide-react'
 import { en } from '@/locales/en'
+import type { Resource } from '@/lib/permissions/catalogue'
+import {
+  Screen,
+  ScreenGroup,
+  SubScreen,
+  screenHref,
+  visibleScreenGroups,
+} from '@/lib/permissions/screens'
 
-interface NavItem {
-  path: string
-  label: string
-  icon: React.ReactNode
-  feature: 'leaves' | null
-  subItems?: { label: string; path: string }[]
+/**
+ * Which screens exist, where they live and which permission each needs is the
+ * registry's business (src/lib/permissions/screens.ts). All the sidebar owns
+ * is how they LOOK: an icon per screen and a label per screen.
+ *
+ * Both maps are `Record<Screen, …>`, so adding a screen to the registry
+ * without an icon or a label fails the build instead of rendering a blank row.
+ */
+const SCREEN_ICONS: Record<Screen, React.ReactNode> = {
+  [Screen.Overview]:  <LayoutDashboard size={18} />,
+  [Screen.Employees]: <Users size={18} />,
+  [Screen.Analytics]: <BarChart2 size={18} />,
+  [Screen.Activity]:  <Calendar size={18} />,
+  [Screen.Holidays]:  <CalendarDays size={18} />,
+  [Screen.Leave]:     <CalendarOff size={18} />,
+  [Screen.Approvals]: <ClipboardCheck size={18} />,
+  [Screen.Reports]:   <FileText size={18} />,
+  [Screen.Roles]:     <ShieldCheck size={18} />,
+  [Screen.Settings]:  <SlidersHorizontal size={18} />,
 }
 
-interface NavGroup {
-  label: string
-  items: NavItem[]
-}
+const SCREEN_LABELS: Record<Screen, string> = en.wsNav.screens
+const GROUP_LABELS: Record<ScreenGroup, string> = en.wsNav.groups
+const SUB_SCREEN_LABELS: Record<SubScreen, string> = en.wsNav.subScreens
 
-const NAV_GROUPS: NavGroup[] = [
-  {
-    label: 'Workforce',
-    items: [
-      { path: '',           label: 'Overview',  icon: <LayoutDashboard size={18} />, feature: null },
-      { path: '/people',    label: 'Employees', icon: <Users size={18} />,           feature: null },
-      { path: '/insights',  label: 'Analytics', icon: <BarChart2 size={18} />,       feature: null },
-      { path: '/monthly',   label: 'Activity',  icon: <Calendar size={18} />,        feature: null },
-      { path: '/holidays',  label: 'Holidays',  icon: <CalendarDays size={18} />,    feature: 'leaves' },
-      {
-        path: '/leaves', label: 'Leave', icon: <CalendarOff size={18} />, feature: 'leaves',
-        subItems: [
-          { label: 'Requests', path: '/leaves' },
-          { label: 'Applied leaves', path: '/leaves' },
-        ],
-      },
-      { path: '/approvals', label: 'Approvals', icon: <ClipboardCheck size={18} />,   feature: null },
-    ],
-  },
-  {
-    label: 'Manage',
-    items: [
-      { path: '/reports',   label: 'Reports',   icon: <FileText size={18} />,           feature: null },
-      { path: '/settings',  label: 'Settings',  icon: <SlidersHorizontal size={18} />,  feature: null },
-    ],
-  },
-]
+/** Screens that carry a pending-count badge, and which count they read. */
+const SCREEN_BADGES: Partial<Record<Screen, 'leave' | 'approvals'>> = {
+  [Screen.Leave]: 'leave',
+  [Screen.Approvals]: 'approvals',
+}
 
 interface Props {
   slug: string
@@ -57,7 +55,10 @@ interface Props {
   pendingLeaveCount: number
   pendingApprovalsCount: number
   userName: string
-  userRole: string
+  /** Display name of the role, e.g. "Owner". Never the raw key. */
+  userRoleName: string
+  /** Resources this role can read - drives which screens are shown. */
+  readableResources: Resource[]
 }
 
 function getInitials(name: string): string {
@@ -71,7 +72,7 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-export default function WsSidebar({ slug, leavesEnabled, pendingLeaveCount, pendingApprovalsCount, userName, userRole }: Props) {
+export default function WsSidebar({ slug, leavesEnabled, pendingLeaveCount, pendingApprovalsCount, userName, userRoleName, readableResources }: Props) {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
@@ -79,10 +80,9 @@ export default function WsSidebar({ slug, leavesEnabled, pendingLeaveCount, pend
   const [loggingOut, setLoggingOut] = useState(false)
   const [leaveExpanded, setLeaveExpanded] = useState(false)
 
-  const NAV_GROUPS_FILTERED = NAV_GROUPS.map((group) => ({
-    ...group,
-    items: group.items.filter((item) => item.feature !== 'leaves' || leavesEnabled),
-  })).filter((group) => group.items.length > 0)
+  // Feature switches and permission both applied by the registry, so the
+  // sidebar and the server can never disagree about which screens exist.
+  const screenGroups = visibleScreenGroups({ readableResources, leavesEnabled })
 
   useEffect(() => {
     const check = () => {
@@ -113,7 +113,9 @@ export default function WsSidebar({ slug, leavesEnabled, pendingLeaveCount, pend
 
   const mobileExpanded = isMobile && !collapsed
   const initials = getInitials(userName)
-  const roleLabel = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : ''
+  // Render the role's display name as stored. Capitalising the key would show
+  // a role keyed `hr-manager` as "Hr-manager".
+  const roleLabel = userRoleName
 
   return (
     <>
@@ -183,8 +185,8 @@ export default function WsSidebar({ slug, leavesEnabled, pendingLeaveCount, pend
 
         {/* Nav groups */}
         <nav style={{ flex: 1, padding: '10px 8px' }}>
-          {NAV_GROUPS_FILTERED.map((group, groupIndex) => (
-            <div key={group.label}>
+          {screenGroups.map(({ group, screens }, groupIndex) => (
+            <div key={group}>
               {!collapsed && (
                 <p style={{
                   fontSize: '9.5px', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
@@ -192,24 +194,29 @@ export default function WsSidebar({ slug, leavesEnabled, pendingLeaveCount, pend
                   margin: groupIndex === 0 ? '4px 12px 6px' : '18px 12px 6px',
                   fontFamily: 'Plus Jakarta Sans, sans-serif',
                 }}>
-                  {group.label}
+                  {GROUP_LABELS[group]}
                 </p>
               )}
               {collapsed && groupIndex > 0 && (
                 <div style={{ height: '1px', background: 'rgba(255,255,255,0.08)', margin: '8px 10px' }} />
               )}
-              {group.items.map(({ path, label, icon, subItems }) => {
-                const href = `/ws/${slug}${path}`
+              {screens.map((screen) => {
+                const { key, path, subScreens } = screen
+                const label = SCREEN_LABELS[key]
+                const href = screenHref(slug, screen)
                 const isActive = path === ''
                   ? pathname === href
                   : pathname === href || pathname.startsWith(href + '/')
-                const hasSubItems = !!subItems && subItems.length > 0 && !collapsed
-                const badgeCount = label === 'Leave' ? pendingLeaveCount : label === 'Approvals' ? pendingApprovalsCount : 0
+                const hasSubItems = !!subScreens && subScreens.length > 0 && !collapsed
+                const badge = SCREEN_BADGES[key]
+                const badgeCount = badge === 'leave'
+                  ? pendingLeaveCount
+                  : badge === 'approvals' ? pendingApprovalsCount : 0
                 const showBadge = badgeCount > 0
 
                 const rowContent = (
                   <>
-                    <span style={{ flexShrink: 0, display: 'flex' }}>{icon}</span>
+                    <span style={{ flexShrink: 0, display: 'flex' }}>{SCREEN_ICONS[key]}</span>
                     {!collapsed && <span className="ws-sidebar-label" style={{ flex: 1 }}>{label}</span>}
                     {!collapsed && showBadge && (
                       <span style={{
@@ -266,25 +273,22 @@ export default function WsSidebar({ slug, leavesEnabled, pendingLeaveCount, pend
                       </button>
                       {leaveExpanded && (
                         <div style={{ paddingLeft: '30px', display: 'flex', flexDirection: 'column', gap: '2px', marginBottom: '2px' }}>
-                          {subItems!.map((sub) => {
-                            const subHref = `/ws/${slug}${sub.path}`
-                            return (
-                              <Link
-                                key={sub.label}
-                                href={subHref}
-                                style={{
-                                  display: 'block', padding: '8px 10px',
-                                  borderRadius: '6px',
-                                  color: 'rgba(255,255,255,0.5)',
-                                  fontFamily: 'Plus Jakarta Sans, sans-serif',
-                                  fontSize: '12.5px', textDecoration: 'none',
-                                  whiteSpace: 'nowrap', overflow: 'hidden',
-                                }}
-                              >
-                                {sub.label}
-                              </Link>
-                            )
-                          })}
+                          {subScreens!.map((sub) => (
+                            <Link
+                              key={sub.key}
+                              href={screenHref(slug, sub)}
+                              style={{
+                                display: 'block', padding: '8px 10px',
+                                borderRadius: '6px',
+                                color: 'rgba(255,255,255,0.5)',
+                                fontFamily: 'Plus Jakarta Sans, sans-serif',
+                                fontSize: '12.5px', textDecoration: 'none',
+                                whiteSpace: 'nowrap', overflow: 'hidden',
+                              }}
+                            >
+                              {SUB_SCREEN_LABELS[sub.key]}
+                            </Link>
+                          ))}
                         </div>
                       )}
                     </div>

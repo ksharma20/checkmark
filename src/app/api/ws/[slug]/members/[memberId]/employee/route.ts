@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireWsAdmin } from '@/lib/ws-admin'
+import { requireWsAccess } from '@/lib/ws-access'
 import {
   createEmployee,
   updateEmployee,
@@ -10,6 +10,7 @@ import {
 import { getWorkspaceMember } from '@/lib/db/queries/workspaces'
 import type { CreateEmployeeInput } from '@/lib/types/employees'
 import { validateEmployeeFields } from '../../../employees/_validate'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
 interface Props { params: Promise<{ slug: string; memberId: string }> }
 
@@ -18,7 +19,7 @@ interface Props { params: Promise<{ slug: string; memberId: string }> }
 
 export async function GET(req: NextRequest, { params }: Props) {
   const { slug, memberId: userId } = await params
-  const ctx = await requireWsAdmin(req, slug)
+  const ctx = await requireWsAccess(req, slug, Resource.Employees, Action.Read)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const employee = await findEmployeeByUserId(ctx.workspace.id, userId)
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
 export async function POST(req: NextRequest, { params }: Props) {
   const { slug, memberId: userId } = await params
-  const ctx = await requireWsAdmin(req, slug)
+  const ctx = await requireWsAccess(req, slug, Resource.Employees, Action.Write)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   // Verify the user is an active member of this workspace
@@ -118,7 +119,7 @@ export async function POST(req: NextRequest, { params }: Props) {
 
 export async function PATCH(req: NextRequest, { params }: Props) {
   const { slug, memberId: userId } = await params
-  const ctx = await requireWsAdmin(req, slug)
+  const ctx = await requireWsAccess(req, slug, Resource.Employees, Action.Write)
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const existing = await findEmployeeByUserId(ctx.workspace.id, userId)
