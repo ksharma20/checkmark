@@ -1,43 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { Avatar, Button, Card, DataTable, EmptyState, Field, Input, Progress, Skeleton, StatCard } from '@/components/ui'
+import type { Column } from '@/components/ui'
 import type { AnalyticsMember, AnalyticsResponse } from '@/app/api/ws/[slug]/analytics/route'
 import { fmtHours } from '@/lib/client/format-time'
+import { wsAdmin } from '@/locales/en/ws-settings'
 
-// ─── Skeleton ─────────────────────────────────────────────────────────────────
+const t = wsAdmin.analytics
 
-const skeletonStyle: React.CSSProperties = {
-  background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
-  backgroundSize: '600px 100%',
-  animation: 'shimmer 1.4s ease-in-out infinite',
-  borderRadius: '6px',
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+function fmtDate(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${parseInt(d, 10)} ${MONTHS[parseInt(m, 10) - 1]} ${y}`
 }
 
-function SkeletonRow() {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '16px',
-      padding: '14px 16px', borderBottom: '1px solid var(--border)',
-    }}>
-      <div style={{ ...skeletonStyle, width: '32px', height: '32px', borderRadius: '50%', flexShrink: 0 }} />
-      <div style={{ flex: '0 0 140px' }}>
-        <div style={{ ...skeletonStyle, height: '12px', width: '100px', marginBottom: '6px' }} />
-        <div style={{ ...skeletonStyle, height: '10px', width: '130px' }} />
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ ...skeletonStyle, height: '6px', borderRadius: '3px', marginBottom: '4px' }} />
-        <div style={{ ...skeletonStyle, height: '6px', borderRadius: '3px', width: '60%' }} />
-      </div>
-      <div style={{ ...skeletonStyle, width: '44px', height: '14px', marginLeft: 'auto' }} />
-    </div>
-  )
-}
-
-interface Props {
-  slug: string
-}
-
-function getThisMonthRange(): { start: string; end: string } {
+function thisMonthRange(): { start: string; end: string } {
   const now = new Date()
   const year = now.getFullYear()
   const month = String(now.getMonth() + 1).padStart(2, '0')
@@ -48,454 +27,236 @@ function getThisMonthRange(): { start: string; end: string } {
   }
 }
 
-function fmtDate(d: string): string {
-  const [y, m, day] = d.split('-')
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${parseInt(day)} ${months[parseInt(m) - 1]} ${y}`
-}
-
-function StatChip({ label, value, sub, icon }: { label: string; value: string | number; sub?: string; icon: React.ReactNode }) {
+/** A labelled day-count bar: `Progress` plus the raw number beside it. */
+function DayBar({ value, max, color }: { value: number; max: number; color?: string }) {
   return (
-    <div style={{
-      background: 'var(--surface-0)',
-      border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-md)',
-      padding: '16px 18px',
-      flex: '1 1 120px',
-      minWidth: '110px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '10px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
-          {label}
-        </p>
-        <div style={{
-          width: '30px', height: '30px', borderRadius: '8px',
-          background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-          color: 'var(--brand)',
-        }}>
-          {icon}
-        </div>
-      </div>
-      <div>
-        <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '24px', fontWeight: 700, color: 'var(--navy)', lineHeight: 1 }}>
-          {value}
-        </p>
-        {sub && (
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            {sub}
-          </p>
-        )}
-      </div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <Progress percent={max > 0 ? (value / max) * 100 : 0} color={color} style={{ flex: 1 }} />
+      <span className="mono t-muted" style={{ minWidth: '22px', textAlign: 'right' }}>{value}</span>
     </div>
   )
 }
 
-function DayBar({ value, max, color }: { value: number; max: number; color: string }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      <div style={{ flex: 1, height: '6px', background: 'var(--surface-2)', borderRadius: '3px', overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', background: color, borderRadius: '3px', transition: 'width 0.3s' }} />
-      </div>
-      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '11px', color: 'var(--text-muted)', minWidth: '20px', textAlign: 'right' }}>
-        {value}
-      </span>
-    </div>
-  )
+interface Props {
+  slug: string
 }
 
-const labelStyle: React.CSSProperties = {
-  fontFamily: 'DM Sans, sans-serif',
-  fontSize: '11px',
-  fontWeight: 600,
-  color: 'var(--text-muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.07em',
-}
-
-function fmtJoined(dateStr: string): string {
-  const [y, m, d] = dateStr.split('-')
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `Joined ${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`
-}
-
-function MemberCard({ m, signalsConfigured }: { m: AnalyticsMember; signalsConfigured: boolean }) {
-  const initials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-  return (
-    <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
-      {/* Row 1: avatar + name/email + hours */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-        <div style={{
-          width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-          background: 'color-mix(in srgb, var(--brand) 15%, transparent)',
-          color: 'var(--brand)', fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 700,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {initials}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {m.name}
-          </div>
-          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {m.email}
-          </div>
-          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--text-muted)', marginTop: '1px' }}>
-            {fmtJoined(m.joined_at)}
-          </div>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
-            {fmtHours(m.total_hours)}
-          </div>
-          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
-            {m.avg_daily_hours}h avg
-          </div>
-        </div>
-      </div>
-      {/* Row 2: bars */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-        {signalsConfigured ? (
-          <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Office</span>
-              <DayBar value={m.office_days} max={m.working_days} color="var(--teal)" />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Remote</span>
-              <DayBar value={m.wfh_days} max={m.working_days} color="var(--amber)" />
-            </div>
-          </>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Present</span>
-            <DayBar value={m.office_days + m.wfh_days} max={m.working_days} color="var(--brand)" />
-          </div>
-        )}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <span style={{ ...labelStyle, width: '50px', flexShrink: 0 }}>Absent</span>
-          <DayBar value={m.absent_days} max={m.working_days} color="var(--danger)" />
-        </div>
-      </div>
-      {m.multi_location_days > 0 && (
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--amber)', marginTop: '6px' }}>
-          {m.multi_location_days} multi-location days
-        </p>
-      )}
-    </div>
-  )
-}
-
-function MemberRow({ m, signalsConfigured }: { m: AnalyticsMember; signalsConfigured: boolean }) {
-  const initials = m.name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase()
-
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: signalsConfigured
-        ? '200px 100px 1fr 1fr 1fr 90px 90px'
-        : '200px 100px 1fr 1fr 90px 90px',
-      gap: '16px',
-      alignItems: 'center',
-      padding: '14px 16px',
-      borderBottom: '1px solid var(--border)',
-      minWidth: signalsConfigured ? '820px' : '720px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
-        <div style={{
-          width: '32px', height: '32px', borderRadius: '50%',
-          background: 'color-mix(in srgb, var(--brand) 15%, transparent)',
-          color: 'var(--brand)', fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 700,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-        }}>
-          {initials}
-        </div>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 500, color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {m.name}
-          </div>
-          <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {m.email}
-          </div>
-        </div>
-      </div>
-
-      {/* Joined date column */}
-      <div>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-primary)', fontWeight: 500 }}>
-          {m.joined_at.slice(8, 10)}{' '}
-          {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.joined_at.slice(5, 7)) - 1]}
-        </p>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>
-          {m.joined_at.slice(0, 4)}
-        </p>
-      </div>
-
-      {signalsConfigured && (
-        <div>
-          <DayBar value={m.office_days} max={m.working_days} color="var(--teal)" />
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>office</p>
-        </div>
-      )}
-
-      {signalsConfigured ? (
-        <div>
-          <DayBar value={m.wfh_days} max={m.working_days} color="var(--amber)" />
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>remote</p>
-        </div>
-      ) : (
-        <div>
-          <DayBar value={m.office_days + m.wfh_days} max={m.working_days} color="var(--brand)" />
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>present</p>
-        </div>
-      )}
-
-      <div>
-        <DayBar value={m.absent_days} max={m.working_days} color="var(--danger)" />
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>absent</p>
-      </div>
-
-      <div style={{ textAlign: 'right' }}>
-        <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
-          {fmtHours(m.total_hours)}
-        </p>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>total</p>
-      </div>
-
-      <div style={{ textAlign: 'right' }}>
-        <p style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>
-          {fmtHours(m.avg_daily_hours)}
-        </p>
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)' }}>avg/day</p>
-        {m.multi_location_days > 0 && (
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '10px', color: 'var(--amber)', marginTop: '2px' }}>
-            {m.multi_location_days} multi-loc
-          </p>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function TableHeader({ signalsConfigured }: { signalsConfigured: boolean }) {
-  return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: signalsConfigured
-        ? '200px 100px 1fr 1fr 1fr 90px 90px'
-        : '200px 100px 1fr 1fr 90px 90px',
-      gap: '16px',
-      padding: '10px 16px',
-      borderBottom: '1px solid var(--border)',
-      minWidth: signalsConfigured ? '820px' : '720px',
-    }}>
-      <p style={labelStyle}>Member</p>
-      <p style={labelStyle}>Joined</p>
-      {signalsConfigured && <p style={labelStyle}>Office</p>}
-      <p style={labelStyle}>{signalsConfigured ? 'Remote' : 'Present'}</p>
-      <p style={labelStyle}>Absent</p>
-      <p style={{ ...labelStyle, textAlign: 'right' }}>Total hrs</p>
-      <p style={{ ...labelStyle, textAlign: 'right' }}>Avg/day</p>
-    </div>
-  )
-}
-
+/**
+ * The per-member half of Analytics, rendered under the bucketed charts on
+ * /ws/[slug]/insights.
+ *
+ * The charts above answer "when is the office busy?" from time buckets; this
+ * answers "who was actually here?" from GET /api/ws/[slug]/analytics, which
+ * returns office / remote / absent day counts and hours per member over an
+ * arbitrary date range. Different question, different endpoint - which is why
+ * this is a companion to InsightsClient rather than a duplicate of it.
+ */
 export default function AnalyticsClient({ slug }: Props) {
-  const defaultRange = getThisMonthRange()
-  const [startDate, setStartDate] = useState(defaultRange.start)
-  const [endDate, setEndDate] = useState(defaultRange.end)
+  const initial = thisMonthRange()
+  const [startDate, setStartDate] = useState(initial.start)
+  const [endDate, setEndDate] = useState(initial.end)
   const [data, setData] = useState<AnalyticsResponse | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isNarrow, setIsNarrow] = useState(false)
-
-  useEffect(() => {
-    function check() { setIsNarrow(window.innerWidth < 640) }
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
+  const [denied, setDenied] = useState(false)
 
   const fetchAnalytics = useCallback(async (start: string, end: string) => {
     setLoading(true)
     try {
       const res = await fetch(`/api/ws/${slug}/analytics?start=${start}&end=${end}`)
+      if (res.status === 403) { setDenied(true); return }
       if (res.ok) {
-        const json = await res.json()
-        setData(json)
+        setDenied(false)
+        setData(await res.json())
       }
     } finally {
       setLoading(false)
     }
   }, [slug])
 
-  useEffect(() => {
-    fetchAnalytics(startDate, endDate)
-  }, [fetchAnalytics, startDate, endDate])
+  useEffect(() => { fetchAnalytics(startDate, endDate) }, [fetchAnalytics, startDate, endDate])
 
-  function setThisMonth() {
-    const r = getThisMonthRange()
-    setStartDate(r.start)
-    setEndDate(r.end)
-  }
+  const signalsConfigured = !!data?.signals_configured
+  const members = data?.members ?? []
 
-  const totalOfficeDays = data?.members.reduce((s, m) => s + m.office_days, 0) ?? 0
-  const totalHours = data?.members.reduce((s, m) => s + m.total_hours, 0) ?? 0
-  const avgAttendance = data?.members.length
-    ? Math.round((data.members.reduce((s, m) => s + m.office_days + m.wfh_days, 0) / data.members.length) * 10) / 10
+  const totalOfficeDays = members.reduce((sum, m) => sum + m.office_days, 0)
+  const totalPresentDays = members.reduce((sum, m) => sum + m.office_days + m.wfh_days, 0)
+  const totalHours = members.reduce((sum, m) => sum + m.total_hours, 0)
+  const avgAttendance = members.length
+    ? Math.round((totalPresentDays / members.length) * 10) / 10
     : 0
 
+  const columns: Column<AnalyticsMember>[] = [
+    {
+      key: 'member',
+      header: t.colMember,
+      width: 220,
+      render: (m) => (
+        <span style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+          <Avatar name={m.name} size={30} />
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: 'block', fontWeight: 600, fontSize: '13px' }}>{m.name}</span>
+            <span className="mono t-muted" style={{ display: 'block', fontSize: '10.5px' }}>{m.email}</span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'joined',
+      header: t.colJoined,
+      width: 96,
+      render: (m) => <span className="mono t-muted">{fmtDate(m.joined_at)}</span>,
+    },
+    ...(signalsConfigured
+      ? [{
+          key: 'office',
+          header: t.colOffice,
+          render: (m: AnalyticsMember) => (
+            <DayBar value={m.office_days} max={m.working_days} color="var(--brand)" />
+          ),
+        }]
+      : []),
+    {
+      key: 'presence',
+      header: signalsConfigured ? t.colRemote : t.colPresent,
+      render: (m) =>
+        signalsConfigured
+          ? <DayBar value={m.wfh_days} max={m.working_days} color="var(--amber)" />
+          : <DayBar value={m.office_days + m.wfh_days} max={m.working_days} color="var(--brand)" />,
+    },
+    {
+      key: 'absent',
+      header: t.colAbsent,
+      render: (m) => <DayBar value={m.absent_days} max={m.working_days} color="var(--danger)" />,
+    },
+    {
+      key: 'total_hours',
+      header: t.colTotalHours,
+      width: 92,
+      align: 'right',
+      render: (m) => <span className="mono">{fmtHours(m.total_hours)}</span>,
+    },
+    {
+      key: 'avg',
+      header: t.colAvgPerDay,
+      width: 100,
+      align: 'right',
+      render: (m) => (
+        <span>
+          <span className="mono" style={{ display: 'block' }}>{fmtHours(m.avg_daily_hours)}</span>
+          {m.multi_location_days > 0 && (
+            <span className="t-muted" style={{ fontSize: '10px' }}>
+              {t.multiLocation(m.multi_location_days)}
+            </span>
+          )}
+        </span>
+      ),
+    },
+  ]
+
+  if (denied) {
+    return (
+      <Card style={{ marginTop: '28px' }}>
+        <p className="t-secondary">{t.forbidden}</p>
+      </Card>
+    )
+  }
+
   return (
-    <div style={{ marginTop: '32px' }}>
-      {/* Section header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+    <section style={{ marginTop: '28px' }}>
+      <div className="row-between" style={{ flexWrap: 'wrap', marginBottom: '14px' }}>
         <div>
-          <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 700, color: 'var(--navy)', margin: 0 }}>
-            Analytics
-          </h2>
+          <h2 className="t-h2">{t.heading}</h2>
           {data && (
-            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              {fmtDate(data.start_date)} – {fmtDate(data.end_date)} · {data.working_days} working days
+            <p className="t-secondary" style={{ marginTop: '2px' }}>
+              {t.subheading(fmtDate(data.start_date), fmtDate(data.end_date), data.working_days)}
             </p>
           )}
         </div>
 
-        {/* Date range picker */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            style={{
-              height: '36px', padding: '0 10px',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-              fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-              background: 'var(--surface-0)', color: 'var(--text-primary)',
-              outline: 'none',
-            }}
-          />
-          <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)' }}>to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            style={{
-              height: '36px', padding: '0 10px',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-              fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-              background: 'var(--surface-0)', color: 'var(--text-primary)',
-              outline: 'none',
-            }}
-          />
-          <button
-            type="button"
-            onClick={setThisMonth}
-            style={{
-              height: '36px', padding: '0 12px',
-              border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-              fontSize: '13px', fontFamily: 'DM Sans, sans-serif',
-              background: 'var(--surface-2)', color: 'var(--text-secondary)',
-              cursor: 'pointer',
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+          <Field label={t.rangeStart} htmlFor="analytics-start">
+            <Input
+              id="analytics-start"
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+            />
+          </Field>
+          <Field label={t.rangeEnd} htmlFor="analytics-end">
+            <Input
+              id="analytics-end"
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+          </Field>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              const range = thisMonthRange()
+              setStartDate(range.start)
+              setEndDate(range.end)
             }}
           >
-            This month
-          </button>
+            {t.thisMonthBtn}
+          </Button>
         </div>
       </div>
 
-      {/* Summary chips */}
       {data && (
-        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-          <StatChip label="Members" value={data.members.length} sub="in workspace" icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-          } />
-          {data.signals_configured ? (
-            <StatChip label="Office days" value={totalOfficeDays} sub="total across team" icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
-              </svg>
-            } />
-          ) : (
-            <StatChip label="Check-ins" value={data.members.reduce((s, m) => s + m.office_days + m.wfh_days, 0)} sub="total across team" icon={
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-            } />
-          )}
-          <StatChip label="Hours tracked" value={fmtHours(totalHours)} sub="total logged" icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-            </svg>
-          } />
-          <StatChip label="Avg days" value={avgAttendance} sub="attended per person" icon={
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-          } />
+        <div
+          className="fx-spring-stagger"
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+            gap: '14px',
+            marginBottom: '14px',
+          }}
+        >
+          <StatCard label={t.statMembers} value={members.length} hint={t.statMembersHint} />
+          <StatCard
+            label={signalsConfigured ? t.statOfficeDays : t.statCheckins}
+            value={signalsConfigured ? totalOfficeDays : totalPresentDays}
+            hint={t.statAcrossTeam}
+            accent="brand"
+          />
+          <StatCard label={t.statHours} value={fmtHours(totalHours)} hint={t.statHoursHint} />
+          <StatCard label={t.statAvgDays} value={avgAttendance} hint={t.statAvgDaysHint} />
         </div>
       )}
 
-      {/* Member table */}
-      {loading ? (
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
-          {[1, 2, 3, 4].map((i) => <SkeletonRow key={i} />)}
-        </div>
-      ) : !data || data.members.length === 0 ? (
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '48px 24px', textAlign: 'center' }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
-            No presence data for this period.
-          </p>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)' }}>
-            Members will appear here as they check in.
-          </p>
-        </div>
-      ) : (
-        <div style={{ background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', overflowX: isNarrow ? 'visible' : 'auto' }}>
-          {!data.signals_configured && (
-            <div style={{
-              padding: '10px 16px',
-              background: 'color-mix(in srgb, var(--amber) 8%, transparent)',
+      <Card padded={false} style={{ overflow: 'hidden' }}>
+        {!loading && data && !signalsConfigured && (
+          <p
+            className="t-secondary"
+            style={{
+              padding: '10px 20px',
+              background: 'color-mix(in srgb, var(--amber) 10%, transparent)',
               borderBottom: '1px solid var(--border)',
-              fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)',
-            }}>
-              No location signals configured - all check-ins are shown. Configure GPS or IP signals in Settings to distinguish office vs remote days.
-            </div>
-          )}
-          {isNarrow ? (
-            data.members.map((m) => (
-              <MemberCard
-                key={m.user_id}
-                m={m}
-                signalsConfigured={data.signals_configured}
-              />
-            ))
-          ) : (
-            <>
-              <TableHeader signalsConfigured={data.signals_configured} />
-              {data.members.map((m) => (
-                <MemberRow
-                  key={m.user_id}
-                  m={m}
-                  signalsConfigured={data.signals_configured}
-                />
-              ))}
-            </>
-          )}
-        </div>
-      )}
+            }}
+          >
+            {t.noSignalsBanner}
+          </p>
+        )}
 
-      {/* Field force note */}
-      {data && data.members.some((m) => m.multi_location_days > 0) && (
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginTop: '10px' }}>
-          Multi-loc: days where checkout was recorded more than 1km from check-in location (field force / site visits).
-        </p>
+        {loading ? (
+          <div className="stack-sm" style={{ padding: '16px 20px' }}>
+            {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={38} radius="var(--radius-sm)" />)}
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            rows={members}
+            rowKey={(m) => m.user_id}
+            minWidth={signalsConfigured ? 900 : 780}
+            empty={<EmptyState title={t.emptyTitle} hint={t.emptyHint} />}
+          />
+        )}
+      </Card>
+
+      {members.some((m) => m.multi_location_days > 0) && (
+        <p className="t-muted" style={{ marginTop: '10px' }}>{t.multiLocationNote}</p>
       )}
-    </div>
+    </section>
   )
 }

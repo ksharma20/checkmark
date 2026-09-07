@@ -4,10 +4,7 @@ import WsLayoutClient from "@/components/ws/WsLayoutClient";
 
 import { en } from "@/locales/en";
 import { getServerUser } from "@/lib/auth";
-import {
-  getWorkspaceBySlug,
-  getActiveMemberIds,
-} from "@/lib/db/queries/workspaces";
+import { getWorkspaceBySlug } from "@/lib/db/queries/workspaces";
 import { getWsRole } from "@/lib/ws-access";
 import { hasAnyOrgAccess, readableResources } from "@/lib/permissions/can";
 import { getUserById } from "@/lib/db/queries/users";
@@ -43,9 +40,8 @@ export default async function WsSlugLayout({ children, params }: Props) {
     redirect("/me");
   }
 
-  const [dbUser, activeMemberIds, pendingLeaveCount, pendingRegularizationCount] = await Promise.all([
+  const [dbUser, pendingLeaveCount, pendingRegularizationCount] = await Promise.all([
     getUserById(user.userId),
-    getActiveMemberIds(workspace.id),
     workspace.leaves_enabled ? getPendingLeaveCount(workspace.id) : Promise.resolve(0),
     getPendingRegularizationCount(workspace.id),
   ]);
@@ -59,9 +55,11 @@ export default async function WsSlugLayout({ children, params }: Props) {
       <meta name="apple-mobile-web-app-title" content={`${en.brand.shortName} WS`} />
       <WsLayoutClient
         slug={slug}
+        workspaceId={workspace.id}
         leavesEnabled={!!workspace.leaves_enabled}
         workspaceName={workspace.name}
-        memberCount={activeMemberIds.length}
+        logoUpdatedAt={workspace.logo_updated_at}
+        plan={workspace.plan}
         pendingLeaveCount={pendingLeaveCount}
         pendingApprovalsCount={pendingLeaveCount + pendingRegularizationCount}
         userName={dbUser?.full_name?.trim() || user.email}

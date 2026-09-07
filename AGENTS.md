@@ -10,7 +10,7 @@ AI agent coordination guide for working on this codebase.
 **Use for:** Understanding existing code before changing it.
 - Read files in `src/lib/`, `src/app/api/`, `src/app/(public)/`, `src/app/me/`, `src/app/ws/`
 - Map signal flow: client → API route → query function → DB
-- Check schema in `lib/db/schema.ts` + `scripts/migrate.js`
+- **Check schema in `scripts/migrate.js`. `lib/db/schema.ts` was deleted — there is no TypeScript schema file, no ORM model, nothing else that knows what columns exist.** The row-shape interfaces inside each query file are documentation, not enforcement: the compiler never checks them against the database, so trusting one instead of the migration is how you write a query against a column that isn't there.
 - Never write code - report findings only
 
 ### Implementation Agent
@@ -24,43 +24,103 @@ AI agent coordination guide for working on this codebase.
 **Use for:** Finding bugs, gaps, or inconsistencies.
 - Compare README claims vs actual code
 - Check signal matching logic against AND semantics
-- Verify all workspace routes call `requireWsAdmin()`
+- Verify every `/api/ws/[slug]/*` route calls `requireWsAccess(req, slug, Resource, Action)` and returns `forbidden()` on `null`. **`requireWsAdmin()` was removed** — a route still importing it will not build, and a route that gates on membership alone has no permission check at all
+- Verify `/api/me/ws/[slug]/*` routes use `requireWsMember()` and scope to the session user
 - Verify no raw SQL in route handlers
 - Check cookie settings (httpOnly, SameSite, secure)
+
+### Design System Agent
+**Use for:** Anything touching `src/app/globals.css` or `src/components/ui/`.
+- Read `docs/design/` first — tokens, motion tiers, the reduced-motion contract, the elevation rule, the 44px rule
+- **Run alone.** These files are shared by every screen; see Task Boundaries
+- A new visual goes in as a class in `globals.css`, or as a primitive that uses one. Never a `<style>` block, never an inline style object
+- A new decorative animation must be added to the `prefers-reduced-motion` guard in the same change
+- Update `docs/design/` in the same change
 
 ### Reviewer Agent
 **Use for:** Validating a completed change before merge.
 - Run `npm run build` - must pass
 - Verify changed routes use `getServerUser()` not req.body.userId
+- Verify workspace routes gate on `requireWsAccess(..., Resource, Action)` with the resource the screen registry uses
 - Verify new DB queries are in `lib/db/queries/` not inline
 - Check for new signal matching logic - must be AND semantics
+- Check for new styles: any new class belongs in `globals.css`; any new animation must appear in the reduced-motion guard
+- Check new user-facing strings live in a `src/locales/en/` module
 
 ---
 
 ## Task Boundaries
 
-### Safe to parallelize (no shared state)
-- Marketing page changes (`src/app/(public)/`)
-- SEO metadata and sitemap changes (`src/app/layout.tsx`, `src/app/robots.ts`, `src/app/sitemap.ts`)
+The repo has three layers, and they parallelise very differently.
+
+### Layer 1 — the design system: SHARED AND SEQUENTIAL
+
+`src/app/globals.css` and `src/components/ui/` are one file and one small directory that **every screen depends on**. Two agents editing them at once produce duplicate near-identical classes, or one agent's `.btn` change silently reshaping the other's page.
+
+So: **finish the design-system layer before starting surface work, and give it to one agent.** Concretely, a change is design-system work if it touches `globals.css`, adds or alters a `src/components/ui/` primitive, or changes the barrel `src/components/ui/index.ts` (which every surface imports — a merge conflict there blocks everyone).
+
+Read `docs/design/` before touching either. A new class goes in `globals.css`, never in a component.
+
+### Layer 2 — surfaces: PARALLELISE FREELY
+
+Once the primitives exist, screens are independent. Safe to run at the same time:
+- Marketing pages (`src/app/(public)/`, `src/components/*` landing components) — these are outside the app design system and keep their own Tailwind styling
+- SEO metadata and sitemap (`src/app/layout.tsx`, `src/app/robots.ts`, `src/app/sitemap.ts`)
 - Different API route domains (checkin vs workspace vs me)
-- Different query files (`users.ts` vs `events.ts` vs `leaves.ts`)
+- Different query files (`users.ts` vs `events.ts` vs `leaves.ts` vs `assets.ts` vs `documents.ts` vs `maternity.ts`)
+- Different `/ws/[slug]/*` screens, and different `/me/*` screens
 - Leave type admin routes vs leave request employee routes
-- UI components that don't share state
+
+### Layer 3 — shared-write files: COORDINATE EXPLICITLY
+
+These are edited by *many* otherwise-independent tasks. Two agents appending to the same one will conflict every time. Either serialise them, or have each agent write a **disjoint top-level key** and hand the merge to one owner.
+
+| File | Why it is shared | How to split it |
+|---|---|---|
+| `src/locales/en.ts` | Every screen's copy is composed here | Add copy to a **per-area module** in `src/locales/en/` and register one import line. Two agents = two modules = one-line conflicts, not thousand-line ones. This is exactly how `wsAdmin` was split: `ws-overview.ts` and `ws-settings.ts` are spread together in `en.ts` and their sub-keys are deliberately disjoint |
+| `src/lib/permissions/screens.ts` | Adding a `/ws` screen means a new `Screen` enum member **and** a `SCREEN_DEFS` entry; the `Record<Screen, ScreenDef>` type makes a missing entry a build error, so a half-merge breaks the build for everyone | One agent adds all the screens for a batch of work, before the surface agents start |
+| `src/lib/permissions/catalogue.ts` | Same shape — new `Resource` requires a `RESOURCE_DEFS` entry, and the values are persisted in the `permissions` JSON column, so changing one is a data migration | Prefer reusing an existing resource. Maternity reuses `Resource.Leaves` rather than minting its own |
+| `src/lib/permissions/system-roles.json` | Read by the app **and** by `scripts/migrate.js` | Never copy it. See CLAUDE.md invariant 12 |
+| `src/components/ui/index.ts` | The barrel every surface imports | Owned by the design-system agent |
+| `scripts/migrate.js` | The only schema | One agent per batch of schema changes |
 
 ### Must be sequential (shared state)
-- Schema changes + migration script + query functions that use new columns
+- Schema changes (`scripts/migrate.js`) + query functions that use the new columns
 - Signal matching logic changes + dashboard display changes
-- Auth flow changes (proxy.ts + auth.ts + login page)
+- Auth flow changes (`proxy.ts` + `auth.ts` + login page)
+- Permission catalogue/screen registry changes + the routes and sidebar that read them
+- Design-system changes + the screens that consume them
 
 ---
 
 ## User-facing copy
 
-English UI copy, emails, and stable technical identifiers live in `src/locales/en.ts`. Import `en` and use nested keys (for example `en.meWsToday.tabPeopleNotCheckedIn`). Avoid hardcoding product strings in components or routes; when editing a file that still has literals, prefer moving those strings into `en` in the same change. Technical identifiers (cookie names, DNS prefixes, DB filenames) already belong under `en.constants`.
+English UI copy, emails, and stable technical identifiers are assembled into one `en` object by `src/locales/en.ts`. **New copy goes in a per-area module under `src/locales/en/`, not inline in `en.ts`.**
 
-### Multi-workspace + `/me/timeline`
+Current modules: `me.ts`, `me-screens.ts`, `me-settings.ts`, `marketing.ts`, `documents.ts` (which also exports `assets` and `maternity`), `ws-overview.ts`, `ws-people.ts`, `ws-settings.ts`, `ws-reminders.ts`.
 
-Users can be active in multiple workspaces. The default **All workspaces** timeline (`GET /api/events`) shows the user’s presence history without workspace-scoped signal evaluation. When a workspace is selected in the UI, use **`GET /api/me/ws/[slug]/events`** (member auth + membership check) so `queryWorkspaceEvents()` can attach `matched_by` / `matched_signals` for that workspace only. Do not add `workspace_id` to `presence_events`; keep AND semantics in `lib/signals.ts`.
+To add copy for a new area:
+1. Create `src/locales/en/<area>.ts` exporting one named const.
+2. Import it in `src/locales/en.ts` and add it to the `en` object — **one line**, which is the whole point: it is the difference between a one-line merge conflict and a thousand-line one.
+
+Both import styles resolve to the same object, so either works at a call site:
+
+```ts
+import { en } from '@/locales/en'          // en.wsReminders.x
+import { wsReminders } from '@/locales/en/ws-reminders'   // wsReminders.x
+```
+
+Prefer the direct module import in new code — it keeps two agents working on two areas out of the same file.
+
+The groups still written inline in `en.ts` are the original single-file copy, kept so existing `en.x` call sites keep working. **Move a group into a module as its screens are touched; do not add to them.** Technical identifiers (cookie names, DNS prefixes, DB filenames) stay under `en.constants`.
+
+When two agents each own half of one area, give them **disjoint sub-keys** and spread both modules onto the same key — this is what `wsAdmin: { ...wsAdminWorkforce, ...wsAdminManage }` does today. Overlapping sub-keys silently lose one agent's copy to the spread order.
+
+### Multi-workspace + the `/me` active workspace
+
+Users can be active in multiple workspaces, and `/me` has **exactly one** selector for which of them is in scope: the top-bar pill in `MeTopbar`, backed by the `cm_ws` cookie and exposed to every screen through `useWorkspaceScope()` (`src/app/me/workspace-scope.tsx`). Resolution is `?ws=` → cookie → first active membership, validated server-side against real memberships in `src/app/me/layout.tsx`. **Do not add a per-screen workspace picker** — `/me/timeline` had one and it was removed precisely because it could disagree with the pill.
+
+`/me/timeline` is therefore always scoped: it calls **`GET /api/me/ws/[slug]/events`** (member auth + membership check) so `queryWorkspaceEvents()` can attach `matched_by` / `matched_signals` for that workspace only. Its old **All workspaces** option is gone; `GET /api/events` still exists as the unscoped global-history endpoint but has no UI consumer. Do not add `workspace_id` to `presence_events`; keep AND semantics in `lib/signals.ts`.
 
 ---
 
@@ -129,7 +189,18 @@ Query files and their domains:
 - `holidays.ts` — workspace holiday calendar
 - `leaves.ts` — workspace leave types (`workspace_leave_types`) and leave requests (`leave_requests`); exports `getLeaveTypesWithBalance()` which computes balance from join date using calendar month/quarter arithmetic
 - `employees.ts` — employee records (personal, contact, employment, lifecycle, identity, bank, emergency contact); sensitive fields AES-256-GCM encrypted; exports `listEmployees`, `getEmployee`, `createEmployee`, `updateEmployee`, `softDeleteEmployee`
+- `employees-list.ts` — the directory read path, split out so a list query can never accidentally decrypt sensitive columns
 - `roles.ts` — workspace roles and permission grids; exports `seedSystemRoles`, `getMembershipWithRole`, `listWorkspaceRoles`
+- `assets.ts` — `workspace_assets`; soft-deleted so assignment history survives a retired laptop
+- `documents.ts` — `employee_documents` metadata **and** `employee_document_blobs`; the one file outside `lib/storage.ts` allowed to see base64. Metadata is soft-deleted, the blob is hard-deleted with it
+- `maternity.ts` — `maternity_cases` and the `requested → approved → onleave → returned` stage machine (`canTransition()`); the one backward edge is `approved → requested`
+- `regularizations.ts` — `regularization_requests`; approving one writes an `admin_overrides` row and a *new* `presence_events` row, never an edit to an existing one
+- `notifications.ts` — in-app notifications
+- `reminders.ts` — reads/writes for the wall-clock reminder pass (`reminder_log`)
+
+### Document bytes
+
+Never read or write `employee_document_blobs` from a route. Go through `documentStore` in `src/lib/storage.ts` — it is the seam an S3 backend would replace, and it stops working as a seam the moment a caller string-handles base64. Callers hand over and receive `Buffer`. MIME type comes from `sniffMimeType()` (magic bytes), never from the browser-supplied `File.type`, which is attacker-controlled. Bytes leave the server only from a dedicated `.../file` route, never inside a JSON body.
 
 ### Creating a workspace
 
@@ -178,18 +249,28 @@ Step 3 is not optional. Rank cannot substitute for it: all custom roles share `C
 
 ```ts
 // src/app/api/ws/[slug]/example/route.ts
-import { requireWsAdmin } from '@/lib/ws-admin'
-import { getServerUser } from '@/lib/auth'
+import { requireWsAccess, forbidden } from '@/lib/ws-access'
+import { Action, Resource } from '@/lib/permissions/catalogue'
 
-export async function GET(req: NextRequest, { params }: { params: { slug: string } }) {
-  const ctx = await requireWsAdmin(req, params.slug)
-  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+interface Props { params: Promise<{ slug: string }> }
 
-  // ctx.workspace.id and ctx.userId are now verified
+export async function GET(req: NextRequest, { params }: Props) {
+  const { slug } = await params            // params is a Promise in this Next version
+  const ctx = await requireWsAccess(req, slug, Resource.Assets, Action.Read)
+  if (!ctx) return forbidden()             // 403 { error: 'Forbidden', code: 'FORBIDDEN' }
+
+  // ctx.workspace.id, ctx.userId, ctx.memberId, ctx.role and
+  // ctx.visibleMemberIds are all now verified.
   const data = await getSomethingForWorkspace(ctx.workspace.id)
   return NextResponse.json(data)
 }
 ```
+
+`requireWsAccess` answers "may this role perform this action on this resource?", not "is this person an admin?". It returns `null` for every failure mode — no header, no workspace, inactive membership, permission denied — so the caller cannot accidentally leak which one it was. `Resource` and `Action` are enums, so the compiler rejects a guard naming a resource that does not exist.
+
+Pick the resource that matches the **screen** the route backs, as registered in `src/lib/permissions/screens.ts`. If sidebar visibility and route enforcement disagree, a user gets a tab that 403s.
+
+For pages that need to know *who* is asking in order to decide what to render, rather than to gate one action, use `getWsRole(workspaceId, userId)`.
 
 For user routes (not workspace):
 ```ts
@@ -219,8 +300,11 @@ Common codes: `UNAUTHORIZED`, `NOT_FOUND`, `VALIDATION_ERROR`, `ALREADY_EXISTS`,
 Before editing any of these files, always read them first:
 - `lib/signals.ts` - core logic, easy to break AND semantics
 - `lib/auth.ts` - security-critical, JWT + cookie handling
-- `lib/db/schema.ts` - understand all columns before adding queries
+- **`scripts/migrate.js` - the only description of the database. Understand all columns here before adding queries. (`lib/db/schema.ts` no longer exists.)**
+- `lib/permissions/catalogue.ts` + `screens.ts` - which resource gates a route and which screen it backs; they must agree
+- `lib/ws-access.ts` - the single door to every workspace-admin route
 - `proxy.ts` - edge middleware, limited runtime (no Node.js APIs)
+- `src/app/globals.css` - the whole design system; a new class goes here, not in a component
 
 ---
 
@@ -230,7 +314,13 @@ Before editing any of these files, always read them first:
 - Modify `presence_events` rows (immutable after insert, except `note`)
 - Delete user/workspace data (soft delete only)
 - Store raw WiFi SSIDs (always bcrypt hash)
-- Add drop shadows or gradients to UI components
+- Look for `lib/db/schema.ts` — it is deleted; read `scripts/migrate.js`
+- Reintroduce `requireWsAdmin()`, or gate a `/api/ws/[slug]/*` route on membership alone
+- Put a shadow on an inline surface (card, input, chip, row, table) — shadows are for overlays only. Add gradients to app UI
+- Write a `<style>` block in a component, or an ad-hoc inline style object — add a class to `globals.css`
+- Ship a decorative animation without adding its selector to the `prefers-reduced-motion` guard in `globals.css`
+- Return document bytes or base64 in a JSON response
+- Hardcode a user-facing string instead of adding it to a `src/locales/en/` module
 - Introduce new npm dependencies without noting it in the PR description
 - Change signal matching from AND to OR logic
 - Trust userId or workspaceId from request body without JWT verification
@@ -244,6 +334,8 @@ Before editing any of these files, always read them first:
 1. `README.md` - update the affected section
 2. `CLAUDE.md` - update invariants, architecture, or key rules if affected
 3. `AGENTS.md` - update conventions or patterns if affected
+4. `docs/architecture/` - update if the change moves a boundary or a data flow
+5. `docs/design/` - **required** for any change to `src/app/globals.css` or `src/components/ui/`: a new token, a new class, a new primitive, a new animation, or a change to touch targets, elevation or status tones
 
 Never let code and docs diverge. Stale docs cause bugs in future AI-assisted sessions because agents rely on them for context.
 
@@ -255,3 +347,5 @@ Never let code and docs diverge. Stale docs cause bugs in future AI-assisted ses
 - Adding DB columns or tables
 - Changing plan limits or feature flags
 - Adding/removing environment variables
+- Adding a design token, class, UI primitive or animation
+- Adding a `/ws` screen or a permission resource

@@ -1,5 +1,11 @@
 # Workspace Management Flows
 
+> Last updated: 2026-08-31
+>
+> `requireWsAdmin()` no longer exists. Every route below is gated by
+> `requireWsAccess(request, slug, Resource, Action)` — see
+> [`permissions.md`](./permissions.md).
+
 ---
 
 ## 1. Workspace Creation
@@ -15,14 +21,35 @@ sequenceDiagram
   U->>API: POST /api/auth/register\n{ accountType: 'org', orgName, orgSlug, orgDomain, ... }
   API->>API: verifyOtpCookie(email)
   API->>DB: createUser(email, passwordHash, name)
-  API->>DB: createWorkspace(name, slug, plan='free', orgType)
-  API->>DB: createWorkspaceMember(userId, workspaceId, role='admin', status='active')
-  opt domain provided
-    API->>DB: createWorkspaceDomain(workspaceId, domain)
+  API->>DB: createWorkspace({ slug, name, creatorUserId, creatorEmail, domains })
+
+  rect rgb(240,244,255)
+    Note over DB: ONE db.transaction()
+    DB->>DB: INSERT workspaces (plan defaults to 'free')
+    DB->>DB: seedSystemRoles(id, tx) — owner · admin · member
+    DB->>DB: INSERT workspace_members role='owner' status='active'
+    DB->>DB: INSERT workspace_domains per domain
   end
+
   API->>API: createJwt + setSessionCookie
   API-->>U: { redirect: '/ws/:slug' }
 ```
+
+**Two invariants live in this transaction:**
+
+1. **Roles are seeded before the member row.** Every permission lookup
+   `LEFT JOIN`s `workspace_members.role` to `workspace_roles`, so a workspace
+   with no role rows grants *nobody* anything — its creator included. Never
+   insert a workspace by any other path.
+2. **The creator is the `owner`, not an `admin`.** Only `owner` carries the
+   `ownership` resource (transfer, archive, billing), so a workspace whose
+   creator is an admin has nobody who can do those things.
+
+`scripts/migrate.js → seedRolesAndOwners()` repairs both for pre-existing
+workspaces: `INSERT OR IGNORE` for the three roles, a refresh of any system grid
+that has drifted from `system-roles.json`, and an owner backfilled from the
+oldest active admin. A workspace with no active admin is counted as `ownerless`
+and left alone.
 
 **Workspace limits:** Free plan allows 1 workspace per account. Attempting a second returns 403 `WORKSPACE_LIMIT_REACHED`.
 
@@ -39,7 +66,7 @@ sequenceDiagram
   participant M as Invited Member
 
   A->>API: POST /api/ws/:slug/members\n{ email: 'colleague@company.com' }
-  API->>API: requireWsAdmin(req, slug)
+  API->>API: requireWsAccess(req, slug, Resource.Members, Action.Write)
   API->>DB: getActiveMember(workspaceId, email) - 409 if already active
   API->>DB: getMemberByEmail(workspaceId, email) - 409 if already pending_consent
   API->>DB: upsertWorkspaceMember({\n  status: 'pending_consent',\n  consent_token: uuid(),\n  consent_token_expires_at: +7days\n})
@@ -85,7 +112,7 @@ sequenceDiagram
   participant DB as Database
 
   A->>API: POST /api/ws/:slug/domain\n{ domain: 'acme.com' }
-  API->>API: requireWsAdmin
+  API->>API: requireWsAccess(req, slug, Resource.Domains, Action.Write)
   API->>DB: Check domain not already claimed by another workspace (409 DOMAIN_CLAIMED)
   API->>DB: createWorkspaceDomain(workspaceId, 'acme.com')
   API->>API: Compute token = HMAC-SHA256(\n  'domain-verify:{workspaceId}:acme.com',\n  JWT_SECRET\n).slice(0, 32)
@@ -94,7 +121,7 @@ sequenceDiagram
   Note over A: Adds TXT record to DNS:\n_checkmark-verify.acme.com = "checkmark-verify=abc123..."
 
   A->>API: POST /api/ws/:slug/domain/:id/verify
-  API->>API: requireWsAdmin
+  API->>API: requireWsAccess(req, slug, Resource.Domains, Action.Write)
   API->>API: Recompute token (deterministic - no DB column needed)
   API->>DNS: resolveTxt('_checkmark-verify.acme.com')
   DNS-->>API: [["checkmark-verify=abc123..."]]
@@ -107,26 +134,26 @@ sequenceDiagram
 
 ## 4. Signal Configuration
 
+Only **`gps`** and **`ip`** exist. WiFi was removed in `d0a0dca` and
+`POST /api/ws/[slug]/signals` rejects any other `signal_type` with
+`400 INVALID_SIGNAL_TYPE`.
+
 ```mermaid
 flowchart TD
-  A[Admin opens Settings tab] --> B{Signal type to add?}
+  A[Admin opens Settings] --> B{"requireWsAccess(Resource.Signals, Action.Write)"}
+  B -->|denied| F[403 FORBIDDEN]
+  B -->|allowed| C{signal_type}
 
-  B -->|GPS| C[/ws/:slug/signals POST\n{ signal_type: 'gps',\n  gps_lat, gps_lng, gps_radius_m }]
-  C --> D[Stored in workspace_signal_config\nbcrypt NOT used - GPS is plain coords]
+  C -->|gps| D["{ signal_type: 'gps', gps_lat, gps_lng, gps_radius_m? }\nstored as plain coordinates (default radius 300m)"]
+  D --> D2["timezoneFromCoords() → updateWorkspace(display_timezone)\nthe only place the workspace timezone is auto-detected"]
 
-  B -->|WiFi| E[/ws/:slug/signals POST\n{ signal_type: 'wifi', wifi_ssid: 'OfficeNetwork' }]
-  E --> F[bcrypt.hash ssid, 12 → wifi_ssid_hash\nRaw SSID NEVER stored]
-  F --> G[Stored in workspace_signal_config\nDisplayed as 'Off***k' partial mask]
+  C -->|ip| E["{ signal_type: 'ip' }\n— the server uses the REQUESTING ip, never one from the body"]
+  E --> E2["getIpGeo(clientIp) → ip_geo_lat/lng (default proximity 500m)\n400 IP_UNRESOLVABLE on localhost / private IP"]
 
-  B -->|IP| H[/ws/:slug/signals POST\n{ signal_type: 'ip' }\n— server uses requesting IP]
-  H --> I[getIpGeo client IP → lat/lng]
-  I --> J[Stored as ip_geo_lat/lng + ip_proximity_m]
-
-  subgraph Effect["Effect on queryWorkspaceEvents"]
-    D & G & J --> K[configuredTypes Set builds from\nnon-null signal configs]
-    K --> L[AND matching: event must match\nALL configured types]
-  end
+  D2 & E2 --> G["configuredTypes is rebuilt on the next queryWorkspaceEvents()\n→ AND matching now requires this type"]
 ```
+
+See [`signal-matching.md`](./signal-matching.md) for what happens to the events.
 
 ---
 
@@ -135,7 +162,7 @@ flowchart TD
 ```mermaid
 flowchart TD
   A[Admin loads /ws/:slug] --> B[GET /api/ws/:slug/dashboard]
-  B --> C[requireWsAdmin slug → workspace.id + userId]
+  B --> C["requireWsAccess(Resource.Dashboard, Action.Read)\n→ workspace.id + userId + role"]
   C --> D[Compute today UTC bounds\ntodayInTz workspace.timezone]
   D --> E[queryWorkspaceEvents\nworkspaceId, plan, startDate, endDate]
 
@@ -170,7 +197,7 @@ sequenceDiagram
 
   A->>API: GET /api/ws/:slug/analytics?start=2026-04-01&end=2026-04-30
 
-  API->>API: requireWsAdmin
+  API->>API: requireWsAccess(req, slug, Resource.Analytics, Action.Read)
   API->>SIG: queryWorkspaceEvents(workspaceId, plan, { startDate, endDate })
   SIG->>DB: getActiveMemberIds + getEventsForUsers + signal matching
   SIG-->>API: PresenceEventWithMatch[]
@@ -194,15 +221,21 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-  A[Active Workspace] -->|POST /api/ws/:slug/archive\nOTP verified| B[Archived Workspace\narchived_at stamped]
-  B -->|POST /api/ws/:slug/restore| A
+  A[Active Workspace] -->|"POST /api/ws/:slug/archive\nrequireWsAccess(ownership, write)"| B[Archived Workspace\narchived_at stamped]
+  B -->|"POST /api/ws/:slug/restore\nsame gate"| A
 
   subgraph Effects
     B --> C[Workspace hidden from\nactive workspace list]
     B --> D[Events and members preserved]
     B --> E[Still accessible via\n/ws picker archived section]
+    B --> F[Excluded from the reminder cron\ngetWorkspacesWithReminders filters archived_at IS NULL]
   end
 ```
+
+Both archive and restore are gated on `ownership:write`, which **only the owner
+holds** — admins deliberately lack it. Archiving an already-archived workspace
+returns `409 ALREADY_ARCHIVED`. There is no OTP step on archive; the OTP flow
+belongs to ownership transfer (§8).
 
 ---
 
@@ -249,20 +282,33 @@ Two independent rate limits back this, both in `rate_limit_log`: 5 password atte
 
 Every workspace API route must:
 
-1. Call `requireWsAdmin(req, slug)` → returns `{ workspace, userId }` or null
-2. Use `ctx.workspace.id` (never slug or URL param) for all DB queries
+1. Call `requireWsAccess(request, slug, Resource.X, Action.Y)` — it returns an
+   `AccessContext` or `null`
+2. Use `ctx.workspace.id` (never the slug or a URL param) for all DB queries
 3. Scope every query: `WHERE workspace_id = ?` with `ctx.workspace.id`
-4. Never accept `workspaceId` from request body
+4. Never accept `workspaceId` (or `userId`) from the request body
+5. Resolve any client-supplied foreign id against **this** workspace before
+   writing it — see the `getEmployee(employeeId, ctx.workspace.id)` check in the
+   asset-assign route
 
 ```typescript
-// Correct pattern:
+import { requireWsAccess, forbidden } from '@/lib/ws-access'
+import { Action, Resource } from '@/lib/permissions/catalogue'
+
 export async function GET(req: NextRequest, { params }: Props) {
   const { slug } = await params
-  const ctx = await requireWsAdmin(req, slug)
-  if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
+  const ctx = await requireWsAccess(req, slug, Resource.Holidays, Action.Read)
+  if (!ctx) return forbidden()          // { error: 'Forbidden', code: 'FORBIDDEN' }, 403
 
-  // ctx.workspace.id is verified - use it for ALL queries
+  // ctx.workspace.id is verified - use it for ALL queries.
+  // ctx.role.permissions is available for secondary can() checks that shape
+  // the response (e.g. which buttons the client may render).
   const data = await getSomethingForWorkspace(ctx.workspace.id)
   return NextResponse.json(data)
 }
 ```
+
+`/me/*` routes use `requireWsMember(request, slug)` instead. It authenticates an
+active membership and carries **no permission meaning** — the `/me` surface is
+self-only for every role, decided by the session user id with no role lookup at
+all.

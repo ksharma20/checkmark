@@ -1,46 +1,13 @@
-'use client';
+import { marketing } from '@/locales/en/marketing';
 
-type Feature = {
-  title: string;
-  description: string;
-  icon: 'grid' | 'map' | 'lock' | 'phone' | 'building' | 'integration';
-};
+const copy = marketing.features;
+
+type FeatureIcon = (typeof copy.items)[number]['icon'];
 
 export default function Features() {
-  const features: Feature[] = [
-    {
-      title: 'Hybrid Office Mode',
-      description: 'Register your GPS and IP. CheckMark auto-filters presence events to verified office check-ins.',
-      icon: 'grid',
-    },
-    {
-      title: 'Field Force Mode',
-      description: 'No location pre-registration needed. Every check-in is logged with full location for agents.',
-      icon: 'map',
-    },
-    {
-      title: 'Immutable History',
-      description: 'Companies cannot delete or alter user check-ins. Seven-year retention keeps a portable proof-of-work record.',
-      icon: 'lock',
-    },
-    {
-      title: 'Zero Hardware',
-      description: 'No biometric devices. No IT setup. If you have a phone, setup is quick.',
-      icon: 'phone',
-    },
-    {
-      title: 'Coworking-Ready',
-      description: 'Works where biometric systems fail. Multi-location support handles distributed teams.',
-      icon: 'building',
-    },
-    {
-      title: 'Payroll and HRMS Integration',
-      description: 'Clean presence data feeds payroll, incentives, leave management, and compliance workflows.',
-      icon: 'integration',
-    },
-  ];
+  const features = copy.items;
 
-  const getIcon = (type: Feature['icon']) => {
+  const getIcon = (type: FeatureIcon) => {
     switch (type) {
       case 'grid':
         return <><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></>;
@@ -61,24 +28,26 @@ export default function Features() {
     <section id="features" className="relative z-10 mx-auto max-w-[1200px] px-6 py-[80px] md:px-10 md:py-[100px]">
       <div className="section-eyebrow reveal mb-4 flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.14em] text-checkmark-brand">
         <span className="h-0.5 w-6 rounded bg-checkmark-brand" />
-        Platform features
+        {copy.eyebrow}
       </div>
 
       <h2 className="section-title reveal mb-5 font-dm-sans text-4xl font-black leading-tight tracking-tight md:text-5xl">
-        Built for the <em className="font-syne italic text-checkmark-brand">hybrid era</em>
+        {copy.headingBefore}
+        <em className="font-syne italic text-checkmark-brand">{copy.headingEmphasis}</em>
+        {copy.headingAfter}
       </h2>
 
       <p className="section-desc reveal mb-14 max-w-[540px] text-base leading-relaxed text-checkmark-text-muted md:text-lg">
-        One platform, two modes. Same architecture, different use cases.
+        {copy.description}
       </p>
 
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
         {features.map((feature, i) => (
-          <div key={feature.title} className="reveal group relative overflow-hidden rounded-[14px] border border-checkmark-border bg-checkmark-bg-card p-7 transition-all hover:-translate-y-0.5 hover:border-[rgba(27,77,255,0.35)] hover:shadow-[0_16px_48px_rgba(0,0,0,0.35)]" style={{ transitionDelay: `${i * 0.08}s` }}>
+          <div key={feature.title} className="reveal group relative overflow-hidden rounded-[14px] border border-checkmark-border bg-checkmark-bg-card p-7 transition-colors hover:border-[color-mix(in_srgb,var(--checkmark-brand)_35%,transparent)]" style={{ transitionDelay: `${i * 0.08}s` }}>
             <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-checkmark-brand to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
 
-            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-[rgba(27,77,255,0.2)] bg-[rgba(27,77,255,0.1)]">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] border border-[color-mix(in_srgb,var(--checkmark-brand)_20%,transparent)] bg-[color-mix(in_srgb,var(--checkmark-brand)_10%,transparent)] text-checkmark-brand">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 {getIcon(feature.icon)}
               </svg>
             </div>

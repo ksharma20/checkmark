@@ -95,7 +95,7 @@ export default function ForYouPage() {
               fontSize: "14px",
               fontWeight: 600,
               color: "var(--brand)",
-              background: "#1B4DFF10",
+              background: "color-mix(in srgb, var(--brand) 8%, transparent)",
               padding: "6px 16px",
               borderRadius: "20px",
               marginBottom: "32px",
@@ -347,11 +347,6 @@ export default function ForYouPage() {
         </div>
       </section>
 
-      <style>{`
-        @media (max-width: 600px) {
-          .privacy-row { grid-template-columns: 1fr !important; gap: 8px !important; }
-        }
-      `}</style>
 
       <MarketingFooter />
     </div>

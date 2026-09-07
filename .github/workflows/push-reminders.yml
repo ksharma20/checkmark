@@ -2,7 +2,20 @@ name: Push Reminders Cron
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    # Every 30 minutes, on the hour and the half hour.
+    #
+    # The half-hour tick is not cosmetic: India (UTC+5:30), Iran (+3:30) and
+    # parts of Australia (+9:30 / +10:30) sit on half-hour offsets, so an
+    # hourly UTC schedule lands at :30 past their local hour and a reminder set
+    # for 10:00 IST could never fire on time.
+    #
+    # GitHub Actions cron is BEST-EFFORT: runs are queued, not guaranteed, and
+    # regularly start several minutes - occasionally much longer - after the
+    # scheduled minute. Reminder times are therefore approximate. The route
+    # absorbs this with a grace window (REMINDER_GRACE_MIN in
+    # src/lib/reminders.ts) and dedupes on the reminder_log table, so a late or
+    # doubled run still sends each person at most one reminder per day.
+    - cron: '0,30 * * * *'
   workflow_dispatch:
 
 jobs:

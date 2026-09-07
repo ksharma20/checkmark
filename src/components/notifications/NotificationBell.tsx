@@ -30,12 +30,12 @@ export default function NotificationBell({ pollUrl, href, onBellClick, isOpen = 
       type="button"
       onClick={() => href ? router.push(href) : onBellClick?.()}
       aria-label={`Notifications${count > 0 ? ` (${count} unread)` : ''}`}
+      className="icon-btn icon-btn-plain pressable"
       style={{
-        position: 'relative', width: '32px', height: '32px',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: isOpen ? 'rgba(255,255,255,0.12)' : 'transparent',
-        border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px',
-        color: 'rgba(241,245,249,0.75)', cursor: 'pointer', flexShrink: 0,
+        position: 'relative', borderRadius: '999px',
+        border: '1px solid var(--border)',
+        background: isOpen ? 'var(--surface-2)' : 'transparent',
+        flexShrink: 0,
       }}
     >
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -46,7 +46,7 @@ export default function NotificationBell({ pollUrl, href, onBellClick, isOpen = 
         <span style={{
           position: 'absolute', top: '-5px', right: '-5px',
           minWidth: '17px', height: '17px', background: 'var(--danger)',
-          color: '#fff', fontSize: '10px', fontFamily: 'DM Sans, sans-serif',
+          color: '#fff', fontSize: '10px', fontFamily: 'var(--font-body)',
           fontWeight: 700, borderRadius: '9px', display: 'flex',
           alignItems: 'center', justifyContent: 'center', padding: '0 3px',
         }}>

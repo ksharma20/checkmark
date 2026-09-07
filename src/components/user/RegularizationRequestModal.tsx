@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
+import { Button, Field, Input, Modal, Textarea } from '@/components/ui'
 import { en } from '@/locales/en'
 
 interface Props {
@@ -13,27 +13,30 @@ interface Props {
   onSuccess: () => void
 }
 
-const fieldLabelStyle: React.CSSProperties = {
-  display: 'block', fontSize: '12px', fontFamily: 'DM Sans, sans-serif',
-  color: 'var(--text-secondary)', marginBottom: '5px',
-}
-
-const inputStyle: React.CSSProperties = {
-  width: '100%', height: '44px', padding: '0 12px', border: '1px solid var(--border)',
-  borderRadius: 'var(--radius-md)', fontSize: '14px', fontFamily: 'DM Sans, sans-serif',
-  background: 'var(--surface-2)', color: 'var(--text-primary)', outline: 'none', boxSizing: 'border-box',
-}
-
-export default function RegularizationRequestModal({ slug, minDate, maxDate, prefillDate, onClose, onSuccess }: Props) {
-  const [mounted, setMounted] = useState(false)
-  useEffect(() => setMounted(true), [])
-
+/**
+ * "Request a correction" dialog.
+ *
+ * Built on the `Modal` primitive rather than a hand-rolled portal, so it picks
+ * up the design-system scrim/panel, the Escape handler, the body scroll lock
+ * and focus restoration for free. Callers still mount it conditionally, so it
+ * is always rendered `open`.
+ */
+export default function RegularizationRequestModal({
+  slug,
+  minDate,
+  maxDate,
+  prefillDate,
+  onClose,
+  onSuccess,
+}: Props) {
   const [date, setDate] = useState(prefillDate ?? '')
   const [requestedType, setRequestedType] = useState<'office' | 'remote'>('office')
   const [reason, setReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+
+  const canSubmit = !!date && !!reason.trim() && !submitting
 
   async function submit() {
     if (!date || !reason.trim()) return
@@ -60,122 +63,81 @@ export default function RegularizationRequestModal({ slug, minDate, maxDate, pre
     }
   }
 
-  if (!mounted) return null
-
-  return createPortal(
-    <div
-      role="presentation"
-      style={{
-        position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', minHeight: '100dvh',
-        zIndex: 1100, background: 'rgba(13, 27, 42, 0.45)', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', padding: '16px', boxSizing: 'border-box', overflow: 'auto',
-      }}
-      onClick={() => { if (!submitting) onClose() }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="reg-request-title"
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: '100%', maxWidth: '420px', background: 'var(--surface-0)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)', padding: '20px', margin: 'auto',
-        }}
-      >
-        <h2 id="reg-request-title" style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 700, color: 'var(--navy)', margin: '0 0 18px' }}>
-          {en.meWsRegularization.modalTitle}
-        </h2>
-
-        {success ? (
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)', textAlign: 'center', padding: '20px 0' }}>
-            {en.meWsRegularization.submitSuccess}
-          </p>
-        ) : (
+  return (
+    <Modal
+      open
+      onClose={() => { if (!submitting) onClose() }}
+      title={en.meWsRegularization.modalTitle}
+      maxWidth={420}
+      footer={
+        success ? null : (
           <>
-            <div style={{ marginBottom: '14px' }}>
-              <label style={fieldLabelStyle}>{en.meWsRegularization.fieldDate}</label>
-              <input
-                type="date"
-                value={date}
-                min={minDate}
-                max={maxDate}
-                disabled={!!prefillDate}
-                onChange={(e) => setDate(e.target.value)}
-                style={{ ...inputStyle, opacity: prefillDate ? 0.7 : 1 }}
-              />
-            </div>
-
-            <div style={{ marginBottom: '14px' }}>
-              <label style={fieldLabelStyle}>{en.meWsRegularization.fieldType}</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {(['office', 'remote'] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setRequestedType(t)}
-                    style={{
-                      flex: 1, height: '42px', borderRadius: 'var(--radius-md)',
-                      border: requestedType === t ? '1px solid var(--brand)' : '1px solid var(--border)',
-                      background: requestedType === t ? 'color-mix(in srgb, var(--brand) 12%, transparent)' : 'var(--surface-2)',
-                      color: requestedType === t ? 'var(--brand)' : 'var(--text-secondary)',
-                      fontFamily: 'DM Sans, sans-serif', fontSize: '13.5px', fontWeight: 600, cursor: 'pointer',
-                    }}
-                  >
-                    {t === 'office' ? en.meWsRegularization.typeOffice : en.meWsRegularization.typeRemote}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div style={{ marginBottom: '18px' }}>
-              <label style={fieldLabelStyle}>{en.meWsRegularization.fieldReason}</label>
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder={en.meWsRegularization.fieldReasonPlaceholder}
-                rows={3}
-                style={{ ...inputStyle, height: 'auto', padding: '10px 12px', resize: 'vertical' }}
-              />
-            </div>
-
-            {error && (
-              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--danger)', margin: '0 0 12px' }}>
-                {error}
-              </p>
-            )}
-
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button
-                type="button"
-                disabled={submitting}
-                onClick={onClose}
-                style={{
-                  height: '44px', padding: '0 16px', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)',
-                  background: 'transparent', fontFamily: 'DM Sans, sans-serif', fontSize: '14px', fontWeight: 600,
-                  color: 'var(--text-secondary)', cursor: submitting ? 'default' : 'pointer',
-                }}
-              >
-                {en.meWsRegularization.cancel}
-              </button>
-              <button
-                type="button"
-                disabled={submitting || !date || !reason.trim()}
-                onClick={() => void submit()}
-                style={{
-                  height: '44px', padding: '0 16px', border: 'none', borderRadius: 'var(--radius-md)',
-                  background: 'var(--brand)', fontFamily: 'DM Sans, sans-serif', fontSize: '14px', fontWeight: 600,
-                  color: '#fff',
-                  cursor: submitting || !date || !reason.trim() ? 'not-allowed' : 'pointer',
-                  opacity: submitting || !date || !reason.trim() ? 0.65 : 1,
-                }}
-              >
-                {submitting ? en.meWsRegularization.submitting : en.meWsRegularization.submit}
-              </button>
-            </div>
+            <Button variant="secondary" disabled={submitting} onClick={onClose}>
+              {en.meWsRegularization.cancel}
+            </Button>
+            <Button loading={submitting} disabled={!canSubmit} onClick={() => void submit()}>
+              {submitting ? en.meWsRegularization.submitting : en.meWsRegularization.submit}
+            </Button>
           </>
-        )}
-      </div>
-    </div>,
-    document.body,
+        )
+      }
+    >
+      {success ? (
+        <p
+          role="status"
+          className="t-secondary"
+          style={{ color: 'var(--brand)', textAlign: 'center', padding: '20px 0', margin: 0 }}
+        >
+          {en.meWsRegularization.submitSuccess}
+        </p>
+      ) : (
+        <div className="stack">
+          <Field label={en.meWsRegularization.fieldDate} htmlFor="reg-date">
+            <Input
+              id="reg-date"
+              type="date"
+              value={date}
+              min={minDate}
+              max={maxDate}
+              disabled={!!prefillDate}
+              onChange={(e) => setDate(e.target.value)}
+            />
+          </Field>
+
+          <Field label={en.meWsRegularization.fieldType} htmlFor="reg-type-office">
+            <div role="radiogroup" style={{ display: 'flex', gap: '8px' }}>
+              {(['office', 'remote'] as const).map((t) => (
+                <Button
+                  key={t}
+                  id={`reg-type-${t}`}
+                  role="radio"
+                  aria-checked={requestedType === t}
+                  variant={requestedType === t ? 'primary' : 'secondary'}
+                  block
+                  onClick={() => setRequestedType(t)}
+                >
+                  {t === 'office'
+                    ? en.meWsRegularization.typeOffice
+                    : en.meWsRegularization.typeRemote}
+                </Button>
+              ))}
+            </div>
+          </Field>
+
+          <Field label={en.meWsRegularization.fieldReason} htmlFor="reg-reason">
+            <Textarea
+              id="reg-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={en.meWsRegularization.fieldReasonPlaceholder}
+              rows={3}
+            />
+          </Field>
+
+          {/* Submit failures belong to the request, not to any one field. */}
+          {error && <p className="field-error" role="alert" style={{ margin: 0 }}>{error}</p>}
+        </div>
+      )}
+    </Modal>
   )
 }

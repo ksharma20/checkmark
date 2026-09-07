@@ -1,80 +1,35 @@
 import Link from 'next/link'
+import { marketing } from '@/locales/en/marketing'
 
-const footerLinks = [
-  { label: 'For Teams', href: '/for-teams' },
-  { label: 'For You', href: '/for-you' },
-  { label: 'Pricing', href: '/pricing' },
-  { label: 'Open Source', href: '/open-source' },
-  { label: 'Privacy', href: '/privacy' },
-  { label: 'Terms', href: '/terms' },
-]
-
+/** Shared footer for the light marketing pages. */
 export default function MarketingFooter() {
   return (
     <footer
-      style={{
-        borderTop: "1px solid var(--border)",
-        background: "var(--surface-0)",
-        padding: "40px 24px",
-      }}
+      aria-label={marketing.footer.label}
+      className="border-t border-border bg-surface-0 px-6 py-10"
     >
-      <div
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: "20px",
-          alignItems: "center",
-        }}
-      >
-        <Link href="/" style={{ textDecoration: "none" }}>
-          <span
-            style={{
-              fontFamily: "Syne, sans-serif",
-              fontWeight: 700,
-              fontSize: "16px",
-              color: "var(--brand)",
-            }}
-          >
-            checkmark
-          </span>
+      <div className="mx-auto flex w-full max-w-[1100px] flex-col items-center gap-5">
+        <Link href="/" className="no-underline">
+          <span className="font-heading text-base font-bold text-brand">checkmark</span>
         </Link>
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: "8px 24px",
-            justifyContent: "center",
-          }}
-        >
-          {footerLinks.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              style={{
-                fontSize: "13px",
-                color: "var(--text-muted)",
-                textDecoration: "none",
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            >
-              {l.label}
-            </Link>
+
+        <ul className="flex list-none flex-wrap justify-center gap-x-6 gap-y-2">
+          {marketing.footer.links.map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className="text-[13px] text-text-muted no-underline transition-colors hover:text-brand"
+              >
+                {link.label}
+              </Link>
+            </li>
           ))}
-        </div>
-        <p
-          style={{
-            fontSize: "12px",
-            color: "var(--text-muted)",
-            margin: 0,
-            textAlign: "center",
-          }}
-        >
-          © {new Date().getFullYear()} checkmark. Presence intelligence for modern
-          teams.
+        </ul>
+
+        <p className="m-0 text-center text-xs text-text-muted">
+          {marketing.footer.tagline(new Date().getFullYear())}
         </p>
       </div>
     </footer>
-  );
+  )
 }

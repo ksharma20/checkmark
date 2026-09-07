@@ -21,6 +21,9 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   const { items } = await getPendingApprovalItems(ctx.workspace.id, {
     leavesEnabled: !!ctx.workspace.leaves_enabled,
+    // approvals:read does not imply documents:read - the doc items are
+    // included only for a role that holds both.
+    viewer: ctx.role,
   })
 
   const filtered = items.filter((item) => {

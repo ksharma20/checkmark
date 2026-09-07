@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAccess } from '@/lib/ws-access'
 import { getWorkspaceMembers, removeWorkspaceMember } from '@/lib/db/queries/workspaces'
+import { reparentReportsOf } from '@/lib/db/queries/hierarchy'
 import { canManage } from '@/lib/permissions/ranks'
 import { Action, Resource } from '@/lib/permissions/catalogue'
 
@@ -29,6 +30,21 @@ export async function DELETE(request: NextRequest, { params }: Props) {
       { error: 'You cannot remove yourself', code: 'SELF_REMOVE' },
       { status: 400 },
     )
+  }
+
+  // Re-parent first, while the row this reads is still there. Their reports
+  // move onto the departing member's own manager; a null grandparent is the
+  // right answer, not a failure - the reports become unassigned and roll up to
+  // the owner at read time, which is what "my manager had no manager" means.
+  //
+  // Skipping this would not dangle a pointer (buildReportingTree treats an
+  // unknown manager as absent) but it would silently reassign the whole subtree
+  // to the owner instead of to whoever actually inherits them.
+  if (target.user_id) {
+    await reparentReportsOf({
+      workspaceId: ctx.workspace.id,
+      departingUserId: target.user_id,
+    })
   }
 
   await removeWorkspaceMember(memberId, ctx.workspace.id)

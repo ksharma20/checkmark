@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { leaveWorkspace } from '@/lib/db/queries/workspaces'
+import { reparentReportsOf } from '@/lib/db/queries/hierarchy'
 
 export async function DELETE(
   request: NextRequest,
@@ -19,6 +20,13 @@ export async function DELETE(
       { status: 403 }
     )
   }
+
+  // AFTER the leave, not before: leaveWorkspace can refuse (sole admin), and
+  // re-parenting first would restructure the org on a leave that never
+  // happened. Safe to run late because leaveWorkspace only sets status to
+  // 'revoked' - the row it reads is still there. The admin-side removal is the
+  // mirror image: that one hard-deletes, so it must re-parent first.
+  await reparentReportsOf({ workspaceId, departingUserId: userId })
 
   return NextResponse.json({ success: true })
 }

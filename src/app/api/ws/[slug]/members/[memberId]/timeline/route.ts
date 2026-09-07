@@ -16,7 +16,13 @@ export async function GET(
 ) {
   const { slug, memberId: targetUserId } = await params;
 
-  const ctx = await requireWsAccess(request, slug, Resource.Members, Action.Read);
+  // Activity:read, not Members:read. This route backs the person screen's
+  // Activity tab, which `person-tabs.ts` gates on `Resource.Activity` - and a
+  // route enforcing a different resource from the tab it draws means the two
+  // can disagree about who may see a colleague's movements. It NARROWS access:
+  // a custom role holding members:read without activity:read used to reach this
+  // and no longer does, which is the point of splitting the resources at all.
+  const ctx = await requireWsAccess(request, slug, Resource.Activity, Action.Read);
   if (!ctx) {
     return NextResponse.json(
       { error: "Forbidden", code: "FORBIDDEN" },

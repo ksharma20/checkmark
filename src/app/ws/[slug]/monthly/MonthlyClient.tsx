@@ -1,47 +1,71 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import type { MonthlyResponse, DayStatus, MemberMonthRow } from '@/app/api/ws/[slug]/monthly/route'
+import { useCallback, useEffect, useState } from 'react'
+import { Avatar, Button, Card, EmptyState, IconButton, Skeleton } from '@/components/ui'
+import { ChevronLeft, ChevronRight, Download } from 'lucide-react'
+import { wsAdmin } from '@/locales/en/ws-settings'
+import type { MemberMonthRow, MonthlyResponse, DayStatus } from '@/app/api/ws/[slug]/monthly/route'
 
-const skeletonStyle: React.CSSProperties = {
-  background: 'linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%)',
-  backgroundSize: '600px 100%',
-  animation: 'shimmer 1.4s ease-in-out infinite',
-  borderRadius: '4px',
-}
+const t = wsAdmin.monthly
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
 
-
+/**
+ * Day-cell fills. `remote` collapses onto the office colour when the workspace
+ * has no signals configured: with nothing to match against, "remote" is not a
+ * distinction the data can actually make.
+ */
 function dayColor(status: DayStatus, signalsConfigured: boolean): string {
-  if (status === 'future') return 'transparent'
-  if (status === 'absent') return 'color-mix(in srgb, var(--danger) 15%, transparent)'
-  if (status === 'leave')  return 'color-mix(in srgb, #0EA5E9 15%, transparent)'
-  if (status === 'holiday') return 'color-mix(in srgb, #8B5CF6 15%, transparent)'
-  if (status === 'office') return 'color-mix(in srgb, var(--teal) 25%, transparent)'
-  if (status === 'remote') return signalsConfigured
-    ? 'color-mix(in srgb, var(--amber) 25%, transparent)'
-    : 'color-mix(in srgb, var(--teal) 25%, transparent)'
-  return 'transparent'
+  switch (status) {
+    case 'absent':  return 'color-mix(in srgb, var(--danger) 15%, transparent)'
+    case 'leave':   return 'color-mix(in srgb, var(--info) 15%, transparent)'
+    case 'holiday': return 'var(--surface-2)'
+    case 'office':  return 'color-mix(in srgb, var(--brand) 20%, transparent)'
+    case 'remote':  return signalsConfigured
+      ? 'color-mix(in srgb, var(--amber) 22%, transparent)'
+      : 'color-mix(in srgb, var(--brand) 20%, transparent)'
+    default:        return 'transparent'
+  }
 }
 
 function dayBorder(status: DayStatus, signalsConfigured: boolean): string {
-  if (status === 'future') return 'transparent'
-  if (status === 'absent') return 'color-mix(in srgb, var(--danger) 35%, transparent)'
-  if (status === 'leave')  return 'color-mix(in srgb, #0EA5E9 35%, transparent)'
-  if (status === 'holiday') return 'color-mix(in srgb, #8B5CF6 35%, transparent)'
-  if (status === 'office') return 'color-mix(in srgb, var(--teal) 50%, transparent)'
-  if (status === 'remote') return signalsConfigured
-    ? 'color-mix(in srgb, var(--amber) 50%, transparent)'
-    : 'color-mix(in srgb, var(--teal) 50%, transparent)'
-  return 'transparent'
+  switch (status) {
+    case 'absent':  return 'color-mix(in srgb, var(--danger) 35%, transparent)'
+    case 'leave':   return 'color-mix(in srgb, var(--info) 35%, transparent)'
+    case 'holiday': return 'var(--border)'
+    case 'office':  return 'color-mix(in srgb, var(--brand) 45%, transparent)'
+    case 'remote':  return signalsConfigured
+      ? 'color-mix(in srgb, var(--amber) 45%, transparent)'
+      : 'color-mix(in srgb, var(--brand) 45%, transparent)'
+    default:        return 'transparent'
+  }
 }
 
+const STATUS_LABEL: Record<DayStatus, string> = {
+  office: t.legendOffice,
+  remote: t.legendRemote,
+  absent: t.legendAbsent,
+  leave: t.legendLeave,
+  holiday: t.legendHoliday,
+  future: '',
+}
 
-interface CalendarCellProps {
+function LegendItem({ color, border, label }: { color: string; border: string; label: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <span
+        aria-hidden
+        style={{ width: '14px', height: '14px', borderRadius: '4px', background: color, border: `1px solid ${border}` }}
+      />
+      <span className="t-muted">{label}</span>
+    </span>
+  )
+}
+
+interface CellProps {
   day: number
   dateStr: string
   status: DayStatus | undefined
@@ -50,127 +74,105 @@ interface CalendarCellProps {
   offDays: number[]
 }
 
-function CalendarCell({ day, dateStr, status, signalsConfigured, joinedDate, offDays }: CalendarCellProps) {
-  const isWeekend = offDays.includes(new Date(dateStr + 'T12:00:00Z').getUTCDay())
+function CalendarCell({ day, dateStr, status, signalsConfigured, joinedDate, offDays }: CellProps) {
+  // Noon UTC, so the weekday never rolls over for a viewer west of UTC.
+  const isWeekend = offDays.includes(new Date(`${dateStr}T12:00:00Z`).getUTCDay())
+  const base: React.CSSProperties = {
+    width: '100%',
+    height: '28px',
+    borderRadius: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '10px',
+  }
 
-  const isPreJoin = dateStr < joinedDate
-
-  if (isPreJoin) {
+  if (dateStr < joinedDate) {
     return (
       <div
-        title={`${dateStr}: not yet a member`}
-        style={{
-          width: '100%', height: '28px', borderRadius: '4px',
-          background: 'var(--surface-1)',
-          border: '1px dashed var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          opacity: 0.45,
-        }}
+        title={t.cellPreJoin(dateStr)}
+        style={{ ...base, background: 'var(--surface-1)', border: '1px dashed var(--border)', opacity: 0.45, color: 'var(--text-muted)' }}
       >
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', color: 'var(--text-muted)' }}>
-          {day}
-        </span>
+        {day}
       </div>
     )
   }
 
   if (isWeekend) {
     return (
-      <div style={{
-        width: '100%', height: '28px', borderRadius: '4px',
-        background: 'var(--surface-2)',
-        border: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        opacity: 0.4,
-      }}>
-        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '9px', color: 'var(--text-muted)' }}>
-          {day}
-        </span>
+      <div
+        title={t.cellStatus(dateStr, t.legendWeekend)}
+        style={{ ...base, background: 'var(--surface-2)', border: '1px solid var(--border)', opacity: 0.45, color: 'var(--text-muted)' }}
+      >
+        {day}
       </div>
     )
   }
 
-  const s = status ?? 'absent'
-  const titleLabel = s === 'holiday' ? 'holiday' : s === 'leave' ? 'on leave' : s
-
+  const resolved: DayStatus = status ?? 'absent'
   return (
     <div
-      title={`${dateStr}: ${titleLabel}`}
+      title={t.cellStatus(dateStr, STATUS_LABEL[resolved] || t.legendAbsent)}
       style={{
-        width: '100%', height: '28px', borderRadius: '4px',
-        background: dayColor(s, signalsConfigured),
-        border: `1px solid ${dayBorder(s, signalsConfigured)}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        position: 'relative',
+        ...base,
+        background: dayColor(resolved, signalsConfigured),
+        border: `1px solid ${dayBorder(resolved, signalsConfigured)}`,
+        fontWeight: resolved === 'office' ? 600 : 400,
       }}
     >
-      <span style={{
-        fontFamily: 'JetBrains Mono, monospace', fontSize: '10px',
-        color: s === 'future' ? 'var(--text-muted)' : 'var(--text-primary)',
-        fontWeight: s === 'office' ? 600 : 400,
-      }}>
-        {day}
-      </span>
+      {day}
     </div>
   )
 }
 
-interface MemberRowProps {
+function MemberRow({
+  member, daysInMonth, year, month, signalsConfigured, offDays,
+}: {
   member: MemberMonthRow
   daysInMonth: number
   year: number
   month: number
   signalsConfigured: boolean
   offDays: number[]
-}
-
-function MemberRow({ member, daysInMonth, year, month, signalsConfigured, offDays }: MemberRowProps) {
-  const ini = member.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()
+}) {
   const monthStr = String(month).padStart(2, '0')
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'center', gap: '12px',
-      padding: '10px 16px', borderBottom: '1px solid var(--border)',
-    }}>
-      {/* Avatar + name */}
-      <div style={{ width: '160px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
-        <div style={{
-          width: '30px', height: '30px', borderRadius: '50%', flexShrink: 0,
-          background: 'color-mix(in srgb, var(--brand) 12%, transparent)',
-          color: 'var(--brand)', fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 700,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          {ini}
-        </div>
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '10px 20px',
+        borderTop: '1px solid var(--border)',
+        minWidth: 'max-content',
+      }}
+    >
+      <div style={{ width: '170px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <Avatar name={member.name} size={30} />
         <div style={{ minWidth: 0 }}>
-          <div style={{
-            fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 500,
-            color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-          }}>
+          <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
             {member.name}
           </div>
-          <div style={{
-            fontFamily: 'JetBrains Mono, monospace', fontSize: '10px', color: 'var(--text-muted)',
-          }}>
-            {member.office_days}d{signalsConfigured && member.remote_days > 0 ? ` / ${member.remote_days}r` : ''}
-            {member.absent_days > 0 && ` / ${member.absent_days}a`}
+          <div className="mono t-muted" style={{ fontSize: '10px' }}>
+            {member.office_days}d
+            {signalsConfigured && member.remote_days > 0 ? ` / ${member.remote_days}r` : ''}
+            {member.absent_days > 0 ? ` / ${member.absent_days}a` : ''}
           </div>
         </div>
       </div>
 
-      {/* Day cells */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${daysInMonth}, 1fr)`, gap: '2px', flex: 1, minWidth: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${daysInMonth}, 22px)`, gap: '2px' }}>
         {Array.from({ length: daysInMonth }, (_, i) => {
-          const d = i + 1
-          const dateStr = `${year}-${monthStr}-${String(d).padStart(2, '0')}`
-          const status = member.days[dateStr]
+          const day = i + 1
+          const dateStr = `${year}-${monthStr}-${String(day).padStart(2, '0')}`
           return (
             <CalendarCell
               key={dateStr}
-              day={d}
+              day={day}
               dateStr={dateStr}
-              status={status}
+              status={member.days[dateStr]}
               signalsConfigured={signalsConfigured}
               joinedDate={member.joined_date}
               offDays={offDays}
@@ -189,10 +191,21 @@ interface Props {
   historyMonths: number | null
 }
 
-export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths }: Props) {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+export default function MonthlyClient({ slug, tz, canExport, historyMonths }: Props) {
+  // "Now" is the workspace's now, not the viewer's: an admin in London must not
+  // be able to page into a month that has not started in Kolkata yet.
+  const [todayYear, todayMonth] = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+    .format(new Date())
+    .split('-')
+    .map(Number)
+
+  const [year, setYear] = useState(todayYear)
+  const [month, setMonth] = useState(todayMonth)
   const [data, setData] = useState<MonthlyResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [planGated, setPlanGated] = useState(false)
@@ -203,11 +216,8 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
     setPlanGated(false)
     try {
       const res = await fetch(`/api/ws/${slug}/monthly?year=${y}&month=${m}`)
-      if (res.status === 402) {
-        setPlanGated(true)
-      } else if (res.ok) {
-        setData(await res.json())
-      }
+      if (res.status === 402) setPlanGated(true)
+      else if (res.ok) setData(await res.json())
     } finally {
       setLoading(false)
     }
@@ -215,31 +225,23 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
 
   useEffect(() => { fetchMonthly(year, month) }, [fetchMonthly, year, month])
 
-  function prevMonth() {
-    if (month === 1) { setYear(y => y - 1); setMonth(12) }
-    else setMonth(m => m - 1)
-  }
-
-  function nextMonth() {
-    const futureCheck = month === 12 ? new Date(year + 1, 0, 1) : new Date(year, month, 1)
-    if (futureCheck > now) return
-    if (month === 12) { setYear(y => y + 1); setMonth(1) }
-    else setMonth(m => m + 1)
-  }
-
-  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
-  const isFutureMonth = (() => {
-    const next = month === 12 ? new Date(year + 1, 0, 1) : new Date(year, month, 1)
-    return next > now
-  })()
-
+  const isCurrentMonth = year === todayYear && month === todayMonth
+  const isFutureMonth = year > todayYear || (year === todayYear && month >= todayMonth)
   const isAtHistoryLimit = (() => {
     if (historyMonths === null) return false
     const limit = new Date()
     limit.setMonth(limit.getMonth() - historyMonths)
-    const current = new Date(year, month - 2, 1)
-    return current <= limit
+    return new Date(year, month - 2, 1) <= limit
   })()
+
+  function prevMonth() {
+    if (month === 1) { setYear((y) => y - 1); setMonth(12) } else setMonth((m) => m - 1)
+  }
+
+  function nextMonth() {
+    if (isFutureMonth) return
+    if (month === 12) { setYear((y) => y + 1); setMonth(1) } else setMonth((m) => m + 1)
+  }
 
   async function handleExport() {
     if (!canExport) return
@@ -247,8 +249,7 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
     try {
       const res = await fetch(`/api/ws/${slug}/export?year=${year}&month=${month}`)
       if (res.ok) {
-        const blob = await res.blob()
-        const url = URL.createObjectURL(blob)
+        const url = URL.createObjectURL(await res.blob())
         const a = document.createElement('a')
         a.href = url
         a.download = `attendance-${slug}-${year}-${String(month).padStart(2, '0')}.xlsx`
@@ -260,168 +261,118 @@ export default function MonthlyClient({ slug, tz: _tz, canExport, historyMonths 
     }
   }
 
+  const signalsConfigured = !!data?.signals_configured
+
   return (
     <div>
-      {/* Month navigation */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '20px', flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <button
-            type="button"
+      {/* Month stepper */}
+      <div className="row-between fx-snap" style={{ flexWrap: 'wrap', marginBottom: '14px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <IconButton
+            variant="plain"
+            label={t.prevMonth}
+            icon={<ChevronLeft size={16} />}
             disabled={isAtHistoryLimit}
             onClick={prevMonth}
-            style={{
-              width: '32px', height: '32px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)', background: 'var(--surface-0)',
-              cursor: isAtHistoryLimit ? 'default' : 'pointer', opacity: isAtHistoryLimit ? 0.4 : 1,
-              fontFamily: 'DM Sans, sans-serif', fontSize: '16px', color: 'var(--text-secondary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            ‹
-          </button>
-          <span style={{
-            fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '18px',
-            color: 'var(--navy)', minWidth: '160px', textAlign: 'center',
-          }}>
+          />
+          <span className="t-h2" style={{ minWidth: '150px', textAlign: 'center' }}>
             {MONTH_NAMES[month - 1]} {year}
           </span>
-          <button
-            type="button"
+          <IconButton
+            variant="plain"
+            label={t.nextMonth}
+            icon={<ChevronRight size={16} />}
             disabled={isFutureMonth}
             onClick={nextMonth}
-            style={{
-              width: '32px', height: '32px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)', background: 'var(--surface-0)',
-              cursor: isFutureMonth ? 'default' : 'pointer', opacity: isFutureMonth ? 0.4 : 1,
-              fontFamily: 'DM Sans, sans-serif', fontSize: '16px', color: 'var(--text-secondary)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}
-          >
-            ›
-          </button>
+          />
           {!isCurrentMonth && (
-            <button
-              type="button"
-              onClick={() => { setYear(now.getFullYear()); setMonth(now.getMonth() + 1) }}
-              style={{
-                height: '32px', padding: '0 10px',
-                border: '1px solid var(--border)', borderRadius: 'var(--radius-sm)',
-                background: 'var(--surface-2)', color: 'var(--text-secondary)',
-                fontFamily: 'DM Sans, sans-serif', fontSize: '12px', cursor: 'pointer',
-              }}
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { setYear(todayYear); setMonth(todayMonth) }}
             >
-              Today
-            </button>
+              {t.todayBtn}
+            </Button>
           )}
         </div>
 
         {canExport && (
-          <button
-            type="button"
-            disabled={exporting || !data}
+          <Button
+            size="sm"
+            icon={<Download size={14} />}
+            loading={exporting}
+            disabled={!data}
             onClick={handleExport}
-            style={{
-              height: '32px', padding: '0 14px',
-              border: '1px solid var(--brand)', borderRadius: 'var(--radius-sm)',
-              background: 'transparent', color: 'var(--brand)',
-              fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600,
-              cursor: (exporting || !data) ? 'default' : 'pointer',
-              opacity: (exporting || !data) ? 0.5 : 1,
-              marginLeft: 'auto',
-            }}
           >
-            {exporting ? 'Exporting…' : '↓ Export Report'}
-          </button>
+            {exporting ? t.exportingBtn : t.exportBtn}
+          </Button>
         )}
       </div>
 
       {/* Legend */}
       {data && (
-        <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', flexWrap: 'wrap' }}>
-          <LegendItem color="color-mix(in srgb, var(--teal) 25%, transparent)" border="color-mix(in srgb, var(--teal) 50%, transparent)" label={data.signals_configured ? 'Office' : 'Present'} />
-          {data.signals_configured && (
-            <LegendItem color="color-mix(in srgb, var(--amber) 25%, transparent)" border="color-mix(in srgb, var(--amber) 50%, transparent)" label="Remote" />
-          )}
-          <LegendItem color="color-mix(in srgb, var(--danger) 15%, transparent)" border="color-mix(in srgb, var(--danger) 35%, transparent)" label="Absent" />
-          <LegendItem color="color-mix(in srgb, #0EA5E9 15%, transparent)" border="color-mix(in srgb, #0EA5E9 35%, transparent)" label="On Leave" />
-          <LegendItem color="color-mix(in srgb, #8B5CF6 15%, transparent)" border="color-mix(in srgb, #8B5CF6 35%, transparent)" label="Holiday" />
-          <LegendItem color="var(--surface-2)" border="var(--border)" label="Weekend" />
-          <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginLeft: 'auto' }}>
-            {data.working_days} working days
-          </span>
+        <div className="row-between" style={{ flexWrap: 'wrap', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <LegendItem
+              color={dayColor('office', signalsConfigured)}
+              border={dayBorder('office', signalsConfigured)}
+              label={signalsConfigured ? t.legendOffice : t.legendPresent}
+            />
+            {signalsConfigured && (
+              <LegendItem
+                color={dayColor('remote', true)}
+                border={dayBorder('remote', true)}
+                label={t.legendRemote}
+              />
+            )}
+            <LegendItem color={dayColor('absent', signalsConfigured)} border={dayBorder('absent', signalsConfigured)} label={t.legendAbsent} />
+            <LegendItem color={dayColor('leave', signalsConfigured)} border={dayBorder('leave', signalsConfigured)} label={t.legendLeave} />
+            <LegendItem color={dayColor('holiday', signalsConfigured)} border={dayBorder('holiday', signalsConfigured)} label={t.legendHoliday} />
+            <LegendItem color="var(--surface-2)" border="var(--border)" label={t.legendWeekend} />
+          </div>
+          <span className="t-muted">{t.workingDays(data.working_days)}</span>
         </div>
       )}
 
-
-      {/* Content */}
+      {/* Grid */}
       {loading ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '4px' }}>
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} style={{ ...skeletonStyle, height: '48px', borderRadius: 'var(--radius-sm)' }} />
-          ))}
+        <div className="stack-sm">
+          {[0, 1, 2, 3].map((i) => <Skeleton key={i} height={48} radius="var(--radius-md)" />)}
         </div>
       ) : planGated ? (
-        <div style={{
-          background: 'var(--surface-0)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)', padding: '40px 24px', textAlign: 'center',
-        }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', margin: '0 0 4px' }}>
-            This month is outside your plan&apos;s history window.
-          </p>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>
-            Upgrade to access more history.
-          </p>
-        </div>
+        <Card>
+          <EmptyState title={t.planGatedTitle} hint={t.planGatedHint} />
+        </Card>
       ) : !data || data.members.length === 0 ? (
-        <div style={{
-          background: 'var(--surface-0)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)', padding: '40px 24px', textAlign: 'center',
-        }}>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--text-muted)', margin: 0 }}>
-            No active members to display.
-          </p>
-        </div>
+        <Card>
+          <EmptyState title={t.emptyTitle} hint={t.emptyHint} />
+        </Card>
       ) : (
-        <div style={{
-          background: 'var(--surface-0)', border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)', overflow: 'hidden',
-        }}>
-          {!data.signals_configured && (
-            <div style={{
-              padding: '10px 16px', background: 'color-mix(in srgb, var(--amber) 8%, transparent)',
-              borderBottom: '1px solid var(--border)',
-              fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--text-secondary)',
-            }}>
-              No location signals configured - all check-ins counted as present. Configure GPS or IP signals in Settings to distinguish office vs remote.
-            </div>
+        <Card className="fx-spring" padded={false} style={{ overflowX: 'auto' }}>
+          {!signalsConfigured && (
+            <p
+              className="t-secondary"
+              style={{
+                padding: '10px 20px',
+                background: 'color-mix(in srgb, var(--amber) 10%, transparent)',
+              }}
+            >
+              {t.noSignalsBanner}
+            </p>
           )}
-            {data.members.map((member) => (
-              <MemberRow
-                key={member.user_id}
-                member={member}
-                daysInMonth={data.days_in_month}
-                year={year}
-                month={month}
-                signalsConfigured={data.signals_configured}
-                offDays={data.off_days}
-              />
+          {data.members.map((member) => (
+            <MemberRow
+              key={member.user_id}
+              member={member}
+              daysInMonth={data.days_in_month}
+              year={year}
+              month={month}
+              signalsConfigured={signalsConfigured}
+              offDays={data.off_days}
+            />
           ))}
-        </div>
+        </Card>
       )}
-    </div>
-  )
-}
-
-function LegendItem({ color, border, label }: { color: string; border: string; label: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-      <div style={{
-        width: '14px', height: '14px', borderRadius: '3px',
-        background: color, border: `1px solid ${border}`,
-      }} />
-      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-secondary)' }}>
-        {label}
-      </span>
     </div>
   )
 }

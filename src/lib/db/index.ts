@@ -24,9 +24,17 @@ export interface DB {
 // ─── SQLite via better-sqlite3 (local dev) ───────────────────────────────────
 
 function createSQLiteDB(): DB {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // Both `require`s are deliberate and must stay lazy. This module is the single
+  // entry point every query file imports, so anything hoisted to a top-level
+  // `import` here is pulled into every bundle that reaches it - including the
+  // Turso/libSQL production path, which must never resolve `better-sqlite3` (a
+  // native binary), and any non-Node runtime, which cannot resolve `path`.
+  // Requiring them inside the local-SQLite branch is what keeps them out.
+  // `no-require-imports` therefore cannot be satisfied without breaking that.
+  /* eslint-disable @typescript-eslint/no-require-imports */
   const Database = require("better-sqlite3");
   const path = require("path") as typeof import("path");
+  /* eslint-enable @typescript-eslint/no-require-imports */
   const dbPath = path.join(process.cwd(), en.constants.dbFile);
   const sqlite = new Database(dbPath) as import("better-sqlite3").Database;
 

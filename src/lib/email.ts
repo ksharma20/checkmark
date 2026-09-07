@@ -76,6 +76,12 @@ export async function sendConsentEmail(params: {
   workspaceName: string
   consentToken: string
   appUrl: string
+  /**
+   * The name on their employee record, when one was filled in before the
+   * invitation went out - which is the normal order now that People has an
+   * Add employee flow rather than a bare email box.
+   */
+  recipientName?: string | null
 }): Promise<void> {
   const client = getResend()
   const acceptUrl = `${params.appUrl}/consent/${params.consentToken}?action=accept`
@@ -112,14 +118,17 @@ export async function sendConsentEmail(params: {
             </div>
 
             <h2 style="font-size: 20px; font-weight: 700; color: #0D1B2A; margin: 0 0 12px 0;">
-              ${en.email.consent.heading(params.workspaceName)}
+              ${params.recipientName
+                ? en.email.consent.headingNamed(params.recipientName, params.workspaceName)
+                : en.email.consent.heading(params.workspaceName)}
             </h2>
             <p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 0 0 10px 0;">
               ${en.email.consent.body(params.workspaceName)}
             </p>
-            <p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 0 0 32px 0;">
+            <p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 0 0 10px 0;">
               ${en.email.consent.revoke}
             </p>
+            ${params.recipientName ? `<p style="color: #64748B; font-size: 14px; line-height: 1.6; margin: 0 0 32px 0;">${en.email.consent.profileReady}</p>` : '<div style="height: 22px;"></div>'}
 
             <!-- Action buttons -->
             <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom: 32px;">

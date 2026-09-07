@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getUserByEmail, createUser } from '@/lib/db/queries/users'
 import {
   getVerifiedDomainsForEmail,
-  addWorkspaceMember,
-  updateWorkspaceMember,
   getWorkspaceMemberByEmail,
   getAdminWorkspacesForUser,
   createWorkspace,
   getWorkspaceBySlug,
-  linkUserToMemberRecord,
 } from '@/lib/db/queries/workspaces'
+import { autoEnrolIntoWorkspace, claimPendingMemberships } from '@/lib/membership'
 import { hashPassword, createJwt, setSessionCookie, verifyOtpCookie, clearOtpCookie } from '@/lib/auth'
 import { validateSlug } from '@/lib/slug'
 import { validatePassword } from '@/lib/password'
@@ -17,16 +15,6 @@ import { getRedirectAfterLogin } from '@/lib/permissions/ranks'
 
 function apiError(message: string, code: string, status: number) {
   return NextResponse.json({ error: message, code }, { status })
-}
-
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-    .slice(0, 48)
 }
 
 export async function POST(request: NextRequest) {
@@ -84,24 +72,23 @@ export async function POST(request: NextRequest) {
   const passwordHash = await hashPassword(password)
   const user = await createUser({ email, passwordHash, fullName: full_name })
 
-  // Link any pending invited memberships for this email to the new user account
-  await linkUserToMemberRecord(email, user.id)
+  // Link any pending invited memberships for this email to the new user account,
+  // and claim any HR record that was filed under that address before they had
+  // one - an admin can add an employee and invite them afterwards, so the record
+  // routinely exists first.
+  await claimPendingMemberships(email, user.id)
 
   // Auto-enrol based on verified domain
   const matchingWorkspaceIds = await getVerifiedDomainsForEmail(email)
   for (const workspaceId of matchingWorkspaceIds) {
     const alreadyMember = await getWorkspaceMemberByEmail(workspaceId, email)
-    if (!alreadyMember) {
-      await addWorkspaceMember({
-        workspaceId,
-        userId: user.id,
-        email,
-        role: 'member',
-        status: 'active',
-      })
-    } else if (alreadyMember.status === 'pending_consent') {
-      await updateWorkspaceMember(alreadyMember.id, workspaceId, { status: 'active' })
-    }
+    await autoEnrolIntoWorkspace({
+      workspaceId,
+      userId: user.id,
+      email,
+      existingMemberId: alreadyMember?.id ?? null,
+      existingStatus: alreadyMember?.status ?? null,
+    })
   }
 
   // Create workspace for org accounts

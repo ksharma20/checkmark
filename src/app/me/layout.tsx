@@ -1,11 +1,21 @@
-import Link from 'next/link'
+import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import { getServerUser } from '@/lib/auth'
-import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
+import {
+  getUserWorkspaces,
+  getWorkspacesByIds,
+} from '@/lib/db/queries/workspaces'
+import { getRolesForUserWorkspaces } from '@/lib/db/queries/roles'
+import { getUserById } from '@/lib/db/queries/users'
+import { hasAnyOrgAccess } from '@/lib/permissions/can'
 import BottomNav from '@/components/user/BottomNav'
+import MeTopbar, { type MeWorkspaceOption } from '@/components/user/MeTopbar'
+import TimezoneReporter from '@/components/user/TimezoneReporter'
 import PwaInstallPrompt from '@/components/PwaInstallPrompt'
 import PageTransition from '@/components/PageTransition'
-import NotificationBell from '@/components/notifications/NotificationBell'
+import { ToastProvider } from '@/components/shared/Toast'
+import { ActiveWorkspaceProvider } from './workspace-scope'
+import { resolveActiveWorkspaceSlug } from './active-workspace'
 import { en } from '@/locales/en'
 
 export const metadata: Metadata = {
@@ -18,90 +28,82 @@ export const metadata: Metadata = {
 
 export default async function MeLayout({ children }: { children: React.ReactNode }) {
   const user = await getServerUser()
-  const adminWorkspaces = user ? await getAdminWorkspacesForUser(user.userId) : []
 
-  const wsHref =
-    adminWorkspaces.length === 1 ? `/ws/${adminWorkspaces[0].slug}` : '/ws'
+  // The shell renders for signed-out visitors too (middleware handles the
+  // redirect); it just has nothing to put in the pill.
+  let workspaces: MeWorkspaceOption[] = []
+  let userName = ''
+  let activeSlug: string | null = null
+
+  if (user) {
+    const [memberships, rolesByWorkspace, profile] = await Promise.all([
+      getUserWorkspaces(user.userId),
+      getRolesForUserWorkspaces(user.userId),
+      getUserById(user.userId),
+    ])
+
+    const wsRows = await getWorkspacesByIds(memberships.map((m) => m.workspace_id))
+    const wsMap = new Map(wsRows.map((w) => [w.id, w]))
+
+    workspaces = memberships.flatMap((m) => {
+      const ws = wsMap.get(m.workspace_id)
+      if (!ws || ws.archived_at) return []
+      const role = rolesByWorkspace[m.workspace_id]
+      return [{
+        id: ws.id,
+        slug: ws.slug,
+        name: ws.name,
+        // Display name, never the raw key - `hr-manager` would otherwise
+        // render as "Hr-manager".
+        logoUpdatedAt: ws.logo_updated_at ?? null,
+        roleName: role?.name ?? m.role,
+        hasOrgAccess: hasAnyOrgAccess(role?.permissions),
+      }]
+    })
+
+    // The remembered choice, checked against the memberships just loaded - a
+    // cookie naming a workspace this user is not in resolves to their first.
+    activeSlug = await resolveActiveWorkspaceSlug(workspaces.map((w) => w.slug))
+
+    userName = profile?.full_name?.trim() || user.email.split('@')[0]
+  }
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        background: 'var(--surface-1)',
-      }}
-    >
-      {/* PWA meta tags for /me */}
+    <>
+      {/* PWA meta tags for /me. theme-color matches --surface-1, the shell's ground. */}
       <link rel="manifest" href="/manifest-me.json" />
-      <meta name="theme-color" content="#ffffff" />
+      <meta name="theme-color" content="#F8FAFC" />
       <meta name="apple-mobile-web-app-capable" content="yes" />
       <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       <meta name="apple-mobile-web-app-title" content={en.brand.shortName} />
-      {/* Header */}
-      <header
-        style={{
-          height: '52px',
-          background: 'var(--header-bg)',
-          boxShadow: '0 1px 0 rgba(27,77,255,0.15)',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '0 16px',
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-        }}
-      >
-        <div style={{ flex: 1 }}>
-          <img src="/logo.png" alt="CheckMark" style={{ height: '60px', width: 'auto' }} />
-        </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <NotificationBell pollUrl="/api/me/notifications/unread-count" href="/me/notifications" />
-          {adminWorkspaces.length > 0 && (
-            <Link
-              href={wsHref}
-              style={{
-                fontSize: '12px',
-                fontFamily: 'DM Sans, sans-serif',
-                color: 'rgba(241,245,249,0.65)',
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '4px',
-                height: '28px',
-                padding: '0 10px',
-                border: '1px solid rgba(27,77,255,0.35)',
-                borderRadius: 'var(--radius-sm)',
-              }}
-            >
-              Workspace →
-            </Link>
-          )}
-          <Link
-            href="/me/settings"
-            aria-label="Settings"
-            className="flex items-center justify-center sm:hidden"
-            style={{
-              width: '32px',
-              height: '32px',
-              color: 'rgba(241,245,249,0.65)',
-              textDecoration: 'none',
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-            </svg>
-          </Link>
-        </div>
-      </header>
+      <ToastProvider>
+        {/* One provider around the topbar *and* the page, because the pill in
+            the topbar is the only workspace selector on this surface and every
+            screen below it reads the choice. Suspense because the provider
+            resolves `?ws=` through `useSearchParams`. */}
+        <Suspense>
+          <ActiveWorkspaceProvider workspaces={workspaces} initialSlug={activeSlug}>
+            <div className="shell-me" style={{ background: 'var(--surface-1)' }}>
+              {/* Silent timezone reporter - keeps DB in sync with browser timezone */}
+              <TimezoneReporter />
 
-      {/* Main content - padded bottom for fixed nav */}
-      <main style={{ flex: 1, paddingBottom: '72px' }}><PageTransition>{children}</PageTransition></main>
+              <MeTopbar
+                workspaces={workspaces}
+                userName={userName}
+                userEmail={user?.email ?? ''}
+              />
 
-      <BottomNav />
-      <PwaInstallPrompt />
-    </div>
+              <main className="me-content">
+                <PageTransition>{children}</PageTransition>
+              </main>
+
+              <BottomNav />
+            </div>
+          </ActiveWorkspaceProvider>
+        </Suspense>
+        <PwaInstallPrompt />
+      </ToastProvider>
+    </>
   )
 }

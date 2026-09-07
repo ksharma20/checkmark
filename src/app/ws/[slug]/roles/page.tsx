@@ -31,26 +31,9 @@ export default async function RolesPage({ params }: Props) {
   ])
 
   return (
-    <div style={{ maxWidth: '1100px', margin: '0 auto', padding: '24px 20px' }}>
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        {en.wsRoles.pageTitle}
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '13px',
-          color: 'var(--text-secondary)',
-          marginBottom: '20px',
-        }}
-      >
+    <>
+      <h1 className="t-h1 fx-snap">{en.wsRoles.pageTitle}</h1>
+      <p className="t-secondary fx-snap" style={{ margin: '4px 0 16px' }}>
         {en.wsRoles.pageSubtitle}
       </p>
 
@@ -79,6 +62,6 @@ export default async function RolesPage({ params }: Props) {
           canDelete: can(role.permissions, Resource.Roles, Action.Delete),
         }}
       />
-    </div>
+    </>
   )
 }

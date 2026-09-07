@@ -90,7 +90,7 @@ export default function OpenSourcePage() {
       {/* Hero */}
       <section style={{ background: "var(--navy)", padding: "80px 0 64px" }}>
         <div style={S.section}>
-          <p style={{ ...S.label, color: "#00D4AA" }}>Open Source</p>
+          <p style={{ ...S.label, color: "var(--teal)" }}>Open Source</p>
           <h1
             style={{
               ...S.h1,
@@ -300,7 +300,7 @@ export default function OpenSourcePage() {
                     style={{
                       display: "block",
                       background: "var(--navy)",
-                      color: "#00D4AA",
+                      color: "var(--teal)",
                       padding: "10px 14px",
                       borderRadius: "var(--radius-sm)",
                       fontSize: "13px",

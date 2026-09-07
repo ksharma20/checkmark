@@ -6,7 +6,9 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import type { WorkspaceMember, Workspace } from '@/lib/db/queries/workspaces'
 import { isWorkspaceAdmin } from '@/lib/permissions/ranks'
+import { Button, Card, EmptyState, WorkspaceAvatar } from '@/components/ui'
 import { en } from '@/locales/en'
+import { meSettings } from '@/locales/en/me-settings'
 
 interface Props {
   activeMemberships: WorkspaceMember[]
@@ -47,6 +49,7 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
         setActiveList((prev) => prev.filter((m) => m.workspace_id !== workspaceId))
         router.refresh()
       } else {
+        // 409 SOLE_ADMIN lands here - the server explains why the leave was refused.
         const data = await res.json()
         alert(data.error || en.meOrgs.leaveError)
       }
@@ -73,95 +76,41 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
   }
 
   return (
-    <div>
+    <div className="stack">
       {/* Pending consent invites */}
       {pendingList.length > 0 && (
-        <section style={{ marginBottom: '28px' }}>
-          <h2
-            style={{
-              fontFamily: 'Syne, sans-serif',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: 'var(--amber)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '10px',
-            }}
-          >
+        <section>
+          <h2 className="t-eyebrow" style={{ color: 'var(--amber)', margin: '0 0 8px' }}>
             {en.meOrgs.pendingInvitesTitle}
           </h2>
+
           {pendingList.map((m) => {
             const ws = wsMap[m.workspace_id]
+            const name = ws?.name ?? m.workspace_id
             return (
-              <div
-                key={m.id}
-                style={{
-                  background: 'var(--surface-0)',
-                  border: '1px solid var(--amber)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '14px 16px',
-                  marginBottom: '8px',
-                }}
-              >
-                <p
-                  style={{
-                    fontFamily: 'DM Sans, sans-serif',
-                    fontWeight: 500,
-                    fontSize: '14px',
-                    color: 'var(--text-primary)',
-                    marginBottom: '4px',
-                  }}
-                >
-                  {ws?.name ?? m.workspace_id}
-                </p>
-                <p
-                  style={{
-                    fontFamily: 'DM Sans, sans-serif',
-                    fontSize: '12px',
-                    color: 'var(--text-secondary)',
-                    marginBottom: '12px',
-                  }}
-                >
+              <Card key={m.id} style={{ borderColor: 'var(--amber)' }}>
+                <p className="t-h2" style={{ margin: 0, color: 'var(--navy)' }}>{name}</p>
+                <p className="t-secondary" style={{ margin: '4px 0 14px' }}>
                   {en.meOrgs.pendingInviteBody}
                 </p>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    onClick={() => handleConsent(m.id, 'accept')}
+                  <Button
+                    size="sm"
                     disabled={loadingId === m.id}
-                    style={{
-                      height: '36px',
-                      padding: '0 16px',
-                      background: 'var(--brand)',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '13px',
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
+                    onClick={() => handleConsent(m.id, 'accept')}
                   >
                     {en.meOrgs.acceptBtn}
-                  </button>
-                  <button
-                    onClick={() => handleConsent(m.id, 'decline')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     disabled={loadingId === m.id}
-                    style={{
-                      height: '36px',
-                      padding: '0 16px',
-                      background: 'transparent',
-                      color: 'var(--text-secondary)',
-                      border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: '13px',
-                      fontFamily: 'DM Sans, sans-serif',
-                      cursor: 'pointer',
-                    }}
+                    onClick={() => handleConsent(m.id, 'decline')}
                   >
                     {en.meOrgs.declineBtn}
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             )
           })}
         </section>
@@ -170,133 +119,105 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
       {/* Active memberships */}
       {activeList.length > 0 ? (
         <section>
-          <h2
-            style={{
-              fontFamily: 'Syne, sans-serif',
-              fontSize: '14px',
-              fontWeight: 600,
-              color: 'var(--text-secondary)',
-              textTransform: 'uppercase',
-              letterSpacing: '0.05em',
-              marginBottom: '10px',
-            }}
-          >
-            {en.meOrgs.activeTitle}
-          </h2>
+          <h2 className="t-eyebrow" style={{ margin: '0 0 8px' }}>{en.meOrgs.activeTitle}</h2>
+
           {activeList.map((m) => {
             const ws = wsMap[m.workspace_id]
+            const name = ws?.name ?? m.workspace_id
             const href = `/me/ws/${ws?.slug ?? m.workspace_id}`
-            return (
-              <div
-                key={m.id}
-                style={{
-                  position: 'relative',
-                  background: 'var(--surface-0)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius-md)',
-                  padding: '14px 16px',
-                  marginBottom: '8px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                  transition: 'box-shadow 0.15s, border-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.boxShadow = '0 2px 12px color-mix(in srgb, var(--brand) 12%, transparent)'
-                  e.currentTarget.style.borderColor = 'var(--brand)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.boxShadow = ''
-                  e.currentTarget.style.borderColor = 'var(--border)'
-                }}
-              >
-                {/* Full-card link overlay */}
-                <Link
-                  href={href}
-                  style={{ position: 'absolute', inset: 0, borderRadius: 'var(--radius-md)' }}
-                  aria-label={ws?.name ?? m.workspace_id}
-                />
+            const count = counts[m.workspace_id]
 
-                <div style={{ flex: 1, position: 'relative', zIndex: 1, pointerEvents: 'none' }}>
-                  <p
-                    style={{
-                      fontFamily: 'DM Sans, sans-serif',
-                      fontWeight: 600,
-                      fontSize: '14px',
-                      color: 'var(--text-primary)',
-                      marginBottom: '2px',
-                    }}
-                  >
-                    {ws?.name ?? m.workspace_id}
-                  </p>
-                  {/* The role's display name as stored - never the raw key,
-                      which `capitalize` would render as e.g. "Hr-manager". */}
-                  <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginBottom: counts[m.workspace_id] ? '4px' : '0' }}>
-                    {roleNames[m.workspace_id] ?? m.role}
-                  </p>
-                  {counts[m.workspace_id] && (
-                    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      <span style={{ color: 'var(--teal)', fontWeight: 500 }}>{counts[m.workspace_id].present} in office</span>
-                      {' · '}
-                      <span>{counts[m.workspace_id].visited} visited</span>
-                      {' · '}
-                      <span>{counts[m.workspace_id].notIn} not in</span>
+            return (
+              <Card
+                key={m.id}
+                className="hoverlift pressable"
+                style={{ position: 'relative', padding: '14px 16px' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {/* Full-card link overlay - keeps the whole row tappable while
+                      the Leave button stays a separate, higher-stacked target. */}
+                  <Link
+                    href={href}
+                    aria-label={name}
+                    style={{ position: 'absolute', inset: 0, borderRadius: 'var(--radius-lg)' }}
+                  />
+
+                  {/* The WORKSPACE mark, not the person Avatar that used to be
+                      here: `workspace-color.ts` keeps the two palettes apart on
+                      purpose, so a workspace wearing a member colour reads as a
+                      relationship that is not there. */}
+                  <span style={{ position: 'relative', pointerEvents: 'none', display: 'flex' }}>
+                    <WorkspaceAvatar
+                      id={ws?.id ?? m.workspace_id}
+                      slug={ws?.slug ?? ''}
+                      name={name}
+                      logoUpdatedAt={ws?.logo_updated_at}
+                      size="lg"
+                    />
+                  </span>
+
+                  <div style={{ flex: 1, minWidth: 0, position: 'relative', pointerEvents: 'none' }}>
+                    <p className="t-h2" style={{ margin: 0, color: 'var(--navy)' }}>{name}</p>
+                    {/* The role's display name as stored - never the raw key,
+                        which `capitalize` would render as e.g. "Hr-manager". */}
+                    <p className="t-muted" style={{ margin: '2px 0 0' }}>
+                      {roleNames[m.workspace_id] ?? m.role}
                     </p>
-                  )}
+                    {count && (
+                      <p className="t-muted" style={{ margin: '4px 0 0' }}>
+                        <span style={{ color: 'var(--teal)', fontWeight: 600 }}>
+                          {meSettings.orgs.countsInOffice(count.present)}
+                        </span>
+                        {' · '}
+                        {meSettings.orgs.countsVisited(count.visited)}
+                        {' · '}
+                        {meSettings.orgs.countsNotIn(count.notIn)}
+                      </p>
+                    )}
+                  </div>
+
+                  <ChevronRight
+                    size={20}
+                    strokeWidth={2.5}
+                    aria-hidden
+                    style={{ position: 'relative', color: 'var(--brand)', flexShrink: 0, pointerEvents: 'none' }}
+                  />
                 </div>
 
-                {/* Arrow hint */}
-                <ChevronRight size={22} strokeWidth={2.5} style={{ position: 'relative', zIndex: 1, color: 'var(--brand)', flexShrink: 0, pointerEvents: 'none' }} />
-
+                {/* Leaving is blocked server-side for a sole admin (409). */}
                 {!isWorkspaceAdmin(m.role) && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleLeave(m.workspace_id, ws?.name ?? en.meOrgs.leaveFallbackName)
-                    }}
-                    disabled={loadingId === m.workspace_id}
-                    style={{
-                      position: 'relative',
-                      zIndex: 1,
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--danger)',
-                      fontSize: '12px',
-                      fontFamily: 'DM Sans, sans-serif',
-                      cursor: 'pointer',
-                      padding: '4px 0',
-                      marginLeft: '8px',
-                    }}
-                  >
-                    {loadingId === m.workspace_id ? en.meOrgs.leavingBtn : en.meOrgs.leaveBtn}
-                  </button>
+                  <div style={{ position: 'relative', marginTop: '6px' }}>
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={loadingId === m.workspace_id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleLeave(m.workspace_id, name || en.meOrgs.leaveFallbackName)
+                      }}
+                    >
+                      {loadingId === m.workspace_id ? en.meOrgs.leavingBtn : en.meOrgs.leaveBtn}
+                    </Button>
+                  </div>
                 )}
-              </div>
+              </Card>
             )
           })}
         </section>
       ) : (
         pendingList.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '48px 20px' }}>
-            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-              {en.meOrgs.emptyTitle}
-            </p>
-            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px', lineHeight: 1.6 }}>
-              {en.meOrgs.emptyBody}
-            </p>
-            <Link
-              href="/ws"
-              style={{
-                fontFamily: 'DM Sans, sans-serif',
-                fontSize: '13px',
-                color: 'var(--brand)',
-                textDecoration: 'none',
-                fontWeight: 500,
-              }}
-            >
-              {en.meOrgs.createLink}
-            </Link>
-          </div>
+          <EmptyState
+            title={en.meOrgs.emptyTitle}
+            hint={
+              <>
+                {en.meOrgs.emptyBody}
+                <br />
+                <Link href="/ws" style={{ color: 'var(--brand)', fontWeight: 600 }}>
+                  {en.meOrgs.createLink}
+                </Link>
+              </>
+            }
+          />
         )
       )}
     </div>

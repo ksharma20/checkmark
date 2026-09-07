@@ -1,23 +1,36 @@
 'use client'
 
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import type { ApprovalItem } from '@/lib/approvals'
+import { Avatar, Button, Chip, IconButton, Input, type ChipTone } from '@/components/ui'
 import { en } from '@/locales/en'
+import { wsAdmin } from '@/locales/en/ws-overview'
+import { documents } from '@/locales/en/documents'
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/)
-  if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-  return name.slice(0, 2).toUpperCase()
-}
-
+// A switch on `kind` rather than a ternary: ApprovalItem is a discriminated
+// union, so adding a fourth kind becomes a compile error here instead of a row
+// that silently renders the wrong fields.
 export function itemLabel(item: ApprovalItem): string {
-  return item.kind === 'leave' ? item.leave_type_name : (item.requested_type === 'office' ? en.wsApprovals.markWfo : en.wsApprovals.markWfh)
+  switch (item.kind) {
+    case 'leave': return item.leave_type_name
+    case 'doc':   return documents.approvals.label
+    default:      return item.requested_type === 'office' ? en.wsApprovals.markWfo : en.wsApprovals.markWfh
+  }
 }
 
 export function itemDetail(item: ApprovalItem): string {
-  if (item.kind === 'leave') return `${item.start_date} → ${item.end_date} · ${item.days}d`
-  return `${item.target_date} · ${item.reason}`
+  switch (item.kind) {
+    case 'leave': return `${item.start_date} → ${item.end_date} · ${item.days}d`
+    case 'doc':   return documents.approvals.detail(item.doc_name, item.file_name)
+    default:      return `${item.target_date} · ${item.reason}`
+  }
+}
+
+function itemTone(item: ApprovalItem): ChipTone {
+  return item.kind === 'leave' ? 'leave' : 'partial'
 }
 
 interface Props {
@@ -31,114 +44,96 @@ interface Props {
 }
 
 /**
- * Renders one pending leave/regularization request with approve/decline actions.
- * Shared by the Overview widget's data, the dedicated Approvals page, and the
- * People page section - all backed by the same lib/approvals.ts source of truth,
- * so this is the single place the row UI needs to change.
+ * Renders one pending approval with its actions. Shared by the Overview
+ * widget, the dedicated Approvals page and the People page section - all backed
+ * by the same lib/approvals.ts source of truth, so this is the single place the
+ * row UI needs to change.
+ *
+ * `kind: 'doc'` is deliberately NOT actionable inline: verifying a document
+ * means looking at the file, so the row links into the employee record instead
+ * of offering an approve button that would act on something unseen. The
+ * approvals PATCH route only accepts `leave` and `regularization` for the same
+ * reason.
+ *
+ * The workspace slug comes from the route rather than a prop: this row is only
+ * ever rendered under /ws/[slug], and threading it through three unrelated
+ * callers just to build one href buys nothing.
  */
 export function ApprovalRow({
   item, busy, declining, onApprove, onDeclineStart, onDeclineCancel, onDeclineConfirm,
 }: Props) {
+  const { slug } = useParams<{ slug: string }>()
   const [reason, setReason] = useState('')
   const name = item.user_full_name ?? item.user_email
-  const chipColor = item.kind === 'leave' ? 'var(--brand)' : 'var(--amber)'
 
   return (
     <div
       className="fx-spring"
       style={{
-        display: 'flex', flexDirection: declining ? 'column' : 'row', alignItems: declining ? 'stretch' : 'center',
-        gap: '10px', padding: '13px 20px', borderTop: '1px solid var(--border)',
+        display: 'flex', gap: '10px', padding: '12px 20px',
+        borderTop: '1px solid var(--border)',
+        flexDirection: declining ? 'column' : 'row',
+        alignItems: declining ? 'stretch' : 'center',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
-        <div style={{
-          width: '34px', height: '34px', borderRadius: '50%', flexShrink: 0,
-          background: 'color-mix(in srgb, var(--brand) 16%, transparent)', color: 'var(--brand)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontFamily: 'DM Sans, sans-serif', fontSize: '12.5px', fontWeight: 700,
-        }}>
-          {initials(name)}
-        </div>
+        <Avatar name={name} />
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13.5px', fontWeight: 600, color: 'var(--text-primary)' }}>
-              {name}
-            </span>
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', height: '18px', padding: '0 8px',
-              borderRadius: '999px', fontSize: '10px', fontWeight: 700, letterSpacing: '0.03em',
-              textTransform: 'uppercase', color: chipColor,
-              background: `color-mix(in srgb, ${chipColor} 14%, transparent)`,
-              border: `1px solid color-mix(in srgb, ${chipColor} 30%, transparent)`,
-            }}>
-              {itemLabel(item)}
-            </span>
-          </div>
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11.5px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
-            {itemDetail(item)}
+          <p style={{ fontWeight: 600, fontSize: '13px', color: 'var(--text-primary)', margin: 0 }}>
+            {name}
           </p>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginTop: '2px', flexWrap: 'wrap' }}>
+            <Chip tone={itemTone(item)}>{itemLabel(item)}</Chip>
+            <span className="t-muted">{itemDetail(item)}</span>
+          </div>
         </div>
       </div>
 
       {declining ? (
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '44px' }}>
-          <input
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', paddingLeft: '44px', flexWrap: 'wrap' }}>
+          <Input
             autoFocus
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder={en.wsApprovals.declineReasonPlaceholder}
-            style={{
-              flex: 1, height: '34px', padding: '0 10px', border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)', background: 'var(--surface-2)', color: 'var(--text-primary)',
-              fontFamily: 'DM Sans, sans-serif', fontSize: '12.5px', outline: 'none',
-            }}
+            style={{ flex: '1 1 200px', height: '38px' }}
           />
-          <button
-            type="button"
-            onClick={onDeclineCancel}
-            style={{ height: '34px', padding: '0 12px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 600, cursor: 'pointer' }}
-          >
+          <Button variant="secondary" size="sm" onClick={onDeclineCancel}>
             {en.wsApprovals.cancel}
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="danger"
+            size="sm"
             disabled={busy || !reason.trim()}
             onClick={() => onDeclineConfirm(reason.trim())}
-            style={{ height: '34px', padding: '0 14px', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--danger)', color: '#fff', fontSize: '12px', fontWeight: 600, cursor: busy || !reason.trim() ? 'default' : 'pointer', opacity: busy || !reason.trim() ? 0.6 : 1 }}
           >
             {en.wsApprovals.confirmDecline}
-          </button>
+          </Button>
         </div>
+      ) : item.kind === 'doc' ? (
+        <Link
+          href={`/ws/${slug}/people/${encodeURIComponent(item.employee_id)}/details?tab=documents`}
+          className="btn btn-secondary btn-sm pressable"
+          style={{ textDecoration: 'none', flexShrink: 0 }}
+        >
+          {wsAdmin.approvals.reviewDocument}
+        </Link>
       ) : (
-        <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
-          <button
-            type="button"
-            title={en.wsApprovals.decline}
+        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+          <IconButton
+            variant="decline"
+            label={en.wsApprovals.decline}
+            icon={<X size={15} />}
             disabled={busy}
             onClick={onDeclineStart}
-            style={{
-              width: '32px', height: '32px', borderRadius: 'var(--radius-sm)', flexShrink: 0,
-              background: 'transparent', color: 'var(--danger)',
-              border: '1px solid color-mix(in srgb, var(--danger) 35%, transparent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: busy ? 'default' : 'pointer',
-            }}
-          >
-            <X size={15} />
-          </button>
-          <button
-            type="button"
-            title={en.wsApprovals.approve}
+          />
+          <IconButton
+            variant="approve"
+            label={en.wsApprovals.approve}
+            icon={<Check size={15} />}
             disabled={busy}
             onClick={onApprove}
-            style={{
-              width: '32px', height: '32px', borderRadius: 'var(--radius-sm)', flexShrink: 0,
-              background: 'var(--brand)', color: '#fff', border: 'none',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: busy ? 'default' : 'pointer',
-            }}
-          >
-            <Check size={15} />
-          </button>
+          />
         </div>
       )}
     </div>

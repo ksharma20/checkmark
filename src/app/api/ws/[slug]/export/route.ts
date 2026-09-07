@@ -25,6 +25,8 @@ const COLOR = {
   holiday:  'FFE9D5FF',
   leave:    'FFBAE6FD',
   weekend:  'FFE2E8F0',
+  // Brand blue (--brand #1B4DFF) as ExcelJS ARGB. A spreadsheet fill cannot
+  // read a CSS custom property, so this is the one place the token is inlined.
   header:   'FF1B4DFF',
 } as const
 

@@ -6,6 +6,9 @@
 //
 // The script creates a fresh SQLite file from Turso schema + data, backs up the
 // current local DB, then swaps the fresh copy into place.
+//
+// Blob tables are created locally but their rows are skipped - see
+// SYNC_EXCLUDED_TABLES below. Set SYNC_INCLUDE_BLOBS=1 to copy them anyway.
 
 const fs = require('fs')
 const path = require('path')
@@ -14,8 +17,34 @@ const ROOT = path.join(__dirname, '..')
 const DEFAULT_LOCAL_DB = path.join(ROOT, 'checkmark.db')
 const BATCH_SIZE = 500
 
+// Tables whose SCHEMA is still created locally but whose ROWS are never copied.
+//
+// employee_document_blobs stores document bytes as base64 TEXT (2 MB cap per
+// file), which is payload, not reference data. Copying it drags every real
+// document byte onto a laptop and makes the local snapshot grow without bound.
+// The metadata row in employee_documents still syncs, so the UI renders the
+// document list correctly - only the downloadable bytes are missing locally.
+//
+// The table is still CREATEd: skipping the create would break `npm run dev` on
+// any query that joins it.
+const SYNC_EXCLUDED_TABLES = new Set(['employee_document_blobs'])
+
+// Escape hatch for anyone debugging a document bug who actually needs the bytes.
+function shouldSkipRows(tableName) {
+  if (process.env.SYNC_INCLUDE_BLOBS === '1') return false
+  return SYNC_EXCLUDED_TABLES.has(tableName)
+}
+
 function loadDotEnvLocal() {
-  const envPath = path.join(ROOT, '.env.local')
+  // .env.sync.local first: it holds the Turso production credentials, which are
+  // deliberately kept OUT of .env.local. Next.js auto-loads .env.local, and
+  // src/lib/db/index.ts switches to Turso whenever TURSO_DATABASE_URL is set -
+  // so keeping them there would silently point `npm run dev` at production.
+  // Shell-provided values still win: loadEnvFile never overwrites process.env.
+  for (const file of ['.env.sync.local', '.env.local']) loadEnvFile(path.join(ROOT, file))
+}
+
+function loadEnvFile(envPath) {
   if (!fs.existsSync(envPath)) return
 
   const lines = fs.readFileSync(envPath, 'utf8').split('\n')
@@ -63,6 +92,11 @@ async function fetchRows(client, tableName, offset) {
     args: [BATCH_SIZE, offset],
   })
   return result.rows.map((row) => ({ ...row }))
+}
+
+async function countRows(client, tableName) {
+  const result = await client.execute(`SELECT COUNT(*) AS count FROM ${quoteIdent(tableName)}`)
+  return Number(result.rows[0]?.count ?? 0)
 }
 
 async function main() {
@@ -122,6 +156,13 @@ async function main() {
     let insertedRows = 0
     for (const table of tableRows) {
       const tableName = table.name
+
+      if (shouldSkipRows(tableName)) {
+        const skippedCount = await countRows(turso, tableName)
+        console.log(`Skipped ${tableName} (${skippedCount} row(s) — blob storage)`)
+        continue
+      }
+
       const columns = local
         .prepare(`PRAGMA table_info(${quoteIdent(tableName)})`)
         .all()

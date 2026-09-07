@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>
@@ -9,38 +9,64 @@ interface BeforeInstallPromptEvent extends Event {
 
 const DISMISSED_KEY = 'pwa_install_dismissed'
 
+/**
+ * `unavailable` - already installed, or the user dismissed the banner before.
+ * `ios`         - no `beforeinstallprompt` on iOS Safari; the banner is purely
+ *                 the "tap Share, then Add to Home Screen" instruction.
+ * `generic`     - everywhere else; the banner waits for the browser to offer
+ *                 `beforeinstallprompt` before it appears.
+ */
+type InstallContext = 'unavailable' | 'ios' | 'generic'
+
+// `matchMedia`, `localStorage` and `navigator` are all browser-only, so the
+// server can only answer `unavailable` and the real value can only be read
+// after hydration. `useSyncExternalStore` expresses that as a plain
+// server/client snapshot pair instead of a setState-in-an-effect cascade -
+// same pattern as the SSR mount guard in `src/components/ui/Modal.tsx`.
+// There is no event to subscribe to, so subscribe is a no-op.
+const subscribeNever = () => () => {}
+
+function getInstallContext(): InstallContext {
+  // Already installed as PWA - skip
+  if (window.matchMedia('(display-mode: standalone)').matches) return 'unavailable'
+  // User dismissed before - skip
+  try {
+    if (localStorage.getItem(DISMISSED_KEY)) return 'unavailable'
+  } catch {
+    // Storage can throw when site data is blocked; treat as "not dismissed".
+  }
+  const ua = navigator.userAgent
+  const ios = /iPhone|iPad|iPod/.test(ua) && !(window.navigator as Navigator & { standalone?: boolean }).standalone
+  return ios ? 'ios' : 'generic'
+}
+
+const getServerInstallContext = (): InstallContext => 'unavailable'
+
 export default function PwaInstallPrompt() {
-  const [show, setShow] = useState(false)
-  const [isIos, setIsIos] = useState(false)
+  const [dismissed, setDismissed] = useState(false)
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
 
+  const context = useSyncExternalStore(subscribeNever, getInstallContext, getServerInstallContext)
+  const isIos = context === 'ios'
+
   useEffect(() => {
-    // Already installed as PWA - skip
-    if (window.matchMedia('(display-mode: standalone)').matches) return
-    // User dismissed before - skip
-    if (localStorage.getItem(DISMISSED_KEY)) return
-
-    const ua = navigator.userAgent
-    const ios = /iPhone|iPad|iPod/.test(ua) && !(window.navigator as Navigator & { standalone?: boolean }).standalone
-
-    if (ios) {
-      setIsIos(true)
-      setShow(true)
-      return
-    }
-
+    if (context !== 'generic') return
     function handler(e: Event) {
       e.preventDefault()
       setDeferredPrompt(e as BeforeInstallPromptEvent)
-      setShow(true)
     }
     window.addEventListener('beforeinstallprompt', handler)
     return () => window.removeEventListener('beforeinstallprompt', handler)
-  }, [])
+  }, [context])
+
+  // iOS shows as soon as it is eligible; every other platform waits until the
+  // browser has actually handed over a deferred prompt. Same visibility rule
+  // the two `setShow(true)` calls used to encode.
+  const show = !dismissed && (isIos || (context === 'generic' && deferredPrompt !== null))
 
   function dismiss() {
     localStorage.setItem(DISMISSED_KEY, '1')
-    setShow(false)
+    setDismissed(true)
   }
 
   async function install() {
@@ -48,7 +74,7 @@ export default function PwaInstallPrompt() {
     await deferredPrompt.prompt()
     const { outcome } = await deferredPrompt.userChoice
     if (outcome === 'accepted') {
-      setShow(false)
+      setDismissed(true)
     } else {
       dismiss()
     }

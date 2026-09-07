@@ -1,13 +1,13 @@
+import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSessionFromCookies } from '@/lib/auth'
 import {
   getWorkspaceBySlug,
-  getMembershipsByEmail,
-  addWorkspaceMember,
   getVerifiedDomainsForEmail,
   getWorkspaceMemberByEmail,
 } from '@/lib/db/queries/workspaces'
+import { autoEnrolIntoWorkspace } from '@/lib/membership'
 import JoinClient from './JoinClient'
 
 interface Props {
@@ -60,10 +60,9 @@ function InfoCard({ children }: { children: React.ReactNode }) {
           border: '1px solid var(--border)',
           borderRadius: 'var(--radius-lg)',
           padding: '32px 28px',
-          boxShadow: '0 0 40px rgba(27,77,255,0.08)',
         }}
       >
-        <img src="/logo.png" alt="CheckMark" style={{ height: '42px', width: 'auto', marginBottom: '24px' }} />
+        <Image src="/logo.png" alt="CheckMark" width={75} height={42} style={{ height: '42px', width: 'auto', marginBottom: '24px' }} />
         {children}
       </div>
     </div>
@@ -117,12 +116,15 @@ export default async function JoinPage({ params }: Props) {
   // No invite but domain might match verified domains - auto-enrol
   const matchingIds = await getVerifiedDomainsForEmail(email)
   if (matchingIds.includes(workspace.id)) {
-    await addWorkspaceMember({
+    // Through the shell so an HR record already filed under this address is
+    // claimed at the same moment - the admin may have added them as an employee
+    // before they ever signed up.
+    await autoEnrolIntoWorkspace({
       workspaceId: workspace.id,
       userId: session.sub,
       email,
-      role: 'member',
-      status: 'active',
+      existingMemberId: existing?.id ?? null,
+      existingStatus: existing?.status ?? null,
     })
     redirect('/me')
   }

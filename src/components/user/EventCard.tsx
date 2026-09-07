@@ -5,9 +5,10 @@ import type { PresenceEvent } from '@/lib/db/queries/events'
 import type { MatchedBy } from '@/lib/signals'
 import type { RegularizationStatus } from '@/lib/db/queries/regularizations'
 import { fmtTime, durationLabel } from '@/lib/client/format-time'
+import { Button, Card, Chip, Divider, Input, toneForMatchedBy } from '@/components/ui'
 import RegularizationRequestModal from './RegularizationRequestModal'
 import { en } from '@/locales/en'
-
+import { meSettings } from '@/locales/en/me-settings'
 
 interface EventCardProps {
   event: PresenceEvent & {
@@ -22,15 +23,94 @@ interface EventCardProps {
   onRegularizationSubmitted?: () => void
 }
 
-export default function EventCard({ event, onNoteUpdate, workspaceSlug, regularizationStatus, onRegularizationSubmitted }: EventCardProps) {
+const MATCHED_LABEL: Record<MatchedBy, string> = {
+  verified: en.meTimeline.matchedVerified,
+  partial: en.meTimeline.matchedPartial,
+  none: en.meTimeline.matchedNone,
+  override: en.meTimeline.matchedOverride,
+}
+
+const REG_STATUS_LABEL: Record<RegularizationStatus, string> = {
+  pending: en.meWsRegularization.statusPending,
+  approved: en.meWsRegularization.statusApproved,
+  rejected: en.meWsRegularization.statusRejected,
+}
+
+/** Chip tone that matches how a correction request currently stands. */
+function regStatusTone(status: RegularizationStatus) {
+  if (status === 'approved') return 'verified' as const
+  if (status === 'rejected') return 'none' as const
+  return 'partial' as const
+}
+
+/** One "Check-in" / "Checkout" line inside the expanded detail panel. */
+function LocationRow({
+  label,
+  remote,
+  lat,
+  lng,
+  text,
+  fallback,
+  danger,
+}: {
+  label: string
+  remote: boolean
+  lat: number | null
+  lng: number | null
+  text: string | null
+  fallback: string
+  danger?: boolean
+}) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: '10px', flexWrap: 'wrap' }}>
+      <span className="t-eyebrow" style={{ width: '62px', flexShrink: 0 }}>{label}</span>
+
+      {remote ? (
+        <span style={{ fontSize: '12.5px', fontWeight: 600, color: 'var(--amber)' }}>
+          {meSettings.event.remote}
+        </span>
+      ) : lat !== null && lng !== null ? (
+        <a
+          href={`https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}&zoom=16`}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={meSettings.event.mapLinkLabel}
+          style={{
+            fontSize: '12.5px',
+            color: 'var(--brand)',
+            textDecoration: 'none',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '5px',
+          }}
+        >
+          <span aria-hidden style={{ color: danger ? 'var(--danger)' : 'var(--teal)' }}>◉</span>
+          {text ?? `${lat.toFixed(4)}, ${lng.toFixed(4)}`}
+        </a>
+      ) : (
+        <span className="t-muted">{fallback}</span>
+      )}
+    </div>
+  )
+}
+
+export default function EventCard({
+  event,
+  onNoteUpdate,
+  workspaceSlug,
+  regularizationStatus,
+  onRegularizationSubmitted,
+}: EventCardProps) {
   const geoLabel = event.location_label ?? null
+  const [expanded, setExpanded] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(event.note ?? '')
   const [saving, setSaving] = useState(false)
   const [regModalOpen, setRegModalOpen] = useState(false)
-  const isRemote = event.event_type === "remote_checkin";
+  const isRemote = event.event_type === 'remote_checkin'
   const eventDate = event.checkin_at.slice(0, 10)
-  const canRequestCorrection = !!workspaceSlug && (event.matched_by === 'partial' || event.matched_by === 'none')
+  const canRequestCorrection =
+    !!workspaceSlug && (event.matched_by === 'partial' || event.matched_by === 'none')
 
   const trustFlags: string[] = (() => {
     try { return event.trust_flags ? JSON.parse(event.trust_flags) as string[] : [] }
@@ -40,27 +120,15 @@ export default function EventCard({ event, onNoteUpdate, workspaceSlug, regulari
 
   const duration = durationLabel(event.checkin_at, event.checkout_at)
 
-  const transparency = (() => {
-    if (event.matched_by == null) return null
-    switch (event.matched_by) {
-      case 'verified':
-        return { label: en.meTimeline.matchedVerified, color: 'var(--teal)' }
-      case 'partial':
-        return { label: en.meTimeline.matchedPartial, color: 'var(--amber)' }
-      case 'none':
-        return { label: en.meTimeline.matchedNone, color: 'var(--text-muted)' }
-      case 'override':
-        return { label: en.meTimeline.matchedOverride, color: 'var(--brand)' }
-      default:
-        return null
-    }
-  })()
-
   // "1:37 PM - 2:15 PM" or just "1:37 PM"
   const timeRange = event.checkout_at
     ? `${fmtTime(event.checkin_at)} - ${fmtTime(event.checkout_at)}`
     : fmtTime(event.checkin_at)
 
+  /**
+   * The note is the ONLY editable field on a presence event - the rows
+   * themselves are immutable, so there is deliberately no delete affordance.
+   */
   async function saveNote() {
     setSaving(true)
     try {
@@ -78,117 +146,158 @@ export default function EventCard({ event, onNoteUpdate, workspaceSlug, regulari
     }
   }
 
+  const hasDetail =
+    !!event.matched_signals?.length ||
+    event.checkout_location_mismatch != null ||
+    event.gps_lat !== null ||
+    !!event.checkout_at ||
+    isRemote
+
   return (
-    <div
-      style={{
-        background: "var(--surface-0)",
-        border: "1px solid var(--border)",
-        borderRadius: "var(--radius-md)",
-        padding: "14px 16px",
-        marginBottom: "8px",
-      }}
-    >
-      {/* Top row: time range + distance badge + type badge + duration */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "8px",
-          marginBottom: "8px",
-          flexWrap: "wrap",
-        }}
-      >
-        <span
-          style={{
-            fontFamily: "JetBrains Mono, monospace",
-            fontSize: "13px",
-            color: "var(--text-primary)",
-            fontWeight: 400,
-          }}
-        >
-          {timeRange}
-        </span>
-
-        {duration && (
+    <Card style={{ padding: '14px 16px' }}>
+      {/* Time range + duration, with the signal verdict on the right. */}
+      <div className="row-between" style={{ alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}>
           <span
             style={{
-              fontSize: "12px",
-              color: "var(--text-muted)",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: 'var(--font-mono)',
+              fontSize: '13.5px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
             }}
           >
-            {duration}
+            {timeRange}
           </span>
-        )}
+          {duration && <span className="t-muted" style={{ marginLeft: '8px' }}>{duration}</span>}
+        </div>
 
-        {geoLabel && (
-          <span
-            style={{
-              marginLeft: "auto",
-              fontSize: "11px",
-              fontFamily: "DM Sans, sans-serif",
-              color: "var(--brand)",
-              background: "color-mix(in srgb, var(--brand) 10%, transparent)",
-              padding: "2px 8px",
-              borderRadius: "20px",
-            }}
-          >
-            {geoLabel}
-          </span>
+        {event.matched_by != null && (
+          <Chip tone={toneForMatchedBy(event.matched_by)}>{MATCHED_LABEL[event.matched_by]}</Chip>
         )}
       </div>
 
-      {transparency && (
-        <div style={{ marginBottom: "8px" }}>
-          <span
+      {/* Location line */}
+      {(geoLabel || isRemote) && (
+        <p className="t-secondary" style={{ margin: '6px 0 0' }}>
+          <span aria-hidden style={{ color: isRemote ? 'var(--amber)' : 'var(--teal)' }}>◉ </span>
+          {isRemote ? meSettings.event.remote : geoLabel}
+        </p>
+      )}
+
+      {/* Inline note editing - PATCH /api/events/{id} */}
+      <div style={{ marginTop: '8px' }}>
+        {editingNote ? (
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Input
+              type="text"
+              value={noteValue}
+              onChange={(e) => setNoteValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') saveNote()
+                if (e.key === 'Escape') { setNoteValue(event.note ?? ''); setEditingNote(false) }
+              }}
+              autoFocus
+              aria-label={meSettings.event.noteEditLabel}
+              placeholder={meSettings.event.notePlaceholder}
+            />
+            <Button size="sm" loading={saving} onClick={saveNote}>
+              {saving ? meSettings.event.noteSaving : meSettings.event.noteSave}
+            </Button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditingNote(true)}
+            aria-label={meSettings.event.noteEditLabel}
+            className="pressable"
             style={{
-              fontSize: "11px",
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: 600,
-              color: transparency.color,
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              textAlign: 'left',
+              width: '100%',
+              font: 'inherit',
+              fontSize: '13px',
+              color: noteValue ? 'var(--text-secondary)' : 'var(--text-muted)',
             }}
           >
-            {transparency.label}
-          </span>
-          {event.matched_signals && event.matched_signals.length > 0 && (
-            <span
-              style={{
-                marginLeft: "8px",
-                fontSize: "11px",
-                color: "var(--text-muted)",
-                fontFamily: "DM Sans, sans-serif",
-              }}
+            {noteValue || meSettings.event.noteEmpty}
+          </button>
+        )}
+      </div>
+
+      {/* Footer: detail toggle + the per-event regularization entry point. */}
+      {(hasDetail || canRequestCorrection || regularizationStatus) && (
+        <div
+          className="row-between"
+          style={{ marginTop: '10px', gap: '8px', flexWrap: 'wrap' }}
+        >
+          {hasDetail ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-expanded={expanded}
+              onClick={() => setExpanded((v) => !v)}
+              style={{ paddingLeft: 0, paddingRight: 0 }}
             >
-              {en.meTimeline.matchedSignals}: {event.matched_signals.join(", ")}
-            </span>
-          )}
+              {expanded ? meSettings.event.detailsHide : meSettings.event.detailsShow}
+            </Button>
+          ) : <span />}
+
+          {regularizationStatus ? (
+            <Chip tone={regStatusTone(regularizationStatus)}>
+              {en.meTimeline.correctionRequested} {REG_STATUS_LABEL[regularizationStatus]}
+            </Chip>
+          ) : canRequestCorrection ? (
+            <Button variant="secondary" size="sm" onClick={() => setRegModalOpen(true)}>
+              {en.meTimeline.requestCorrection}
+            </Button>
+          ) : null}
         </div>
       )}
 
-      {canRequestCorrection && (
-        <div style={{ marginBottom: "8px" }}>
-          {regularizationStatus ? (
-            <span style={{
-              fontSize: "11px", fontFamily: "DM Sans, sans-serif", fontWeight: 600,
-              color: regularizationStatus === "approved" ? "var(--brand)" : regularizationStatus === "rejected" ? "var(--danger)" : "var(--amber)",
-            }}>
-              {en.meTimeline.correctionRequested}{" "}
-              {regularizationStatus === "approved" ? en.meWsRegularization.statusApproved : regularizationStatus === "rejected" ? en.meWsRegularization.statusRejected : en.meWsRegularization.statusPending}
-            </span>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setRegModalOpen(true)}
-              style={{
-                height: "30px", padding: "0 12px", borderRadius: "var(--radius-sm)",
-                background: "var(--surface-2)", color: "var(--text-primary)", border: "1px solid var(--border)",
-                fontFamily: "DM Sans, sans-serif", fontSize: "12px", fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              {en.meTimeline.requestCorrection}
-            </button>
-          )}
-        </div>
+      {/* Expandable detail panel */}
+      {expanded && hasDetail && (
+        <>
+          <Divider style={{ margin: '12px 0' }} />
+          <div className="stack-sm">
+            {event.matched_signals && event.matched_signals.length > 0 && (
+              <p className="t-muted" style={{ margin: 0 }}>
+                {en.meTimeline.matchedSignals}: {event.matched_signals.join(', ')}
+              </p>
+            )}
+
+            <LocationRow
+              label={meSettings.event.checkinLabel}
+              remote={isRemote}
+              lat={event.gps_lat}
+              lng={event.gps_lng}
+              text={geoLabel}
+              fallback={en.meTimeline.checkoutLocationNotCaptured}
+            />
+
+            {event.checkout_at && (
+              <LocationRow
+                label={meSettings.event.checkoutLabel}
+                remote={isRemote}
+                lat={event.checkout_gps_lat}
+                lng={event.checkout_gps_lng}
+                text={event.checkout_location_label}
+                fallback={en.meTimeline.checkoutLocationNotCaptured}
+                danger={isOutsideRadius}
+              />
+            )}
+
+            {event.checkout_location_mismatch != null && (
+              <Chip tone={isOutsideRadius ? 'none' : 'leave'}>
+                {isOutsideRadius
+                  ? meSettings.event.distanceOutside(event.checkout_location_mismatch)
+                  : meSettings.event.distanceInside(event.checkout_location_mismatch)}
+              </Chip>
+            )}
+          </div>
+        </>
       )}
 
       {regModalOpen && workspaceSlug && (
@@ -201,236 +310,6 @@ export default function EventCard({ event, onNoteUpdate, workspaceSlug, regulari
           onSuccess={() => { setRegModalOpen(false); onRegularizationSubmitted?.() }}
         />
       )}
-
-      {/* Checkout distance badge */}
-      {event.checkout_location_mismatch != null && (
-        <div style={{ marginBottom: "8px" }}>
-          <span
-            style={{
-              fontSize: "11px",
-              fontFamily: "DM Sans, sans-serif",
-              fontWeight: isOutsideRadius ? 600 : 400,
-              color: isOutsideRadius
-                ? "var(--danger, #dc2626)"
-                : "var(--text-muted)",
-              background: isOutsideRadius
-                ? "color-mix(in srgb, var(--danger, #dc2626) 10%, transparent)"
-                : "var(--surface-1)",
-              padding: "3px 8px",
-              borderRadius: "4px",
-              border: isOutsideRadius
-                ? "1px solid var(--danger, #dc2626)"
-                : "1px solid var(--border)",
-            }}
-          >
-            {isOutsideRadius ? "⚠" : "✓"} {event.checkout_location_mismatch}m
-            away from office
-            {isOutsideRadius ? " - outside radius" : ""}
-          </span>
-        </div>
-      )}
-
-      {/* Note */}
-      <div style={{ marginBottom: "8px" }}>
-        {editingNote ? (
-          <div style={{ display: "flex", gap: "6px" }}>
-            <input
-              type="text"
-              value={noteValue}
-              onChange={(e) => setNoteValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") saveNote();
-                if (e.key === "Escape") setEditingNote(false);
-              }}
-              autoFocus
-              placeholder="Add a note…"
-              style={{
-                flex: 1,
-                height: "34px",
-                padding: "0 10px",
-                border: "1px solid var(--brand)",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "13px",
-                fontFamily: "DM Sans, sans-serif",
-                background: "var(--surface-0)",
-                outline: "none",
-              }}
-            />
-            <button
-              onClick={saveNote}
-              disabled={saving}
-              style={{
-                height: "34px",
-                padding: "0 12px",
-                background: "var(--brand)",
-                color: "#fff",
-                border: "none",
-                borderRadius: "var(--radius-sm)",
-                fontSize: "13px",
-                cursor: "pointer",
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            >
-              {saving ? "…" : "Save"}
-            </button>
-          </div>
-        ) : (
-          <button
-            onClick={() => setEditingNote(true)}
-            style={{
-              background: "none",
-              border: "none",
-              padding: 0,
-              cursor: "pointer",
-              textAlign: "left",
-              width: "100%",
-              fontSize: "13px",
-              fontFamily: "DM Sans, sans-serif",
-              color: noteValue ? "var(--text-secondary)" : "var(--text-muted)",
-            }}
-          >
-            {noteValue || "Add a note…"}
-          </button>
-        )}
-      </div>
-
-      {/* Location rows: Check-in + Checkout */}
-      <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-        {/* Check-in location */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            flexWrap: "wrap",
-          }}
-        >
-          <span
-            style={{
-              fontSize: "10px",
-              fontWeight: 700,
-              color: "var(--text-muted)",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              width: "60px",
-              flexShrink: 0,
-              fontFamily: "DM Sans, sans-serif",
-            }}
-          >
-            Check-in
-          </span>
-
-          {isRemote ? (
-            <span
-              style={{
-                fontSize: "11px",
-                color: "var(--amber)",
-                fontFamily: "DM Sans, sans-serif",
-                fontWeight: 600,
-              }}
-            >
-              Remote
-            </span>
-          ) : event.gps_lat !== null && event.gps_lng !== null ? (
-            <a
-              href={`https://www.openstreetmap.org/?mlat=${event.gps_lat}&mlon=${event.gps_lng}&zoom=16`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontSize: "11px",
-                fontFamily: "DM Sans, sans-serif",
-                color: "var(--brand)",
-                textDecoration: "none",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
-              <span style={{ color: "var(--teal)" }}>◉</span>
-              {geoLabel ??
-                `${event.gps_lat.toFixed(4)}, ${event.gps_lng.toFixed(4)}`}
-            </a>
-          ) : null}
-        </div>
-
-        {/* Checkout location */}
-        {event.checkout_at && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-              flexWrap: "wrap",
-            }}
-          >
-            <span
-              style={{
-                fontSize: "10px",
-                fontWeight: 700,
-                color: "var(--text-muted)",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-                width: "60px",
-                flexShrink: 0,
-                fontFamily: "DM Sans, sans-serif",
-              }}
-            >
-              Checkout
-            </span>
-
-            {isRemote ? (
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "var(--amber)",
-                  fontFamily: "DM Sans, sans-serif",
-                  fontWeight: 600,
-                }}
-              >
-                Remote
-              </span>
-            ) : event.checkout_gps_lat !== null &&
-              event.checkout_gps_lng !== null ? (
-              <a
-                href={`https://www.openstreetmap.org/?mlat=${event.checkout_gps_lat}&mlon=${event.checkout_gps_lng}&zoom=16`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  fontSize: "11px",
-                  fontFamily: "DM Sans, sans-serif",
-                  color: "var(--brand)",
-                  textDecoration: "none",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "4px",
-                }}
-              >
-                <span
-                  style={{
-                    color: isOutsideRadius
-                      ? "var(--danger, #dc2626)"
-                      : "var(--teal)",
-                  }}
-                >
-                  ◉
-                </span>
-                {event.checkout_location_label ??
-                  `${event.checkout_gps_lat.toFixed(4)}, ${event.checkout_gps_lng.toFixed(4)}`}
-              </a>
-            ) : (
-              <span
-                style={{
-                  fontSize: "11px",
-                  color: "var(--text-muted)",
-                  fontFamily: "DM Sans, sans-serif",
-                }}
-              >
-                {en.meTimeline.checkoutLocationNotCaptured}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    </Card>
+  )
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import NotificationRow from './NotificationRow'
 import type { Notification } from '@/lib/db/queries/notifications'
 import { fetchWsNotifications, markWsNotificationsRead } from '@/lib/api/notifications'
+import { notificationHref } from '@/lib/client/notification-href'
 import { en } from '@/locales/en'
 
 export default function NotificationPanel({ slug, onClose }: { slug: string; onClose: () => void }) {
@@ -42,7 +43,16 @@ export default function NotificationPanel({ slug, onClose }: { slug: string; onC
       }
     }
     onClose()
-    router.push(`/ws/${slug}/leaves`)
+    // Every row used to land on `/ws/:slug/leaves`, whatever it was about - a
+    // document rejection and a correction request both opened the leave list.
+    // The panel is already scoped to one workspace, so its own slug stands in
+    // when the row's own is missing (account-level rows, or a LEFT JOIN miss).
+    router.push(
+      notificationHref(
+        { ...n, workspace_slug: n.workspace_slug ?? slug },
+        'ws',
+      ),
+    )
   }
 
   return (

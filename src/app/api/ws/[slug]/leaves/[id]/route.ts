@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAccess } from '@/lib/ws-access'
-import { actionLeaveRequest, getLeaveTypeById, LeaveAction } from '@/lib/db/queries/leaves'
-import { getUserById } from '@/lib/db/queries/users'
-import { createNotification } from '@/lib/db/queries/notifications'
-import { sendPushToUser } from '@/lib/push'
-import { en } from '@/locales/en'
+import { LeaveAction } from '@/lib/db/queries/leaves'
+import { actionLeaveAndNotify } from '@/lib/leave-action'
 import { Action, Resource } from '@/lib/permissions/catalogue'
 
 interface Props { params: Promise<{ slug: string; id: string }> }
+
+// ─── PATCH /api/ws/[slug]/leaves/[id] ────────────────────────────────────────
+// The leave screen's approve/reject. The approvals queue actions the same row
+// through `/api/ws/[slug]/approvals/leave/[id]`, gated on a different resource.
+//
+// This route owns only the gate and the response shape. The transition and the
+// employee notification live in `actionLeaveAndNotify()`, shared with that
+// route, so the two cannot drift into emitting two different feed rows for the
+// same decision.
 
 export async function PATCH(req: NextRequest, { params }: Props) {
   const { slug, id } = await params
@@ -39,12 +45,13 @@ export async function PATCH(req: NextRequest, { params }: Props) {
     )
   }
 
-  const result = await actionLeaveRequest({
+  const result = await actionLeaveAndNotify({
     id,
     workspaceId: ctx.workspace.id,
+    workspaceSlug: slug,
     action,
     actionedByUserId: ctx.userId,
-    rejectionReason: action === LeaveAction.REJECT ? rejectionReason : null,
+    rejectionReason,
   })
 
   if ('error' in result) {
@@ -60,29 +67,9 @@ export async function PATCH(req: NextRequest, { params }: Props) {
     )
   }
 
-  const [employee, leaveType] = await Promise.all([
-    getUserById(result.updated.user_id),
-    getLeaveTypeById(result.updated.leave_type_id, ctx.workspace.id),
-  ])
-
-  // Notify the requesting employee (leaveType may be null if soft-deleted — use fallback name)
-  if (employee) {
-    const leaveTypeName = leaveType?.name ?? 'Leave'
-    const isApproved = action === LeaveAction.APPROVE
-    const notifType = isApproved ? 'leave_approved' as const : 'leave_rejected' as const
-    const title = isApproved ? en.notifications.leaveApprovedTitle : en.notifications.leaveRejectedTitle
-    const notifBody = isApproved
-      ? en.notifications.leaveApprovedBody(leaveTypeName, result.updated.start_date, result.updated.end_date)
-      : en.notifications.leaveRejectedBody(leaveTypeName, result.updated.start_date, result.updated.end_date)
-    await Promise.allSettled([
-      createNotification({ userId: result.updated.user_id, workspaceId: ctx.workspace.id, type: notifType, title, body: notifBody, refId: result.updated.id, refType: 'leave_request' }),
-      sendPushToUser(result.updated.user_id, { title, body: notifBody, tag: `leave-${notifType}-${result.updated.id}` }),
-    ])
-  }
-
   return NextResponse.json({
     leaveRequest: result.updated,
-    employee: employee ? { id: employee.id, email: employee.email, full_name: employee.full_name } : null,
-    leaveType: leaveType ? { id: leaveType.id, name: leaveType.name } : null,
+    employee: result.employee,
+    leaveType: result.leaveType,
   })
 }

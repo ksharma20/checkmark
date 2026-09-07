@@ -19,12 +19,28 @@ import { Resource } from './catalogue'
 /** Every page on the org surface. */
 export enum Screen {
   Overview = 'overview',
-  Employees = 'employees',
+  /**
+   * The reporting tree at /org, gated on `employees`.
+   *
+   * This slot used to be the HR directory. That directory merged into /people
+   * when it started listing every member - two screens over the same people,
+   * from opposite tables, disagreeing on the headcount. The employee RECORD is
+   * still what `employees:read` protects; this is the shape of the org.
+   */
+  Organisation = 'organisation',
+  Assets = 'assets',
+  Attendance = 'attendance',
+  Leave = 'leave',
+  Holidays = 'holidays',
+  Approvals = 'approvals',
+  /**
+   * The workforce directory at /people - every member, HR record overlaid,
+   * invited people included. Gated on `members`; the HR columns inside it are
+   * gated separately on `employees` by the route that feeds them.
+   */
+  People = 'people',
   Analytics = 'analytics',
   Activity = 'activity',
-  Holidays = 'holidays',
-  Leave = 'leave',
-  Approvals = 'approvals',
   Reports = 'reports',
   Roles = 'roles',
   Settings = 'settings',
@@ -80,27 +96,27 @@ export interface ScreenDef {
  * Keyed by Screen so the compiler enforces exhaustiveness - a new enum member
  * without a definition here is a build error rather than a tab that silently
  * never renders.
+ *
+ * Declaration order IS render order (see SCREENS below), so this object is
+ * written in the order the sidebar should show, group by group.
  */
 const SCREEN_DEFS: Record<Screen, ScreenDef> = {
+  // ── Workforce: the day-to-day people surface ──────────────────────────────
   [Screen.Overview]: {
     key: Screen.Overview, path: '', group: ScreenGroup.Workforce,
     resource: Resource.Dashboard, feature: null,
   },
-  [Screen.Employees]: {
-    key: Screen.Employees, path: '/people', group: ScreenGroup.Workforce,
-    resource: Resource.Members, feature: null,
+  [Screen.Organisation]: {
+    key: Screen.Organisation, path: '/org', group: ScreenGroup.Workforce,
+    resource: Resource.Employees, feature: null,
   },
-  [Screen.Analytics]: {
-    key: Screen.Analytics, path: '/insights', group: ScreenGroup.Workforce,
-    resource: Resource.Analytics, feature: null,
+  [Screen.Assets]: {
+    key: Screen.Assets, path: '/assets', group: ScreenGroup.Workforce,
+    resource: Resource.Assets, feature: null,
   },
-  [Screen.Activity]: {
-    key: Screen.Activity, path: '/monthly', group: ScreenGroup.Workforce,
-    resource: Resource.Activity, feature: null,
-  },
-  [Screen.Holidays]: {
-    key: Screen.Holidays, path: '/holidays', group: ScreenGroup.Workforce,
-    resource: Resource.Holidays, feature: WorkspaceFeature.Leaves,
+  [Screen.Attendance]: {
+    key: Screen.Attendance, path: '/attendance', group: ScreenGroup.Workforce,
+    resource: Resource.Dashboard, feature: null,
   },
   [Screen.Leave]: {
     key: Screen.Leave, path: '/leaves', group: ScreenGroup.Workforce,
@@ -110,11 +126,28 @@ const SCREEN_DEFS: Record<Screen, ScreenDef> = {
       { key: SubScreen.LeaveApplied, path: '/leaves' },
     ],
   },
+  [Screen.Holidays]: {
+    key: Screen.Holidays, path: '/holidays', group: ScreenGroup.Workforce,
+    resource: Resource.Holidays, feature: WorkspaceFeature.Leaves,
+  },
   [Screen.Approvals]: {
     key: Screen.Approvals, path: '/approvals', group: ScreenGroup.Workforce,
     resource: Resource.Approvals, feature: null,
   },
 
+  // ── Manage: workspace administration ──────────────────────────────────────
+  [Screen.People]: {
+    key: Screen.People, path: '/people', group: ScreenGroup.Manage,
+    resource: Resource.Members, feature: null,
+  },
+  [Screen.Analytics]: {
+    key: Screen.Analytics, path: '/insights', group: ScreenGroup.Manage,
+    resource: Resource.Analytics, feature: null,
+  },
+  [Screen.Activity]: {
+    key: Screen.Activity, path: '/monthly', group: ScreenGroup.Manage,
+    resource: Resource.Activity, feature: null,
+  },
   [Screen.Reports]: {
     key: Screen.Reports, path: '/reports', group: ScreenGroup.Manage,
     resource: Resource.Export, feature: null,

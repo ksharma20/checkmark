@@ -12,7 +12,10 @@
 
 # testing
 /coverage
-/temp
+/.tmp
+
+# scratch files - see ~/.ai/CORE.md "SCRATCH FILES LIVE IN ./.temp"
+.temp/
 
 # next.js
 /.next/
@@ -33,19 +36,26 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 *.env*
-*.db*
 !.env.example
+
+# SQLite & dbcode
+*.db
+*.dbcnb
+*.db-shm
+*.db-wal
+# staged snapshot from an interrupted `npm run db:sync`
+*.sync-tmp*
 
 # vercel
 .vercel
 
 # editor
+superpowers/
 .vscode/
+.claude/
 android/
 ios/
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-superpowers/

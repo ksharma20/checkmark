@@ -2,9 +2,13 @@
 
 import { useCallback, useState } from 'react'
 import { Lock } from 'lucide-react'
+import { Button, Card, Chip, Field, Input, Modal } from '@/components/ui'
 import { en } from '@/locales/en'
+import { wsAdmin } from '@/locales/en/ws-settings'
 import { Scope, type PermissionGrid, type Resource, type ResourceDef } from '@/lib/permissions/catalogue'
 import PermissionGridEditor from './PermissionGridEditor'
+
+const r = wsAdmin.roles
 
 interface Role {
   id: string
@@ -73,7 +77,7 @@ export default function RolesClient({ slug, initialRoles, resources, viewer }: P
     setRoles(data.roles ?? [])
   }, [slug])
 
-  const selected = roles.find((r) => r.id === selectedId) ?? null
+  const selected = roles.find((role) => role.id === selectedId) ?? null
 
   /**
    * Select a role AND seed the draft from it.
@@ -117,7 +121,7 @@ export default function RolesClient({ slug, initialRoles, resources, viewer }: P
     })
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
-      setRoles((prev) => prev.map((r) => (r.id === selected.id ? { ...r, ...data.role } : r)))
+      setRoles((prev) => prev.map((role) => (role.id === selected.id ? { ...role, ...data.role } : role)))
     } else {
       setError(data.error ?? en.wsRoles.errorSaveFailed)
     }
@@ -158,7 +162,7 @@ export default function RolesClient({ slug, initialRoles, resources, viewer }: P
     const res = await fetch(`/api/ws/${slug}/roles/${roleToDelete.id}`, { method: 'DELETE' })
     const data = await res.json().catch(() => ({}))
     if (res.ok) {
-      setRoles((prev) => prev.filter((r) => r.id !== roleToDelete.id))
+      setRoles((prev) => prev.filter((role) => role.id !== roleToDelete.id))
       selectRole(null)
       setRoleToDelete(null)
       reloadRoles()
@@ -168,68 +172,26 @@ export default function RolesClient({ slug, initialRoles, resources, viewer }: P
     setDialogBusy(false)
   }
 
-  // ── styles ──────────────────────────────────────────────────────────────
-  const cardStyle: React.CSSProperties = {
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-md)',
-    background: 'var(--surface-0)',
-  }
-  const labelStyle: React.CSSProperties = {
-    fontFamily: 'DM Sans, sans-serif',
-    fontSize: '11px',
-    fontWeight: 700,
-    color: 'var(--text-muted)',
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-    marginBottom: '4px',
-    display: 'block',
-  }
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    height: '40px',
-    padding: '0 10px',
-    border: '1px solid var(--border)',
-    borderRadius: 'var(--radius-sm)',
-    background: 'var(--surface-2)',
-    fontFamily: 'DM Sans, sans-serif',
-    fontSize: '13px',
-    color: 'var(--navy)',
-    outline: 'none',
-  }
-  const btnStyle: React.CSSProperties = {
-    height: '44px',
-    padding: '0 16px',
-    borderRadius: 'var(--radius-md)',
-    border: '1px solid var(--border)',
-    background: 'var(--surface-0)',
-    fontFamily: 'DM Sans, sans-serif',
-    fontSize: '13px',
-    fontWeight: 600,
-    cursor: 'pointer',
-  }
-  const btnPrimaryStyle: React.CSSProperties = {
-    ...btnStyle,
-    background: 'var(--brand)',
-    borderColor: 'var(--brand)',
-    color: '#fff',
-  }
-
-  const customRoles = roles.filter((r) => !r.isSystem)
+  const customRoles = roles.filter((role) => !role.isSystem)
 
   return (
     <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
       {/* ── Role list ─────────────────────────────────────────────────── */}
-      <div style={{ ...cardStyle, width: '240px', flexShrink: 0, minWidth: '220px' }}>
-        <div style={{ ...labelStyle, padding: '10px 12px 6px', marginBottom: 0 }}>
-          {en.wsRoles.listHeading}
-        </div>
-        {roles.map((r) => {
-          const active = r.id === selectedId
+      <Card
+        className="fx-spring"
+        padded={false}
+        style={{ width: '248px', flex: '0 0 auto', minWidth: '220px', overflow: 'hidden' }}
+      >
+        <p className="t-eyebrow" style={{ padding: '14px 16px 8px' }}>{en.wsRoles.listHeading}</p>
+
+        {roles.map((role) => {
+          const active = role.id === selectedId
           return (
             <button
-              key={r.id}
+              key={role.id}
               type="button"
-              onClick={() => selectRole(r)}
+              onClick={() => selectRole(role)}
+              className="rowlink"
               style={{
                 width: '100%',
                 minHeight: '44px',
@@ -237,89 +199,95 @@ export default function RolesClient({ slug, initialRoles, resources, viewer }: P
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 gap: '8px',
-                padding: '10px 12px',
-                background: active ? 'color-mix(in srgb, var(--brand) 8%, transparent)' : 'none',
+                padding: '10px 16px',
+                background: active ? 'color-mix(in srgb, var(--brand) 10%, transparent)' : 'none',
                 border: 'none',
-                borderLeft: active ? '3px solid var(--brand)' : '3px solid transparent',
-                borderBottom: '1px solid var(--border)',
-                cursor: 'pointer',
+                borderLeft: `3px solid ${active ? 'var(--brand)' : 'transparent'}`,
+                borderTop: '1px solid var(--border)',
+                borderRadius: 0,
                 textAlign: 'left',
-                fontFamily: 'DM Sans, sans-serif',
                 fontSize: '13px',
                 fontWeight: active ? 700 : 500,
-                color: 'var(--navy)',
+                color: active ? 'var(--brand)' : 'var(--text-primary)',
+                fontFamily: 'inherit',
               }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
-                {r.isSystem && <Lock size={12} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />}
+                {role.isSystem && <Lock size={12} className="t-muted" style={{ flexShrink: 0 }} aria-hidden />}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {r.name}
+                  {role.name}
                 </span>
               </span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: '11px', color: 'var(--text-muted)' }}>
-                {r.memberCount}
+              <span className="mono t-muted" aria-label={r.memberCountAria(role.memberCount)}>
+                {role.memberCount}
               </span>
             </button>
           )
         })}
 
         {viewer.canWrite && (
-          <button
-            type="button"
-            onClick={() => { setCreateDialogOpen(true); setDuplicateFrom(null); setCreateName(''); setError(null) }}
-            style={{
-              width: 'calc(100% - 20px)',
-              margin: '10px',
-              minHeight: '44px',
-              border: '1px dashed var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              background: 'none',
-              color: 'var(--brand)',
-              fontFamily: 'DM Sans, sans-serif',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            {en.wsRoles.newRoleBtn}
-          </button>
+          <div style={{ padding: '10px' }}>
+            <Button
+              variant="secondary"
+              size="sm"
+              block
+              onClick={() => { setCreateDialogOpen(true); setDuplicateFrom(null); setCreateName(''); setError(null) }}
+            >
+              {en.wsRoles.newRoleBtn}
+            </Button>
+          </div>
         )}
 
         {customRoles.length === 0 && (
-          <p style={{ padding: '0 12px 12px', fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-            {en.wsRoles.emptyStateBody}
-          </p>
+          <p className="t-muted" style={{ padding: '0 16px 14px' }}>{en.wsRoles.emptyStateBody}</p>
         )}
-      </div>
+      </Card>
 
       {/* ── Detail pane ───────────────────────────────────────────────── */}
-      {selected && (
-        <div style={{ ...cardStyle, flex: 1, minWidth: '300px' }}>
-          {selected.isSystem ? (
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', gap: '6px', alignItems: 'center' }}>
-              <Lock size={13} style={{ flexShrink: 0 }} />
-              {en.wsRoles.systemLockedBanner(selected.name)}
-            </div>
-          ) : (
-            <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'color-mix(in srgb, var(--brand) 6%, transparent)', fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-secondary)' }}>
-              {selected.memberCount > 0
-                ? en.wsRoles.inUseBanner(selected.memberCount)
-                : en.wsRoles.unusedBanner}
-            </div>
-          )}
+      {selected ? (
+        <Card className="fx-spring" padded={false} style={{ flex: '1 1 320px', minWidth: '300px', overflow: 'hidden' }}>
+          <div
+            style={{
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--border)',
+              background: selected.isSystem
+                ? 'var(--surface-2)'
+                : 'color-mix(in srgb, var(--brand) 6%, transparent)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              flexWrap: 'wrap',
+            }}
+          >
+            {selected.isSystem ? (
+              <>
+                <Chip tone="owner">{r.systemBadge}</Chip>
+                <span className="t-secondary">{en.wsRoles.systemLockedBanner(selected.name)}</span>
+              </>
+            ) : (
+              <span className="t-secondary">
+                {selected.memberCount > 0
+                  ? en.wsRoles.inUseBanner(selected.memberCount)
+                  : en.wsRoles.unusedBanner}
+              </span>
+            )}
+          </div>
 
-          <div style={{ padding: '12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '14px', flexWrap: 'wrap' }}>
-            <div style={{ flex: '1 1 200px', minWidth: '180px' }}>
-              <label style={labelStyle} htmlFor="role-name">{en.wsRoles.fieldName}</label>
-              <input
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+            <Field label={en.wsRoles.fieldName} htmlFor="role-name" style={{ maxWidth: '320px' }}>
+              <Input
                 id="role-name"
                 value={draftName}
                 disabled={!editable}
-                onChange={(e) => setDraftName(e.target.value)}
                 placeholder={en.wsRoles.fieldNamePlaceholder}
-                style={{ ...inputStyle, opacity: editable ? 1 : 0.7, cursor: editable ? 'text' : 'not-allowed' }}
+                onChange={(e) => setDraftName(e.target.value)}
               />
-            </div>
+            </Field>
+          </div>
+
+          <div style={{ padding: '14px 16px 4px' }}>
+            <p className="t-eyebrow">{r.detailHeading}</p>
+            <p className="t-muted" style={{ margin: '6px 0 0' }}>{r.detailHint}</p>
           </div>
 
           <PermissionGridEditor
@@ -331,105 +299,108 @@ export default function RolesClient({ slug, initialRoles, resources, viewer }: P
           />
 
           {error && (
-            <p style={{ padding: '10px 12px 0', fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--danger)' }}>
-              {error}
-            </p>
+            <p style={{ padding: '10px 16px 0', fontSize: '12px', color: 'var(--danger)' }}>{error}</p>
           )}
 
-          <div style={{ padding: '12px', borderTop: '1px solid var(--border)', display: 'flex', gap: '8px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              padding: '12px 16px',
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              gap: '8px',
+              justifyContent: 'flex-end',
+              flexWrap: 'wrap',
+            }}
+          >
             {viewer.canWrite && (
-              <button
-                type="button"
-                onClick={() => { setCreateDialogOpen(true); setDuplicateFrom(selected.key); setCreateName(`${selected.name} copy`); setError(null) }}
-                style={btnStyle}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setCreateDialogOpen(true)
+                  setDuplicateFrom(selected.key)
+                  setCreateName(`${selected.name} copy`)
+                  setError(null)
+                }}
               >
                 {en.wsRoles.duplicateBtn}
-              </button>
+              </Button>
             )}
             {editable && viewer.canDelete && (
-              <button type="button" onClick={() => setRoleToDelete(selected)} style={{ ...btnStyle, color: 'var(--danger)', borderColor: 'var(--danger)' }}>
+              <Button variant="danger" size="sm" onClick={() => setRoleToDelete(selected)}>
                 {en.wsRoles.deleteBtn}
-              </button>
+              </Button>
             )}
             {editable && (
-              <button
-                type="button"
-                onClick={save}
-                disabled={!dirty || saving}
-                style={{ ...btnPrimaryStyle, opacity: !dirty || saving ? 0.45 : 1, cursor: !dirty || saving ? 'default' : 'pointer' }}
-              >
+              <Button size="sm" disabled={!dirty} loading={saving} onClick={save}>
                 {saving ? en.wsRoles.savingBtn : en.wsRoles.saveBtn}
-              </button>
+              </Button>
             )}
           </div>
-        </div>
+        </Card>
+      ) : (
+        <Card className="fx-spring" style={{ flex: '1 1 320px', minWidth: '300px' }}>
+          <p className="t-secondary">{r.selectPrompt}</p>
+        </Card>
       )}
 
       {/* ── Create / duplicate ────────────────────────────────────────── */}
-      {createDialogOpen && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ ...cardStyle, padding: '24px', maxWidth: '420px', width: '100%' }}>
-            <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 700, color: 'var(--navy)', marginBottom: '12px' }}>
-              {en.wsRoles.createTitle}
-            </h2>
-            <label style={labelStyle} htmlFor="new-role-name">{en.wsRoles.fieldName}</label>
-            <input
-              id="new-role-name"
-              autoFocus
-              value={createName}
-              onChange={(e) => setCreateName(e.target.value)}
-              placeholder={en.wsRoles.fieldNamePlaceholder}
-              style={{ ...inputStyle, marginBottom: '12px' }}
-            />
-            {error && (
-              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--danger)', marginBottom: '10px' }}>{error}</p>
-            )}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => { setCreateDialogOpen(false); setError(null) }} style={btnStyle}>
-                {en.wsRoles.cancelBtn}
-              </button>
-              <button type="button" onClick={create} disabled={dialogBusy} style={{ ...btnPrimaryStyle, opacity: dialogBusy ? 0.6 : 1 }}>
-                {dialogBusy ? en.wsRoles.creatingSubmit : en.wsRoles.createSubmit}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={createDialogOpen}
+        onClose={() => { setCreateDialogOpen(false); setError(null) }}
+        maxWidth={420}
+        title={en.wsRoles.createTitle}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => { setCreateDialogOpen(false); setError(null) }}>
+              {en.wsRoles.cancelBtn}
+            </Button>
+            <Button size="sm" loading={dialogBusy} onClick={create}>
+              {dialogBusy ? en.wsRoles.creatingSubmit : en.wsRoles.createSubmit}
+            </Button>
+          </>
+        }
+      >
+        <Field label={en.wsRoles.fieldName} htmlFor="new-role-name" error={error ?? undefined}>
+          <Input
+            id="new-role-name"
+            autoFocus
+            value={createName}
+            placeholder={en.wsRoles.fieldNamePlaceholder}
+            onChange={(e) => setCreateName(e.target.value)}
+          />
+        </Field>
+      </Modal>
 
       {/* ── Delete ────────────────────────────────────────────────────── */}
-      {roleToDelete && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ ...cardStyle, padding: '24px', maxWidth: '440px', width: '100%' }}>
-            <h2 style={{ fontFamily: 'Syne, sans-serif', fontSize: '18px', fontWeight: 700, color: 'var(--navy)', marginBottom: '10px' }}>
-              {en.wsRoles.deleteTitle(roleToDelete.name)}
-            </h2>
-            <div style={{ border: '1px solid var(--border)', background: 'var(--surface-1)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', marginBottom: '10px', fontFamily: 'DM Sans, sans-serif', fontSize: '13px', lineHeight: 1.55 }}>
+      <Modal
+        open={roleToDelete !== null}
+        onClose={() => { setRoleToDelete(null); setError(null) }}
+        maxWidth={460}
+        title={roleToDelete ? en.wsRoles.deleteTitle(roleToDelete.name) : undefined}
+        footer={
+          <>
+            <Button variant="secondary" size="sm" onClick={() => { setRoleToDelete(null); setError(null) }}>
+              {en.wsRoles.cancelBtn}
+            </Button>
+            <Button variant="danger" size="sm" loading={dialogBusy} onClick={remove}>
+              {dialogBusy ? en.wsRoles.deletingConfirm : en.wsRoles.deleteConfirm}
+            </Button>
+          </>
+        }
+      >
+        {roleToDelete && (
+          <>
+            <p className="t-secondary">
               {roleToDelete.memberCount > 0
                 ? en.wsRoles.deleteBodyWithMembers(roleToDelete.memberCount)
                 : en.wsRoles.deleteBodyEmpty}
-            </div>
-            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              {en.wsRoles.deleteIrreversible}
             </p>
-            {error && (
-              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--danger)', marginBottom: '10px' }}>{error}</p>
-            )}
-            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-              <button type="button" onClick={() => { setRoleToDelete(null); setError(null) }} style={btnStyle}>
-                {en.wsRoles.cancelBtn}
-              </button>
-              <button
-                type="button"
-                onClick={remove}
-                disabled={dialogBusy}
-                style={{ ...btnStyle, background: 'var(--danger)', borderColor: 'var(--danger)', color: '#fff', opacity: dialogBusy ? 0.6 : 1 }}
-              >
-                {dialogBusy ? en.wsRoles.deletingConfirm : en.wsRoles.deleteConfirm}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+            <p className="t-muted" style={{ marginTop: '10px' }}>{en.wsRoles.deleteIrreversible}</p>
+            {error && <p style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '10px' }}>{error}</p>}
+          </>
+        )}
+      </Modal>
     </div>
   )
 }

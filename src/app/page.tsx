@@ -10,9 +10,10 @@ import Hero from '@/components/Hero';
 import HowItWorks from '@/components/HowItWorks';
 import Industries from '@/components/Industries';
 import Marquee from '@/components/Marquee';
-import Navigation from '@/components/Navigation';
+import MarketingNav from '@/components/marketing/MarketingNav';
 import SectionDivider from '@/components/SectionDivider';
 import ComingSoon from '@/components/ComingSoon';
+import { marketing } from '@/locales/en/marketing';
 
 export default function Home() {
   useEffect(() => {
@@ -41,13 +42,13 @@ export default function Home() {
   return (
     <main className="w-full overflow-hidden bg-checkmark-bg-dark font-dm-sans text-checkmark-text">
       <div className="pointer-events-none fixed left-1/2 top-[-20%] z-0 h-[700px] w-[900px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(27,77,255,0.09)_0%,transparent_70%)]" />
-      <Navigation />
+      <MarketingNav variant="dark" links={marketing.nav.landingLinks} />
 
       {/* 1 - Hero: base #0D1B2A */}
       <Hero />
 
       {/* 2 - Marquee: alt */}
-      <div className="bg-[#1E2D3D]">
+      <div className="bg-checkmark-bg-card2">
         <Marquee />
       </div>
 
@@ -56,7 +57,7 @@ export default function Home() {
       <SectionDivider />
 
       {/* 4 - Features: alt */}
-      <div className="bg-[#1E2D3D]">
+      <div className="bg-checkmark-bg-card2">
         <Features />
       </div>
       <SectionDivider />
@@ -66,7 +67,7 @@ export default function Home() {
       <SectionDivider />
 
       {/* 6 - ComparisonTable: alt */}
-      <div className="bg-[#1E2D3D]">
+      <div className="bg-checkmark-bg-card2">
         <ComparisonTable />
       </div>
       <SectionDivider />
@@ -76,7 +77,7 @@ export default function Home() {
       <SectionDivider />
 
       {/* 8 - FAQ: alt */}
-      <div className="bg-[#1E2D3D]">
+      <div className="bg-checkmark-bg-card2">
         <FAQ />
       </div>
       <SectionDivider />

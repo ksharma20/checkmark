@@ -318,12 +318,41 @@ export async function getOpenEvent(userId: string): Promise<PresenceEvent | null
   )
 }
 
-export async function getOpenEventsForCron(): Promise<CronEvent[]> {
+/**
+ * How many open events one cron tick may look at, and how far back it may look.
+ *
+ * Both numbers are a permanent blast-radius guard, not a performance tweak. The
+ * push cron was unreachable for months, and when it came back there were 2008
+ * open `presence_events` waiting - the oldest from April - every one of which
+ * would have fired a full set of milestone pushes at whoever opened the app
+ * that morning. A user who receives forty "Still working?" notifications at
+ * once turns push off, permanently, which also costs them the approval
+ * notifications that actually work.
+ *
+ * The age cutoff is the real fix: a reminder about a check-in from three months
+ * ago is not a reminder, it is noise, and there is no elapsed-hours milestone
+ * worth firing that late. The LIMIT is the second belt - it caps the work (and
+ * the push volume) of any single tick even if the cutoff is somehow satisfied
+ * by a large batch.
+ *
+ * Consequence, deliberately accepted: an event older than the cutoff is never
+ * auto-checked-out by cron and stays open forever. Closing those is a one-off
+ * job (`scripts/drain-open-events.js`), which writes the checkout silently -
+ * exactly the thing this query must never be asked to do at scale.
+ */
+export const CRON_MAX_EVENT_AGE_H = 48
+export const CRON_EVENT_LIMIT = 500
+
+export async function getOpenEventsForCron(now: Date = new Date()): Promise<CronEvent[]> {
+  const cutoff = toSqliteDt(new Date(now.getTime() - CRON_MAX_EVENT_AGE_H * 3_600_000).toISOString())
   return db.query<CronEvent>(
     `SELECT id, user_id, checkin_at, scheduled_checkout_at, push_reminders_sent
      FROM presence_events
-     WHERE checkout_at IS NULL AND deleted_at IS NULL`,
-    []
+     WHERE checkout_at IS NULL AND deleted_at IS NULL
+       AND checkin_at >= ?
+     ORDER BY checkin_at ASC
+     LIMIT ?`,
+    [cutoff, CRON_EVENT_LIMIT]
   )
 }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserByEmail, getUserByEmailIncludeDeleted, getUserById, createOtp, getLatestUnusedOtp, incrementOtpAttempts, markOtpUsed, updateUserEmail } from '@/lib/db/queries/users'
+import { getUserByEmailIncludeDeleted, getUserById, createOtp, getLatestUnusedOtp, incrementOtpAttempts, markOtpUsed, updateUserEmail } from '@/lib/db/queries/users'
 import { generateOtp, otpExpiresAt } from '@/lib/auth'
 import { sendOtpEmail } from '@/lib/email'
 

@@ -1,41 +1,13 @@
-'use client';
+import { marketing } from '@/locales/en/marketing';
 
-type Step = {
-  num: string;
-  title: string;
-  description: string;
-  icon: 'location' | 'wifi' | 'check' | 'chart';
-};
+const copy = marketing.howItWorks;
+
+type StepIcon = (typeof copy.steps)[number]['icon'];
 
 export default function HowItWorks() {
-  const steps: Step[] = [
-    {
-      num: '01',
-      title: "Employee taps \"I'm at office\"",
-      description: 'A single tap on the PWA home-screen shortcut. No app store, no login friction. Works on any smartphone.',
-      icon: 'location',
-    },
-    {
-      num: '02',
-      title: 'Two signals captured silently',
-      description: 'GPS coordinates and IP address are captured in the background and cross-validated for accuracy.',
-      icon: 'wifi',
-    },
-    {
-      num: '03',
-      title: 'Presence verified instantly',
-      description: 'Both signals must match the registered office profile. No match, no credit. Tamper-proof by design.',
-      icon: 'check',
-    },
-    {
-      num: '04',
-      title: 'HR gets clean data automatically',
-      description: 'Month-end reports, allowance calculations, and attendance summaries are generated automatically.',
-      icon: 'chart',
-    },
-  ];
+  const steps = copy.steps;
 
-  const getIcon = (type: Step['icon']) => {
+  const getIcon = (type: StepIcon) => {
     switch (type) {
       case 'location':
         return <><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" /><circle cx="12" cy="9" r="2.5" /></>;
@@ -52,15 +24,17 @@ export default function HowItWorks() {
     <section id="how" className="relative z-10 mx-auto max-w-[1200px] px-6 py-[80px] md:px-10 md:py-[100px]">
       <div className="section-eyebrow reveal mb-4 flex items-center gap-2.5 text-xs font-bold uppercase tracking-[0.14em] text-checkmark-brand">
         <span className="h-0.5 w-6 rounded bg-checkmark-brand" />
-        How it works
+        {copy.eyebrow}
       </div>
 
       <h2 className="section-title reveal mb-5 font-dm-sans text-4xl font-black leading-tight tracking-tight md:text-5xl">
-        One tap. Two <em className="font-syne italic text-checkmark-brand">signals</em>. Zero chaos.
+        {copy.headingBefore}
+        <em className="font-syne italic text-checkmark-brand">{copy.headingEmphasis}</em>
+        {copy.headingAfter}
       </h2>
 
       <p className="section-desc reveal mb-14 max-w-[540px] text-base leading-relaxed text-checkmark-text-muted md:text-lg">
-        CheckMark captures verified presence in seconds. Employees tap once, the system does the rest.
+        {copy.description}
       </p>
 
       <div className="relative mt-4">
@@ -70,15 +44,15 @@ export default function HowItWorks() {
           {steps.map((step, i) => (
             <div key={step.num} className="reveal relative flex flex-col items-start px-0 md:px-5" style={{ transitionDelay: `${i * 0.05}s` }}>
               {i < steps.length - 1 && (
-                <div className="absolute right-0 top-0 hidden h-full w-px bg-gradient-to-b from-[rgba(27,77,255,0.1)] to-transparent md:block" />
+                <div className="absolute right-0 top-0 hidden h-full w-px bg-gradient-to-b from-checkmark-brand-glow to-transparent md:block" />
               )}
 
-              <div className="relative z-10 mb-7 flex h-9 w-9 items-center justify-center rounded-full bg-checkmark-brand text-xs font-bold text-white shadow-[0_0_0_6px_rgba(27,77,255,0.12),_0_0_0_12px_rgba(27,77,255,0.05)]">
+              <div className="relative z-10 mb-7 flex h-9 w-9 items-center justify-center rounded-full bg-checkmark-brand text-xs font-bold text-white ring-[6px] ring-checkmark-brand-glow">
                 {step.num}
               </div>
 
-              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-[rgba(27,77,255,0.22)] bg-[rgba(27,77,255,0.1)]">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-[color-mix(in_srgb,var(--checkmark-brand)_22%,transparent)] bg-[color-mix(in_srgb,var(--checkmark-brand)_10%,transparent)] text-checkmark-brand">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   {getIcon(step.icon)}
                 </svg>
               </div>

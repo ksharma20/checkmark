@@ -5,16 +5,33 @@ import {
   findEmployeeByEmployeeId,
   findEmployeeByWorkEmail,
 } from '@/lib/db/queries/employees'
-import { listEmployeesPaged } from '@/lib/db/queries/employees-list'
+import { listDirectoryPeople } from '@/lib/db/queries/employees-list'
+import {
+  addWorkspaceMember,
+  getWorkspaceMemberByEmail,
+  MEMBER_STATUS_NO_ACCESS,
+} from '@/lib/db/queries/workspaces'
 import type { CreateEmployeeInput } from '@/lib/types/employees'
 import { EmployeeStatus } from '@/lib/constants/employees'
 import { validateEmployeeFields } from './_validate'
 import { Action, Resource } from '@/lib/permissions/catalogue'
+import { can } from '@/lib/permissions/can'
 
 interface Props { params: Promise<{ slug: string }> }
 
 // ─── GET /api/ws/[slug]/employees ─────────────────────────────────────────────
 
+/**
+ * The workforce directory: every active MEMBER, with the HR record overlaid
+ * where one exists. It is not a list of `employees` rows - see
+ * `listDirectoryPeople` for why a table that only an admin ever writes to
+ * cannot be the source of truth for who works here.
+ *
+ * `employees` stays in the response as the subset of `people` that do have a
+ * record. The asset and maternity screens fetch this endpoint purely to fill an
+ * "assign to…" picker, and a picker may only offer people who have a record to
+ * attach the asset or the case to.
+ */
 export async function GET(req: NextRequest, { params }: Props) {
   const { slug } = await params
   const ctx = await requireWsAccess(req, slug, Resource.Employees, Action.Read)
@@ -23,6 +40,7 @@ export async function GET(req: NextRequest, { params }: Props) {
   const sp = req.nextUrl.searchParams
   const limit = Math.min(parseInt(sp.get('limit') ?? '25', 10) || 25, 100)
   const offset = Math.max(0, parseInt(sp.get('offset') ?? '0', 10) || 0)
+  const search = sp.get('search') ?? undefined
   const department = sp.get('department') ?? undefined
   const location   = sp.get('location') ?? undefined
   const statusParam = sp.get('status')
@@ -31,17 +49,25 @@ export async function GET(req: NextRequest, { params }: Props) {
     : undefined
   const include_archived = sp.get('include_archived') === 'true'
 
-  const { employees, total } = await listEmployeesPaged(ctx.workspace.id, {
-    limit, offset, department, status, location, include_archived,
+  const { people, total, withRecord } = await listDirectoryPeople(ctx.workspace.id, {
+    limit, offset, search, department, status, location, include_archived,
   })
 
+  // The org role is membership data, not HR data. A role that may read
+  // employees but not members has never been shown it, and the directory
+  // carrying it in the same payload must not become the hole that leaks it -
+  // so it is stripped server-side rather than merely hidden by the client.
+  const showRole = can(ctx.role.permissions, Resource.Members, Action.Read)
+
   return NextResponse.json({
-    employees,
+    people: showRole ? people : people.map(p => ({ ...p, role: '' })),
+    employees: people.map(p => p.employee).filter((e): e is NonNullable<typeof e> => e !== null),
     total,
+    withRecord,
     pagination: {
       offset,
       limit,
-      nextOffset: offset + employees.length < total ? offset + employees.length : null,
+      nextOffset: offset + people.length < total ? offset + people.length : null,
     },
   })
 }
@@ -113,7 +139,36 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   const employee = await createEmployee(input)
-  return NextResponse.json({ employee }, { status: 201 })
+
+  /**
+   * Every employee record gets a membership row, even when nobody is invited.
+   *
+   * The directory reads `FROM workspace_members`, and the person details page is
+   * keyed on `workspace_members.id`. So a record created without one is
+   * invisible in People AND has no URL - two of those orphans already existed in
+   * the live data before this. Writing the membership here makes an orphan
+   * structurally impossible rather than something the read path has to paper
+   * over with a UNION.
+   *
+   * `status: 'no_access'` is the honest answer: they have an HR record, they
+   * have never been invited, and they cannot sign in. `pending_consent` would
+   * claim an invitation was sent. `user_id` stays NULL - linking an existing
+   * account here would hand someone a workspace they never accepted; the accept
+   * paths in `src/lib/membership.ts` own that link.
+   *
+   * Where a membership already exists for this address - HR filling in the
+   * record of somebody already in the workspace - it is reused untouched. Its
+   * status is theirs, not ours to downgrade.
+   */
+  const existing = await getWorkspaceMemberByEmail(ctx.workspace.id, workEmail)
+  const member = existing ?? await addWorkspaceMember({
+    workspaceId: ctx.workspace.id,
+    email: workEmail,
+    role: 'member',
+    status: MEMBER_STATUS_NO_ACCESS,
+  })
+
+  return NextResponse.json({ employee, member_id: member.id }, { status: 201 })
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

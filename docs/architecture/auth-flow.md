@@ -1,5 +1,7 @@
 # Authentication & Session Flows
 
+> Last updated: 2026-08-31
+
 ---
 
 ## 1. Login / Registration State Machine
@@ -51,14 +53,17 @@ sequenceDiagram
   A-->>U: { exists: false }
 
   U->>A: POST /api/auth/otp/send { email }
-  A->>DB: createOtp(email, codeHash)
+  A->>DB: countRecentOtps(email, 15) - max 3 per 15 min
+  A->>DB: createOtp({ email, code, purpose: 'signup', expiresAt })
   A->>E: sendOtpEmail(email, code)
   A-->>U: { sent: true, expiresIn: 600 }
 
   Note over U: User enters 6-digit code
 
   U->>A: POST /api/auth/otp/verify { email, code }
-  A->>DB: verifyOtp(email, code) - checks hash + expiry + attempts
+  A->>DB: getLatestUnusedOtp(email, 'signup') - attempts >= 5 → 429
+  A->>DB: getValidOtp(email, code, 'signup') - else incrementOtpAttempts
+  A->>DB: markOtpUsed(otp.id)
   A->>A: setOtpVerifiedCookie(email) - 15-min httpOnly JWT
   A-->>U: { verified: true } + Set-Cookie: cm_otp_ok
 
@@ -68,9 +73,11 @@ sequenceDiagram
   A->>A: verifyOtpCookie(email) - validates cm_otp_ok server-side
   A->>A: hashPassword(password) - bcrypt cost 12
   A->>DB: createUser(email, hash, name)
+  A->>DB: linkUserToMemberRecord(email, userId) - claims pending invites
+  A->>DB: getVerifiedDomainsForEmail(email) - auto-enrol as role='member'
   alt accountType === 'org'
-    A->>DB: createWorkspace(name, slug, plan='free')
-    A->>DB: createWorkspaceMember(userId, workspaceId, role='admin')
+    A->>DB: createWorkspace({ slug, name, creatorUserId, creatorEmail, domains })
+    Note over DB: ONE transaction:<br/>INSERT workspaces → seedSystemRoles() → INSERT member role='owner'
   end
   A->>A: createJwt(userId, email) - 30-day, unique jti
   A->>A: setSessionCookie(token) - httpOnly; SameSite=Lax; Secure
@@ -106,8 +113,14 @@ sequenceDiagram
   A->>A: createJwt(userId, email)
   A->>A: setSessionCookie(token)
   A->>DB: getAdminWorkspacesForUser(userId)
+  A->>A: getRedirectAfterLogin(orgWorkspaces)  - 0 → /me · 1 → /ws/:slug · many → /ws
   A-->>U: { user, redirect } + Set-Cookie: cm_session
 ```
+
+> The redirect is keyed on which workspaces grant **org-surface access**
+> (`hasAnyOrgAccess`), not on holding the `admin` role. A custom role with an
+> entirely empty grid is legal, and that person must land on `/me` rather than a
+> stripped `/ws` shell with no navigation.
 
 ---
 
@@ -217,8 +230,16 @@ sequenceDiagram
 | Property | Value |
 |----------|-------|
 | Code length | 6 digits |
-| Expiry | 10 minutes |
-| Max attempts | 5 per code (then locked) |
-| Rate limit | 3 sends per 15 minutes per email |
-| Storage | bcrypt hash of code - never stored in plaintext |
-| Cookie proof | `cm_otp_ok` is a 15-min signed JWT - server never trusts `otpVerified: true` from client |
+| Expiry | 10 minutes (`expires_at`, checked in SQL) |
+| Max attempts | 5 per code — checked against `getLatestUnusedOtp()` **before** comparing, then `incrementOtpAttempts()` on a miss |
+| Rate limit | `countRecentOtps(email, 15) >= 3` → refused |
+| Single use | `markOtpUsed()` sets `used = 1`; every lookup filters `used = 0` |
+| Purpose-scoped | `otp_codes.purpose` — `'signup'`, `'transfer_ownership'`, … A code issued for one purpose cannot satisfy another |
+| Cookie proof | `cm_otp_ok` is a 15-min signed JWT — the server never trusts `otpVerified: true` from the client |
+
+> ⚠️ **Codes are stored in plaintext.** `otp_codes.code` holds the 6-digit code
+> as-is; `getValidOtp()` matches with `AND code = ?` in SQL. There is no
+> `code_hash` column and bcrypt is not involved. Earlier revisions of this
+> document claimed otherwise. The mitigations that do exist are the short
+> expiry, single use, the 5-attempt cap and the 3-per-15-min send limit — but
+> anyone with read access to the database can read a live code.

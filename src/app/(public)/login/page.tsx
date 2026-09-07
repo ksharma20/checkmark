@@ -7,30 +7,48 @@ import { useIsLoggedIn } from '@/hooks/useIsLoggedIn';
 import Image from 'next/image'
 import { en } from '@/locales/en'
 import { startProgress, stopProgress } from '@/components/shared/TopProgressBar'
+import { Button, Card, Field, Input } from '@/components/ui'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Step = 'email' | 'password' | 'otp' | 'accountType' | 'personal' | 'org' | 'deactivated' | 'forgotPassword' | 'resetPassword'
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
+//
+// These are thin adapters over src/components/ui. They exist so the eight step
+// components below keep the prop shapes they were written against - `onChange`
+// takes a string, not an event - while the actual markup, focus ring, invalid
+// border and label wiring all come from the design system.
 
-function Label({ children }: { children: React.ReactNode }) {
+/**
+ * Label + control + message, from the design system's `Field`.
+ *
+ * `htmlFor` is required rather than optional: before the re-skin none of these
+ * labels were associated with their input at all, so clicking a label did
+ * nothing and screen readers announced the controls unnamed.
+ */
+function FieldGroup({
+  label,
+  htmlFor,
+  error,
+  hint,
+  children,
+}: {
+  label: string
+  htmlFor: string
+  error?: string | null
+  hint?: React.ReactNode
+  children: React.ReactNode
+}) {
   return (
-    <label
-      style={{
-        display: 'block',
-        fontSize: '12px',
-        fontFamily: 'DM Sans, sans-serif',
-        color: 'var(--text-secondary)',
-        marginBottom: '5px',
-      }}
-    >
+    <Field className="mb-4" label={label} htmlFor={htmlFor} error={error || undefined} hint={hint}>
       {children}
-    </label>
+    </Field>
   )
 }
 
-function Input({
+function TextInput({
+  id,
   type = 'text',
   value,
   onChange,
@@ -39,7 +57,9 @@ function Input({
   autoFocus,
   onKeyDown,
   hasError,
+  describedBy,
 }: {
+  id: string
   type?: string
   value: string
   onChange: (v: string) => void
@@ -48,9 +68,11 @@ function Input({
   autoFocus?: boolean
   onKeyDown?: (e: React.KeyboardEvent) => void
   hasError?: boolean
+  describedBy?: string
 }) {
   return (
-    <input
+    <Input
+      id={id}
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -58,24 +80,18 @@ function Input({
       placeholder={placeholder}
       autoFocus={autoFocus}
       onKeyDown={onKeyDown}
-      style={{
-        width: '100%',
-        height: '48px',
-        padding: '0 14px',
-        border: `1px solid ${hasError ? 'var(--danger)' : 'var(--border)'}`,
-        borderRadius: 'var(--radius-md)',
-        fontSize: '15px',
-        fontFamily: 'DM Sans, sans-serif',
-        background: 'var(--surface-2)',
-        color: 'var(--text-primary)',
-        outline: 'none',
-        boxSizing: 'border-box',
-        transition: 'border-color 0.15s',
-      }}
+      invalid={hasError}
+      aria-describedby={describedBy}
+      className="h-12"
     />
   )
 }
 
+/**
+ * `Button` sizes to the design system's 42px, which suits the pointer-driven
+ * /ws surface. This is a page people reach on a phone, so the project's 44px
+ * touch minimum is restored with `min-h-11`.
+ */
 function PrimaryBtn({
   children,
   onClick,
@@ -86,76 +102,27 @@ function PrimaryBtn({
   loading?: boolean
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={loading}
-      style={{
-        width: '100%',
-        height: '48px',
-        padding: '0 24px',
-        background: 'var(--brand)',
-        color: '#fff',
-        border: 'none',
-        borderRadius: 'var(--radius-md)',
-        fontSize: '15px',
-        fontFamily: 'DM Sans, sans-serif',
-        fontWeight: 600,
-        cursor: loading ? 'not-allowed' : 'pointer',
-        opacity: loading ? 0.7 : 1,
-      }}
-    >
+    <Button block loading={loading} onClick={onClick} className="min-h-11">
       {loading ? 'Please wait…' : children}
-    </button>
+    </Button>
   )
 }
 
 function BackLink({ onClick }: { onClick: () => void }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        background: 'none',
-        border: 'none',
-        color: 'var(--text-secondary)',
-        fontSize: '13px',
-        fontFamily: 'DM Sans, sans-serif',
-        cursor: 'pointer',
-        padding: '0',
-        marginBottom: '24px',
-        display: 'flex',
-        alignItems: 'center',
-        gap: '4px',
-      }}
-    >
+    <Button variant="ghost" size="sm" onClick={onClick} className="-ml-3 mb-5 min-h-11">
       ← Back
-    </button>
+    </Button>
   )
 }
 
+/** Form-level error - field-level messages go through `FieldGroup`'s `error`. */
 function ErrorMsg({ text }: { text: string | null }) {
   if (!text) return null
   return (
-    <p
-      style={{
-        fontSize: '13px',
-        fontFamily: 'DM Sans, sans-serif',
-        color: 'var(--danger)',
-        marginTop: '10px',
-      }}
-    >
+    <p role="alert" className="field-error mt-2.5">
       {text}
     </p>
-  )
-}
-
-function FieldGroup({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ marginBottom: '16px' }}>
-      <Label>{label}</Label>
-      {children}
-    </div>
   )
 }
 
@@ -220,40 +187,27 @@ function EmailStep({
 
   return (
     <div>
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '26px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '8px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}
-      >
+      <h1 className="mb-2 flex items-center gap-2 font-heading text-[26px] font-bold text-navy">
         Welcome to{' '}
         <Image
           src="/logo.png"
           alt={en.brand.name}
           width={130}
           height={38}
-          style={{ objectFit: 'contain', verticalAlign: 'middle' }}
+          className="inline-block h-auto w-[130px] object-contain align-middle"
           priority
         />
       </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '14px',
-          color: 'var(--text-secondary)',
-          marginBottom: '28px',
-        }}
-      >
+      <p className="mb-7 text-sm text-text-secondary">
         Enter your email to sign in or create an account.
       </p>
-      <FieldGroup label="Email address">
-        <Input
+      <FieldGroup
+        label="Email address"
+        htmlFor="login-email"
+        error={emailInvalid ? 'Please enter a valid email address.' : null}
+      >
+        <TextInput
+          id="login-email"
           type="email"
           value={email}
           onChange={(v) => { setEmail(v); if (error) setError(null) }}
@@ -262,12 +216,8 @@ function EmailStep({
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && proceed()}
           hasError={emailInvalid}
+          describedBy={emailInvalid ? 'login-email-error' : undefined}
         />
-        {emailInvalid && (
-          <p style={{ fontSize: '12px', fontFamily: 'DM Sans, sans-serif', color: 'var(--danger)', marginTop: '4px' }}>
-            Please enter a valid email address.
-          </p>
-        )}
       </FieldGroup>
       <PrimaryBtn onClick={proceed} loading={loading}>
         Continue
@@ -325,29 +275,11 @@ function PasswordStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        Sign in
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '13px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-        }}
-      >
-        {email}
-      </p>
-      <FieldGroup label="Password">
-        <Input
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Sign in</h1>
+      <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
+      <FieldGroup label="Password" htmlFor="login-password" error={error}>
+        <TextInput
+          id="login-password"
           type="password"
           value={password}
           onChange={(v) => { setPassword(v); if (error) setError(null) }}
@@ -355,30 +287,20 @@ function PasswordStep({
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && signIn()}
           hasError={!!error}
+          describedBy={error ? 'login-password-error' : undefined}
         />
-        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={signIn} loading={loading}>
         Sign in
       </PrimaryBtn>
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={onForgotPassword}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: 'var(--text-secondary)',
-          fontSize: '13px',
-          fontFamily: 'DM Sans, sans-serif',
-          cursor: 'pointer',
-          padding: '8px 0',
-          textDecoration: 'underline',
-          display: 'block',
-          marginTop: '4px',
-        }}
+        className="-ml-3 mt-1 min-h-11 underline"
       >
         Forgot password?
-      </button>
+      </Button>
     </div>
   )
 }
@@ -426,27 +348,14 @@ function DeactivatedStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 700, color: 'var(--navy)', marginBottom: '4px' }}>
-        Account deactivated
-      </h1>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '20px' }}>
-        {email}
-      </p>
-      <div style={{
-        background: 'color-mix(in srgb, var(--amber) 10%, transparent)',
-        border: '1px solid var(--amber)',
-        borderRadius: 'var(--radius-md)',
-        padding: '12px 14px',
-        marginBottom: '20px',
-        fontSize: '13px',
-        fontFamily: 'DM Sans, sans-serif',
-        color: 'var(--text-secondary)',
-        lineHeight: 1.5,
-      }}>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Account deactivated</h1>
+      <p className="mb-5 text-[13px] text-text-secondary">{email}</p>
+      <p className="mb-5 rounded-md border border-amber bg-[color-mix(in_srgb,var(--amber)_10%,transparent)] px-3.5 py-3 text-[13px] leading-relaxed text-text-secondary">
         This account was deactivated. Your data is intact - enter your password to reactivate and sign in.
-      </div>
-      <FieldGroup label="Password">
-        <Input
+      </p>
+      <FieldGroup label="Password" htmlFor="reactivate-password" error={error}>
+        <TextInput
+          id="reactivate-password"
           type="password"
           value={password}
           onChange={(v) => { setPassword(v); if (error) setError(null) }}
@@ -454,8 +363,8 @@ function DeactivatedStep({
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && reactivate()}
           hasError={!!error}
+          describedBy={error ? 'reactivate-password-error' : undefined}
         />
-        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={reactivate} loading={loading}>
         Reactivate account
@@ -536,29 +445,13 @@ function OtpStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        Check your inbox
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '13px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-        }}
-      >
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Check your inbox</h1>
+      <p className="mb-6 text-[13px] text-text-secondary">
         We sent a 6-digit code to <strong>{email}</strong>
       </p>
-      <FieldGroup label="Verification code">
-        <Input
+      <FieldGroup label="Verification code" htmlFor="otp-code" error={error}>
+        <TextInput
+          id="otp-code"
           type="text"
           value={code}
           onChange={(v) => { setCode(v.replace(/\D/g, '').slice(0, 6)); if (error) setError(null) }}
@@ -566,42 +459,26 @@ function OtpStep({
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && verify()}
           hasError={!!error}
+          describedBy={error ? 'otp-code-error' : undefined}
         />
-        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={verify} loading={loading}>
         Verify
       </PrimaryBtn>
       {resendMsg && (
-        <p
-          style={{
-            fontSize: '13px',
-            color: 'var(--teal)',
-            fontFamily: 'DM Sans, sans-serif',
-            marginTop: '10px',
-          }}
-        >
+        <p role="status" className="mt-2.5 text-[13px] text-brand">
           {resendMsg}
         </p>
       )}
-      <button
-        type="button"
+      <Button
+        variant="ghost"
+        size="sm"
         onClick={resend}
-        disabled={resending}
-        style={{
-          background: 'none',
-          border: 'none',
-          color: 'var(--text-secondary)',
-          fontSize: '13px',
-          fontFamily: 'DM Sans, sans-serif',
-          cursor: 'pointer',
-          padding: '0',
-          marginTop: '14px',
-          display: 'block',
-        }}
+        loading={resending}
+        className="-ml-3 mt-3 min-h-11"
       >
         {resending ? 'Sending…' : 'Resend code'}
-      </button>
+      </Button>
     </div>
   )
 }
@@ -651,37 +528,22 @@ function ForgotPasswordStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        Reset your password
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '14px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-        }}
-      >
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Reset your password</h1>
+      <p className="mb-6 text-sm text-text-secondary">
         Enter your email and we&apos;ll send a reset code.
       </p>
-      <FieldGroup label="Email address">
-        <Input
+      <FieldGroup label="Email address" htmlFor="reset-email" error={error}>
+        <TextInput
+          id="reset-email"
           type="email"
           value={email}
           onChange={(v) => { setEmail(v); if (error) setError(null) }}
           placeholder="your@email.com"
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && sendResetCode()}
+          hasError={!!error}
+          describedBy={error ? 'reset-email-error' : undefined}
         />
-        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={sendResetCode} loading={loading}>
         Send reset code
@@ -731,39 +593,14 @@ function ResetPasswordStep({
 
   return (
     <div>
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        Set new password
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '13px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-        }}
-      >
-        {email}
-      </p>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '14px',
-          color: 'var(--text-secondary)',
-          marginBottom: '16px',
-        }}
-      >
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Set new password</h1>
+      <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
+      <p className="mb-4 text-sm text-text-secondary">
         Choose a new password (min 8 characters).
       </p>
-      <FieldGroup label="New password">
-        <Input
+      <FieldGroup label="New password" htmlFor="new-password" error={error}>
+        <TextInput
+          id="new-password"
           type="password"
           value={password}
           onChange={(v) => { setPassword(v); if (error) setError(null) }}
@@ -771,8 +608,8 @@ function ResetPasswordStep({
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && resetPassword()}
           hasError={!!error}
+          describedBy={error ? 'new-password-error' : undefined}
         />
-        <ErrorMsg text={error} />
       </FieldGroup>
       <PrimaryBtn onClick={resetPassword} loading={loading}>
         Set new password
@@ -792,29 +629,14 @@ function AccountTypeStep({
 }) {
   return (
     <div>
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '8px',
-        }}
-      >
+      <h1 className="mb-2 font-heading text-[22px] font-bold text-navy">
         How will you use {en.brand.name}?
       </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '14px',
-          color: 'var(--text-secondary)',
-          marginBottom: '28px',
-        }}
-      >
+      <p className="mb-7 text-sm text-text-secondary">
         Choose the type of account to set up.
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      <div className="stack">
         <AccountTypeCard
           title="Personal"
           description="Track your own presence. Join workspaces when invited by your org."
@@ -830,6 +652,10 @@ function AccountTypeStep({
   )
 }
 
+/**
+ * A `.card` that is also a button. The hover border used to be tracked in React
+ * state; `.hoverlift` does it in CSS, and only on devices that actually hover.
+ */
 function AccountTypeCard({
   title,
   description,
@@ -839,44 +665,14 @@ function AccountTypeCard({
   description: string
   onClick: () => void
 }) {
-  const [hovered, setHovered] = useState(false)
   return (
     <button
       type="button"
       onClick={onClick}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{
-        background: 'var(--surface-0)',
-        border: `1px solid ${hovered ? 'var(--brand)' : 'var(--border)'}`,
-        borderRadius: 'var(--radius-lg)',
-        padding: '20px',
-        textAlign: 'left',
-        cursor: 'pointer',
-        width: '100%',
-        transition: 'border-color 0.15s',
-      }}
+      className="card hoverlift pressable w-full cursor-pointer text-left"
     >
-      <p
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '15px',
-          fontWeight: 600,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        {title}
-      </p>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '13px',
-          color: 'var(--text-secondary)',
-        }}
-      >
-        {description}
-      </p>
+      <p className="mb-1 font-heading text-[15px] font-semibold text-navy">{title}</p>
+      <p className="text-[13px] text-text-secondary">{description}</p>
     </button>
   )
 }
@@ -933,41 +729,24 @@ function PersonalSetupStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        Create your account
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '13px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-        }}
-      >
-        {email}
-      </p>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Create your account</h1>
+      <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
 
-      <FieldGroup label="Your name">
-        <Input value={fullName} onChange={setFullName} placeholder="Jane Doe" autoFocus />
+      <FieldGroup label="Your name" htmlFor="personal-name">
+        <TextInput id="personal-name" value={fullName} onChange={setFullName} placeholder="Jane Doe" autoFocus />
       </FieldGroup>
-      <FieldGroup label="Password">
-        <Input
+      <FieldGroup label="Password" htmlFor="personal-password">
+        <TextInput
+          id="personal-password"
           type="password"
           value={password}
           onChange={setPassword}
           placeholder="At least 8 characters"
         />
       </FieldGroup>
-      <FieldGroup label="Confirm password">
-        <Input
+      <FieldGroup label="Confirm password" htmlFor="personal-confirm">
+        <TextInput
+          id="personal-confirm"
           type="password"
           value={confirm}
           onChange={setConfirm}
@@ -1024,22 +803,20 @@ function useSlugCheck(slug: string): SlugStatus {
 }
 
 function SlugHint({ status }: { status: SlugStatus }) {
-  const hints: Record<SlugStatus, { text: string; color: string }> = {
-    idle: { text: 'Lowercase letters, numbers, hyphens', color: 'var(--text-muted)' },
-    checking: { text: 'Checking availability…', color: 'var(--text-secondary)' },
-    available: { text: '✓ Available', color: 'var(--teal)' },
-    taken: { text: '✗ Already taken', color: 'var(--danger)' },
-    invalid: { text: 'Only lowercase letters, numbers and hyphens', color: 'var(--amber)' },
+  const hints: Record<SlugStatus, { text: string; className: string }> = {
+    idle: { text: 'Lowercase letters, numbers, hyphens', className: 'text-text-muted' },
+    checking: { text: 'Checking availability…', className: 'text-text-secondary' },
+    available: { text: '✓ Available', className: 'text-brand' },
+    taken: { text: '✗ Already taken', className: 'text-danger' },
+    invalid: { text: 'Only lowercase letters, numbers and hyphens', className: 'text-amber' },
   }
   const hint = hints[status]
   return (
     <p
-      style={{
-        fontSize: '12px',
-        fontFamily: 'DM Sans, sans-serif',
-        color: hint.color,
-        marginTop: '5px',
-      }}
+      id="org-slug-hint"
+      /* Availability arrives after a debounce, so it has to be announced. */
+      aria-live="polite"
+      className={`mt-1.5 text-[12.5px] ${hint.className}`}
     >
       {hint.text}
     </p>
@@ -1121,147 +898,69 @@ function OrgSetupStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '4px',
-        }}
-      >
-        Set up your organisation
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '13px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-        }}
-      >
-        {email}
-      </p>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Set up your organisation</h1>
+      <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
 
       {/* Org section */}
-      <p
-        style={{
-          fontSize: '11px',
-          fontFamily: 'Syne, sans-serif',
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          marginBottom: '12px',
-        }}
-      >
-        Organisation
-      </p>
+      <h2 className="t-eyebrow mb-3">Organisation</h2>
 
-      <FieldGroup label="Organisation name">
-        <Input value={orgName} onChange={handleOrgName} placeholder="Acme Corp" autoFocus />
+      <FieldGroup label="Organisation name" htmlFor="org-name">
+        <TextInput id="org-name" value={orgName} onChange={handleOrgName} placeholder="Acme Corp" autoFocus />
       </FieldGroup>
 
-      <div style={{ marginBottom: '16px' }}>
-        <Label>URL handle</Label>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--surface-2)',
-            overflow: 'hidden',
-            height: '48px',
-          }}
-        >
-          <span
-            style={{
-              padding: '0 10px',
-              fontSize: '13px',
-              fontFamily: 'DM Sans, sans-serif',
-              color: 'var(--text-secondary)',
-              borderRight: '1px solid var(--border)',
-              height: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              whiteSpace: 'nowrap',
-              background: 'var(--surface-1)',
-              flexShrink: 0,
-            }}
-          >
+      <div className="mb-4">
+        <label className="field-label" htmlFor="org-slug">
+          URL handle
+        </label>
+        {/* A composite control, so it borrows `.input`'s border and fill rather
+            than being one: the `/ws/` prefix sits inside the same frame. */}
+        <div className="flex h-12 items-center overflow-hidden rounded-md border border-border bg-surface-2 focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--ring)]">
+          <span className="flex h-full shrink-0 items-center whitespace-nowrap border-r border-border bg-surface-1 px-2.5 text-[13px] text-text-secondary">
             /ws/
           </span>
           <input
+            id="org-slug"
             type="text"
             value={orgSlug}
             onChange={(e) =>
               setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
             }
             placeholder="acme-corp"
-            style={{
-              flex: 1,
-              height: '100%',
-              border: 'none',
-              outline: 'none',
-              padding: '0 12px',
-              fontSize: '14px',
-              fontFamily: 'JetBrains Mono, monospace',
-              background: 'transparent',
-              color: 'var(--text-primary)',
-              minWidth: 0,
-            }}
+            aria-describedby="org-slug-hint"
+            className="h-full min-w-0 flex-1 border-none bg-transparent px-3 font-mono text-sm text-text-primary outline-none"
           />
         </div>
         <SlugHint status={slugStatus} />
       </div>
 
-      <FieldGroup label="Company email domain (optional)">
-        <Input value={orgDomain} onChange={setOrgDomain} placeholder="acme.com" />
-      </FieldGroup>
-      <p
-        style={{
-          fontSize: '12px',
-          fontFamily: 'DM Sans, sans-serif',
-          color: 'var(--text-muted)',
-          marginTop: '-10px',
-          marginBottom: '20px',
-        }}
+      <FieldGroup
+        label="Company email domain (optional)"
+        htmlFor="org-domain"
+        hint="Employees with this domain are auto-enrolled when they sign up."
       >
-        Employees with this domain are auto-enrolled when they sign up.
-      </p>
+        <TextInput id="org-domain" value={orgDomain} onChange={setOrgDomain} placeholder="acme.com" />
+      </FieldGroup>
 
-      {/* Divider */}
-      <div style={{ borderTop: '1px solid var(--border)', margin: '4px 0 20px' }} />
+      <div className="divider" role="separator" />
 
       {/* Personal section */}
-      <p
-        style={{
-          fontSize: '11px',
-          fontFamily: 'Syne, sans-serif',
-          fontWeight: 600,
-          color: 'var(--text-secondary)',
-          textTransform: 'uppercase',
-          letterSpacing: '0.06em',
-          marginBottom: '12px',
-        }}
-      >
-        Your account
-      </p>
+      <h2 className="t-eyebrow mb-3">Your account</h2>
 
-      <FieldGroup label="Your name">
-        <Input value={fullName} onChange={setFullName} placeholder="Jane Doe" />
+      <FieldGroup label="Your name" htmlFor="org-owner-name">
+        <TextInput id="org-owner-name" value={fullName} onChange={setFullName} placeholder="Jane Doe" />
       </FieldGroup>
-      <FieldGroup label="Password">
-        <Input
+      <FieldGroup label="Password" htmlFor="org-owner-password">
+        <TextInput
+          id="org-owner-password"
           type="password"
           value={password}
           onChange={setPassword}
           placeholder="At least 8 characters"
         />
       </FieldGroup>
-      <FieldGroup label="Confirm password">
-        <Input
+      <FieldGroup label="Confirm password" htmlFor="org-owner-confirm">
+        <TextInput
+          id="org-owner-confirm"
           type="password"
           value={confirm}
           onChange={setConfirm}
@@ -1304,53 +1003,26 @@ function LoginFlow() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: '100dvh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--surface-1)',
-        padding: '24px 16px',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      {/* Subtle radial glow - matches landing page */}
-      <div style={{
-        pointerEvents: 'none',
-        position: 'absolute',
-        left: '50%',
-        top: '-10%',
-        width: '700px',
-        height: '500px',
-        transform: 'translateX(-50%)',
-        background: 'radial-gradient(ellipse at center, rgba(27,77,255,0.09) 0%, transparent 70%)',
-        zIndex: 0,
-      }} />
-      {/* Grid pattern - matches landing page */}
-      <div style={{
-        pointerEvents: 'none',
-        position: 'absolute',
-        inset: 0,
-        backgroundImage: 'linear-gradient(rgba(27,77,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(27,77,255,0.04) 1px, transparent 1px)',
-        backgroundSize: '60px 60px',
-        maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%)',
-        zIndex: 0,
-      }} />
+    <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-surface-1 px-4 py-6">
+      {/* Ambient glow and grid - the same treatment as the landing page hero. */}
       <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-[-10%] z-0 h-[500px] w-[700px] -translate-x-1/2"
+        style={{ background: 'radial-gradient(ellipse at center, var(--brand-glow) 0%, transparent 70%)' }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 z-0"
         style={{
-          position: 'relative',
-          zIndex: 1,
-          width: '100%',
-          maxWidth: '420px',
-          background: 'var(--surface-0)',
-          border: '1px solid var(--border)',
-          borderRadius: 'var(--radius-lg)',
-          padding: '32px 28px',
-          boxShadow: '0 0 40px rgba(27,77,255,0.08)',
+          backgroundImage:
+            'linear-gradient(rgba(27,77,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(27,77,255,0.04) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+          maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%)',
         }}
-      >
+      />
+      {/* No elevation: `.card` is an inline surface, and the design system
+          reserves --shadow-* for overlays. */}
+      <Card className="relative z-[1] w-full max-w-[420px]" style={{ padding: '32px 28px' }}>
         {step === 'email' && (
           <EmailStep
             onExisting={(e) => { setEmail(e); setStep('password') }}
@@ -1423,8 +1095,8 @@ function LoginFlow() {
             onSuccess={handleSuccess}
           />
         )}
-      </div>
-    </div>
+      </Card>
+    </main>
   )
 }
 

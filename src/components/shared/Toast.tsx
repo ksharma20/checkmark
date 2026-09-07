@@ -16,12 +16,6 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | null>(null)
 
-const KIND_COLOR: Record<ToastKind, string> = {
-  success: 'var(--teal)',
-  error: 'var(--danger)',
-  info: 'var(--brand)',
-}
-
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toast, setToast] = useState<ToastState | null>(null)
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -40,27 +34,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       {children}
       {toast && (
         <div
+          className={`toast kind-${toast.kind}`}
           role={toast.kind === 'error' ? 'alert' : 'status'}
           aria-live={toast.kind === 'error' ? 'assertive' : 'polite'}
-          style={{
-            position: 'fixed', bottom: '24px', right: '24px', zIndex: 2000,
-            display: 'flex', alignItems: 'center', gap: '10px',
-            background: 'var(--header-bg)', border: '1px solid rgba(255,255,255,0.1)',
-            borderRadius: '11px', padding: '13px 18px',
-            boxShadow: '0 12px 40px rgba(13,27,42,0.4)',
-            animation: 'vzToastIn 0.28s cubic-bezier(0.22,1,0.36,1) both',
-          }}
         >
-          <span
-            style={{
-              width: '9px', height: '9px', borderRadius: '50%',
-              background: KIND_COLOR[toast.kind], flexShrink: 0,
-              boxShadow: `0 0 0 3px color-mix(in srgb, ${KIND_COLOR[toast.kind]} 30%, transparent)`,
-            }}
-          />
-          <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 600, color: 'var(--checkmark-text)' }}>
-            {toast.message}
-          </span>
+          <span className="toast-dot" />
+          <span>{toast.message}</span>
         </div>
       )}
     </ToastContext.Provider>

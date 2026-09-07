@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "migrate": "node ./scripts/migrate.js",
+    "drain:open-events": "node ./scripts/drain-open-events.js",
     "db:sync": "node ./scripts/sync-local-db.js"
   },
   "dependencies": {

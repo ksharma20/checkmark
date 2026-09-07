@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { en } from '@/locales/en'
+import MarketingNav from '@/components/marketing/MarketingNav'
+import MarketingFooter from '@/components/marketing/MarketingFooter'
 
 export const metadata: Metadata = {
   title: "Pricing",
@@ -25,7 +26,7 @@ const plans = [
     per: "forever",
     tagline: "For small teams getting started.",
     cta: "Get started free",
-    ctaHref: "'/login'",
+    ctaHref: "/login",
     highlight: false,
     features: [
       "Up to 10 team members",
@@ -110,9 +111,6 @@ function PricingCardSection() {
               borderRadius: "var(--radius-lg)",
               padding: "32px 28px",
               position: "relative",
-              boxShadow: plan.highlight
-                ? "0 8px 32px color-mix(in srgb, var(--brand) 25%, transparent)"
-                : "none",
             }}
           >
             {plan.highlight && (
@@ -122,7 +120,7 @@ function PricingCardSection() {
                   top: "-12px",
                   left: "50%",
                   transform: "translateX(-50%)",
-                  background: "var(--teal)",
+                  background: "var(--navy)",
                   color: "#fff",
                   fontFamily: "DM Sans, sans-serif",
                   fontSize: "11px",
@@ -272,46 +270,7 @@ function PricingCardSection() {
 export default function PricingPage() {
   return (
     <div style={{ minHeight: "100dvh", background: "var(--surface-1)" }}>
-      {/* Header */}
-      <header
-        style={{
-          borderBottom: "1px solid var(--border)",
-          background: "var(--surface-0)",
-          padding: "0 24px",
-          display: "flex",
-          alignItems: "center",
-          height: "56px",
-        }}
-      >
-        <Link
-          href="/"
-          style={{
-            fontFamily: "Syne, sans-serif",
-            fontWeight: 700,
-            fontSize: "18px",
-            color: "var(--brand)",
-            textDecoration: "none",
-          }}
-        >
-          {en.brand.name}
-        </Link>
-        <nav style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-          <Link
-            href="/login"
-            style={{
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "14px",
-              color: "var(--text-secondary)",
-              textDecoration: "none",
-              padding: "6px 14px",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-            }}
-          >
-            Sign in
-          </Link>
-        </nav>
-      </header>
+      <MarketingNav />
 
       <main
         style={{ maxWidth: "1080px", margin: "0 auto", padding: "64px 24px" }}
@@ -447,6 +406,8 @@ export default function PricingPage() {
           per month.
         </p>
       </main>
+
+      <MarketingFooter />
     </div>
   );
 }

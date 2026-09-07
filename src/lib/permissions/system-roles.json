@@ -11,6 +11,8 @@
       "export": ["read"],
       "members": ["read", "write", "delete"],
       "employees": ["read", "write", "delete"],
+      "assets": ["read", "write", "delete"],
+      "documents": ["read", "write", "delete"],
       "holidays": ["read", "write", "delete"],
       "leaves": ["read", "write", "delete"],
       "approvals": ["read", "write"],
@@ -18,6 +20,7 @@
       "domains": ["read", "write", "delete"],
       "settings": ["read", "write"],
       "members.role": ["write"],
+      "announcements": ["read", "write", "delete"],
       "roles": ["read", "write", "delete"],
       "ownership": ["write", "delete"]
     }
@@ -34,12 +37,15 @@
       "export": ["read"],
       "members": ["read", "write", "delete"],
       "employees": ["read", "write", "delete"],
+      "assets": ["read", "write", "delete"],
+      "documents": ["read", "write", "delete"],
       "holidays": ["read", "write", "delete"],
       "leaves": ["read", "write", "delete"],
       "approvals": ["read", "write"],
       "signals": ["read", "write", "delete"],
       "domains": ["read", "write", "delete"],
       "settings": ["read", "write"],
+      "announcements": ["read", "write", "delete"],
       "roles": ["read", "write", "delete"],
       "members.role": ["write"]
     }

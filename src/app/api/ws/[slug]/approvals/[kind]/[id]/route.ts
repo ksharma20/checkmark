@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireWsAccess } from '@/lib/ws-access'
-import { actionLeaveRequest, getLeaveTypeById, LeaveAction } from '@/lib/db/queries/leaves'
+import { LeaveAction } from '@/lib/db/queries/leaves'
 import { actionRegularizationRequest, RegularizationAction } from '@/lib/db/queries/regularizations'
 import { getUserById } from '@/lib/db/queries/users'
-import { createNotification } from '@/lib/db/queries/notifications'
-import { sendPushToUser } from '@/lib/push'
+import { notify } from '@/lib/notify'
+import { actionLeaveAndNotify } from '@/lib/leave-action'
 import { en } from '@/locales/en'
 import { Action, Resource } from '@/lib/permissions/catalogue'
 
@@ -41,12 +41,18 @@ export async function PATCH(req: NextRequest, { params }: Props) {
   }
 
   if (kind === 'leave') {
-    const result = await actionLeaveRequest({
+    // The transition and the employee notification are shared with
+    // `PATCH /api/ws/[slug]/leaves/[id]`, which actions the same row behind a
+    // different gate. Only the gate above and the response shape below belong
+    // to this route; duplicating the notification block here is what used to
+    // risk two different feed rows for one decision.
+    const result = await actionLeaveAndNotify({
       id,
       workspaceId: ctx.workspace.id,
+      workspaceSlug: slug,
       action: action === 'approve' ? LeaveAction.APPROVE : LeaveAction.REJECT,
       actionedByUserId: ctx.userId,
-      rejectionReason: action === 'reject' ? rejectionReason : null,
+      rejectionReason,
     })
     if ('error' in result) {
       return NextResponse.json(
@@ -55,24 +61,6 @@ export async function PATCH(req: NextRequest, { params }: Props) {
           : { error: 'Leave request has already been actioned', code: 'ALREADY_ACTIONED' },
         { status: result.error === 'NOT_FOUND' ? 404 : 409 },
       )
-    }
-
-    const [employee, leaveType] = await Promise.all([
-      getUserById(result.updated.user_id),
-      getLeaveTypeById(result.updated.leave_type_id, ctx.workspace.id),
-    ])
-    if (employee) {
-      const leaveTypeName = leaveType?.name ?? 'Leave'
-      const isApproved = action === 'approve'
-      const notifType = isApproved ? 'leave_approved' as const : 'leave_rejected' as const
-      const title = isApproved ? en.notifications.leaveApprovedTitle : en.notifications.leaveRejectedTitle
-      const notifBody = isApproved
-        ? en.notifications.leaveApprovedBody(leaveTypeName, result.updated.start_date, result.updated.end_date)
-        : en.notifications.leaveRejectedBody(leaveTypeName, result.updated.start_date, result.updated.end_date)
-      await Promise.allSettled([
-        createNotification({ userId: result.updated.user_id, workspaceId: ctx.workspace.id, type: notifType, title, body: notifBody, refId: result.updated.id, refType: 'leave_request' }),
-        sendPushToUser(result.updated.user_id, { title, body: notifBody, tag: `leave-${notifType}-${result.updated.id}` }),
-      ])
     }
 
     return NextResponse.json({ leaveRequest: result.updated })
@@ -104,10 +92,17 @@ export async function PATCH(req: NextRequest, { params }: Props) {
     const notifBody = isApproved
       ? en.notifications.regularizationApprovedBody(result.updated.target_date)
       : en.notifications.regularizationRejectedBody(result.updated.target_date)
-    await Promise.allSettled([
-      createNotification({ userId: result.updated.user_id, workspaceId: ctx.workspace.id, type: notifType, title, body: notifBody, refId: result.updated.id, refType: 'regularization_request' }),
-      sendPushToUser(result.updated.user_id, { title, body: notifBody, tag: `regularization-${notifType}-${result.updated.id}` }),
-    ])
+    await notify({
+      userIds: [result.updated.user_id],
+      workspaceId: ctx.workspace.id,
+      workspaceSlug: slug,
+      type: notifType,
+      title,
+      body: notifBody,
+      refId: result.updated.id,
+      refType: 'regularization_request',
+      push: { tag: `regularization-${notifType}-${result.updated.id}` },
+    })
   }
 
   return NextResponse.json({ regularizationRequest: result.updated })

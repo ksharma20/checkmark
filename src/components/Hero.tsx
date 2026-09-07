@@ -1,10 +1,14 @@
-'use client';
-
+import Image from 'next/image';
 import Link from 'next/link';
+import { marketing } from '@/locales/en/marketing';
+
+const copy = marketing.hero;
 
 export default function Hero() {
   return (
     <section className="relative z-10 flex min-h-screen flex-col items-center justify-center overflow-hidden px-6 pb-20 pt-[120px] text-center md:px-10 md:pb-20 md:pt-[140px]">
+      {/* Ambient blobs. These use --brand-glow rather than --ring: --ring is the
+          stronger focus-halo token and reads as a hard edge at this size. */}
       <div className="pointer-events-none absolute -left-[10%] top-[5%] h-[500px] w-[500px] animate-float rounded-full bg-gradient-to-r from-checkmark-brand-glow to-transparent" style={{ animationDelay: '0s' }} />
       <div className="pointer-events-none absolute -right-[8%] bottom-[10%] h-[350px] w-[350px] animate-float rounded-full bg-gradient-to-r from-checkmark-brand-glow to-transparent" style={{ animationDelay: '-3s' }} />
       <div className="pointer-events-none absolute left-[60%] top-[40%] h-[200px] w-[200px] animate-float rounded-full bg-gradient-to-r from-checkmark-brand-glow to-transparent" style={{ animationDelay: '-6s' }} />
@@ -18,41 +22,53 @@ export default function Hero() {
         }}
       />
 
-      <div className="mb-8 inline-flex animate-fade-up items-center gap-2 rounded-full border border-[rgba(27,77,255,0.3)] bg-[rgba(27,77,255,0.1)] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-checkmark-brand" style={{ animationDelay: '0.1s' }}>
-        <div className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-checkmark-brand" />
-        Presence Intelligence Platform
-      </div>
+      <p className="mb-8 inline-flex animate-fade-up items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--checkmark-brand)_30%,transparent)] bg-[color-mix(in_srgb,var(--checkmark-brand)_10%,transparent)] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-checkmark-brand" style={{ animationDelay: '0.1s' }}>
+        <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-checkmark-brand" />
+        {copy.badge}
+      </p>
 
       <h1 className="relative z-10 mb-7 animate-fade-up font-dm-sans text-5xl font-black leading-[1.04] tracking-tight text-checkmark-text md:text-7xl" style={{ animationDelay: '0.2s' }}>
-        Know who's <em className="relative inline-block font-syne italic text-checkmark-brand">actually<span className="absolute -bottom-1 left-0 right-0 h-0.5 rounded bg-checkmark-brand" style={{ transform: 'scaleX(0)', transformOrigin: 'left', animation: 'lineReveal 0.7s 1.1s ease forwards' }} /></em> at work
+        {copy.headingBefore}
+        <em className="relative inline-block font-syne italic text-checkmark-brand">
+          {copy.headingEmphasis}
+          <span aria-hidden="true" className="hero-underline absolute -bottom-1 left-0 right-0 h-0.5 rounded bg-checkmark-brand" />
+        </em>
+        {copy.headingAfter}
       </h1>
 
       <p className="mb-12 max-w-[560px] animate-fade-up text-base leading-relaxed text-checkmark-text-muted md:text-xl" style={{ animationDelay: '0.35s' }}>
-        CheckMark replaces manual check-ins, WhatsApp selfies, and Zoho chaos with one tap, verified by GPS and IP.
+        {copy.subtitle}
       </p>
 
       <div className="flex flex-wrap items-center justify-center gap-4 animate-fade-up" style={{ animationDelay: '0.5s' }} id="hero-cta">
-        <Link href="/login" className="rounded-lg bg-checkmark-brand px-9 py-4 text-base font-bold text-white shadow-[0_0_40px_rgba(27,77,255,0.35),_0_4px_16px_rgba(0,0,0,0.3)] transition-all hover:-translate-y-0.5 hover:bg-[#446CFF] hover:shadow-[0_0_60px_rgba(27,77,255,0.5),_0_8px_32px_rgba(0,0,0,0.4)]">
-          Get Started - It's Free
+        <Link
+          href="/login"
+          className="rounded-lg bg-checkmark-brand px-9 py-4 text-base font-bold text-white transition-colors hover:bg-brand-hover"
+        >
+          {copy.primaryCta}
         </Link>
-        <button className="flex items-center gap-2 rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text-muted transition-all hover:border-checkmark-brand hover:text-checkmark-brand">
-          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+        <Link
+          href="#how"
+          className="flex items-center gap-2 rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text-muted no-underline transition-colors hover:border-checkmark-brand hover:text-checkmark-brand"
+        >
+          <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
             <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none" />
           </svg>
-          See how it works
-        </button>
+          {copy.secondaryCta}
+        </Link>
       </div>
 
       <PinScene />
+
     </section>
   );
 }
 
 function PinScene() {
   return (
-    <div className="relative mt-14 h-[220px] w-[min(580px,90vw)] animate-fade-up" style={{ animationDelay: '0.6s' }}>
-      <div className="absolute inset-0 overflow-hidden rounded-[20px] border border-[rgba(27,77,255,0.12)] bg-[rgba(26,38,53,0.55)] backdrop-blur-lg">
+    <div className="relative mt-14 h-[220px] w-[min(580px,90vw)] animate-fade-up" style={{ animationDelay: '0.6s' }} aria-hidden="true">
+      <div className="absolute inset-0 overflow-hidden rounded-[20px] border border-[color-mix(in_srgb,var(--checkmark-brand)_12%,transparent)] bg-[color-mix(in_srgb,var(--bg-card)_55%,transparent)] backdrop-blur-lg">
         <div
           className="absolute inset-0"
           style={{
@@ -60,11 +76,19 @@ function PinScene() {
             backgroundSize: '40px 40px',
           }}
         />
-        <div className="absolute h-1.5 w-1.5 rounded-full border border-[rgba(27,77,255,0.4)] bg-[rgba(27,77,255,0.25)]" style={{ left: '18%', top: '30%' }} />
-        <div className="absolute h-1.5 w-1.5 rounded-full border border-[rgba(27,77,255,0.4)] bg-[rgba(27,77,255,0.25)]" style={{ left: '72%', top: '22%' }} />
-        <div className="absolute h-1.5 w-1.5 rounded-full border border-[rgba(27,77,255,0.4)] bg-[rgba(27,77,255,0.25)]" style={{ left: '82%', top: '58%' }} />
-        <div className="absolute h-1.5 w-1.5 rounded-full border border-[rgba(27,77,255,0.4)] bg-[rgba(27,77,255,0.25)]" style={{ left: '25%', top: '65%' }} />
-        <div className="absolute h-1.5 w-1.5 rounded-full border border-[rgba(27,77,255,0.4)] bg-[rgba(27,77,255,0.25)]" style={{ left: '55%', top: '75%' }} />
+        {[
+          { left: '18%', top: '30%' },
+          { left: '72%', top: '22%' },
+          { left: '82%', top: '58%' },
+          { left: '25%', top: '65%' },
+          { left: '55%', top: '75%' },
+        ].map((pos) => (
+          <div
+            key={`${pos.left}-${pos.top}`}
+            className="absolute h-1.5 w-1.5 rounded-full border border-[color-mix(in_srgb,var(--checkmark-brand)_40%,transparent)] bg-[color-mix(in_srgb,var(--checkmark-brand)_25%,transparent)]"
+            style={pos}
+          />
+        ))}
 
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 600 220" xmlns="http://www.w3.org/2000/svg">
           <path d="M0 110 Q150 80 300 110 Q450 140 600 110" stroke="rgba(27,77,255,0.08)" strokeWidth="8" fill="none" />
@@ -76,24 +100,41 @@ function PinScene() {
       </div>
 
       <div className="absolute left-1/2 top-0 flex -translate-x-1/2 flex-col items-center">
-        <div className="absolute bottom-[-4px] left-1/2 h-1.5 w-5 rounded-full bg-[rgba(0,0,0,0.35)] blur-sm" style={{ transform: 'translateX(-50%) scaleX(0)', animation: 'shadowLoopSync 2s 1.2s cubic-bezier(0.34,1.56,0.64,1) infinite' }} />
-        <div className="relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br" style={{ animation: 'pinDropLoop 2s 1.2s cubic-bezier(0.34,1.56,0.64,1) infinite' }}>
-          <img src="/favicon-logo.png" alt="CheckMark" className="h-11 w-11 object-contain" />
+        <div className="hero-anim absolute bottom-[-4px] left-1/2 h-1.5 w-5 rounded-full bg-[rgba(0,0,0,0.35)] blur-sm" style={{ transform: 'translateX(-50%) scaleX(0)', animation: 'shadowLoopSync 2s 1.2s cubic-bezier(0.34,1.56,0.64,1) infinite' }} />
+        <div className="hero-anim relative z-10 flex h-20 w-20 items-center justify-center rounded-full" style={{ animation: 'pinDropLoop 2s 1.2s cubic-bezier(0.34,1.56,0.64,1) infinite' }}>
+          <Image src="/favicon-logo.png" alt="" width={44} height={44} className="h-11 w-11 object-contain" />
         </div>
 
-        <div className="absolute left-1/2 top-[40px] rounded-full border-[1.5px] border-checkmark-brand" style={{ width: '40px', height: '40px', transform: 'translate(-50%, -50%)', animation: 'rippleOut 1.6s 2s ease-out infinite' }} />
-        <div className="absolute left-1/2 top-[40px] rounded-full border-[1.5px] border-checkmark-brand" style={{ width: '60px', height: '60px', transform: 'translate(-50%, -50%)', animation: 'rippleOut 1.6s 2.2s ease-out infinite' }} />
-        <div className="absolute left-1/2 top-[40px] rounded-full border-[1.5px] border-checkmark-brand" style={{ width: '80px', height: '80px', transform: 'translate(-50%, -50%)', animation: 'rippleOut 1.6s 2.4s ease-out infinite' }} />
+        {[
+          { size: 40, delay: '2s' },
+          { size: 60, delay: '2.2s' },
+          { size: 80, delay: '2.4s' },
+        ].map((ring) => (
+          <div
+            key={ring.size}
+            className="hero-anim absolute left-1/2 top-[40px] rounded-full border-[1.5px] border-checkmark-brand"
+            style={{
+              width: `${ring.size}px`,
+              height: `${ring.size}px`,
+              transform: 'translate(-50%, -50%)',
+              animation: `rippleOut 1.6s ${ring.delay} ease-out infinite`,
+            }}
+          />
+        ))}
 
-        <div className="absolute left-[calc(50%+28px)] top-0.5 z-20 flex items-center gap-1 whitespace-nowrap rounded-full bg-checkmark-brand px-2.5 py-1 text-xs font-black text-white shadow-lg" style={{ opacity: 0, animation: 'badgeLoopSync 2s 2.0s cubic-bezier(0.34,1.56,0.64,1) infinite' }}>
-          <svg viewBox="0 0 16 16" width="14" height="14"><polyline points="3,8 7,12 13,4" stroke="#0D1B2A" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
-          Verified
+        <div className="hero-anim absolute left-[calc(50%+28px)] top-0.5 z-20 flex items-center gap-1 whitespace-nowrap rounded-full bg-checkmark-brand px-2.5 py-1 text-xs font-black text-white" style={{ opacity: 0, animation: 'badgeLoopSync 2s 2.0s cubic-bezier(0.34,1.56,0.64,1) infinite' }}>
+          <svg viewBox="0 0 16 16" width="14" height="14"><polyline points="3,8 7,12 13,4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
+          {marketing.hero.verifiedBadge}
         </div>
       </div>
 
       <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-2.5">
-        {['GPS ✓', 'IP ✓'].map((label, i) => (
-          <div key={label} className="flex items-center gap-1 rounded-full border border-[rgba(27,77,255,0.25)] bg-[rgba(26,38,53,0.9)] px-3 py-1 text-xs font-semibold text-checkmark-brand backdrop-blur-lg" style={{ opacity: 0, animation: `tagLoopSync 2s ${2.05 + i * 0.1}s ease infinite` }}>
+        {marketing.hero.signalTags.map((label, i) => (
+          <div
+            key={label}
+            className="hero-anim flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--checkmark-brand)_25%,transparent)] bg-[color-mix(in_srgb,var(--bg-card)_90%,transparent)] px-3 py-1 text-xs font-semibold text-checkmark-brand backdrop-blur-lg"
+            style={{ opacity: 0, animation: `tagLoopSync 2s ${2.05 + i * 0.1}s ease infinite` }}
+          >
             <span>{label}</span>
           </div>
         ))}

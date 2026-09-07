@@ -1,14 +1,45 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import type { PresenceEvent } from '@/lib/db/queries/events'
-import type { MatchedBy } from '@/lib/signals'
-import EventCard from '@/components/user/EventCard'
-import { en } from '@/locales/en'
+/**
+ * `/me/timeline` - the member's own check-in history.
+ *
+ * Always scoped to one workspace. This screen used to carry a second
+ * workspace selector of its own (plus an "All workspaces" option reading the
+ * unscoped `/api/events`), which meant the shell's pill and this dropdown could
+ * disagree, and the "All" reading had no `matched_by` at all - the verification
+ * chip silently disappeared. Now it reads `useWorkspaceScope()` like every
+ * other `/me` screen and always calls `/api/me/ws/[slug]/events`, so what the
+ * member sees is exactly the AND-semantics evaluation their admin sees.
+ *
+ * Loaded data carries the slug it was fetched for, so switching workspace
+ * invalidates it by construction rather than by a reset effect - one
+ * workspace's events are never painted while the pill names another.
+ */
 
-type TimelineEvent = PresenceEvent & {
-  matched_by?: MatchedBy
-  matched_signals?: string[]
+import { useState, useEffect, useCallback, useRef } from 'react'
+import type { PresenceEventWithMatch } from '@/lib/signals'
+import EventCard from '@/components/user/EventCard'
+import { Button, Card, EmptyState, Field, Input, Skeleton } from '@/components/ui'
+import { en } from '@/locales/en'
+import { meScreens } from '@/locales/en/me-screens'
+import { meSettings } from '@/locales/en/me-settings'
+import { useWorkspaceScope } from '../workspace-scope'
+
+/** Workspace-scoped, so `matched_by` / `matched_signals` are always present. */
+type TimelineEvent = PresenceEventWithMatch
+
+/** A loaded page of events, tagged with the workspace it was fetched for. */
+interface TimelineData {
+  slug: string
+  events: TimelineEvent[]
+  total: number
+}
+
+type RegularizationStatus = 'pending' | 'approved' | 'rejected'
+
+interface RegularizationData {
+  slug: string
+  byEventId: Record<string, RegularizationStatus>
 }
 
 function getMonthBounds() {
@@ -39,311 +70,189 @@ function formatDateHeading(dateStr: string): string {
   })
 }
 
+/** Three card-shaped placeholders, mirroring the height of a real event row. */
+function EventSkeletons({ idPrefix }: { idPrefix: string }) {
+  return (
+    // No wrapper gap: `.card + .card` already spaces adjacent cards by 14px.
+    <div aria-hidden>
+      {[0, 1, 2].map((i) => (
+        <Card key={`${idPrefix}-${i}`} style={{ padding: '14px 16px' }}>
+          <div className="row-between" style={{ marginBottom: '10px' }}>
+            <Skeleton width={120} height={15} />
+            <Skeleton width={72} height={18} radius={999} />
+          </div>
+          <Skeleton width="70%" height={12} />
+        </Card>
+      ))}
+    </div>
+  )
+}
+
 export default function TimelinePage() {
+  const { slug } = useWorkspaceScope()
   const defaults = getMonthBounds()
   const today = new Date().toISOString().split('T')[0]
   const [startDate, setStartDate] = useState(defaults.start)
   const [endDate, setEndDate] = useState(defaults.end)
   const [joinedDate, setJoinedDate] = useState<string | null>(null)
-  const [events, setEvents] = useState<TimelineEvent[]>([])
-  const [total, setTotal] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [workspaces, setWorkspaces] = useState<{ slug: string; name: string }[]>([])
-  const [workspaceSlug, setWorkspaceSlug] = useState<string | null>(null)
-  const [regularizationByEventId, setRegularizationByEventId] = useState<Record<string, 'pending' | 'approved' | 'rejected'>>({})
-  const nextOffsetRef = useRef(0);
+  const [data, setData] = useState<TimelineData | null>(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [regularizations, setRegularizations] = useState<RegularizationData | null>(null)
+  const nextOffsetRef = useRef(0)
 
   const fetchRegularizations = useCallback(async () => {
-    if (!workspaceSlug) { setRegularizationByEventId({}); return }
+    if (!slug) return
     try {
-      const res = await fetch(`/api/me/ws/${encodeURIComponent(workspaceSlug)}/regularizations`)
-      const data = await res.json()
-      const map: Record<string, 'pending' | 'approved' | 'rejected'> = {}
-      for (const r of data.regularizationRequests ?? []) {
-        if (r.presence_event_id) map[r.presence_event_id] = r.status
+      const res = await fetch(`/api/me/ws/${encodeURIComponent(slug)}/regularizations`)
+      const json = await res.json()
+      const byEventId: Record<string, RegularizationStatus> = {}
+      for (const r of json.regularizationRequests ?? []) {
+        if (r.presence_event_id) byEventId[r.presence_event_id] = r.status
       }
-      setRegularizationByEventId(map)
+      setRegularizations({ slug, byEventId })
     } catch {
       // silent - the "Request correction" button just won't reflect existing requests
     }
-  }, [workspaceSlug])
+  }, [slug])
 
   useEffect(() => { fetchRegularizations() }, [fetchRegularizations])
 
+  // The account's created_at is the floor of the date pickers - no event can
+  // predate it, so offering earlier dates only invites empty results.
   useEffect(() => {
     fetch('/api/me')
       .then((r) => r.json())
-      .then((data) => {
-        if (data.user?.created_at) {
-          const minDate = data.user.created_at.slice(0, 10)
+      .then((json) => {
+        if (json.user?.created_at) {
+          const minDate = json.user.created_at.slice(0, 10)
           setJoinedDate(minDate)
-          if (startDate < minDate) setStartDate(minDate)
-        }
-        if (Array.isArray(data.workspaces)) {
-          setWorkspaces(data.workspaces)
-          if (data.workspaces.length === 1) {
-            setWorkspaceSlug(data.workspaces[0].slug);
-          }
+          setStartDate((prev) => (prev < minDate ? minDate : prev))
         }
       })
       .catch(() => {})
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const fetchEvents = useCallback(
     async (opts?: { append?: boolean }) => {
-      const append = !!opts?.append;
-      if (append) setLoadingMore(true);
-      else setLoading(true);
+      if (!slug) return
+      const append = !!opts?.append
+      if (append) setLoadingMore(true)
+      else {
+        nextOffsetRef.current = 0
+        setData(null)
+      }
+      const reqOffset = append ? nextOffsetRef.current : 0
       try {
-        if (!append) nextOffsetRef.current = 0;
-        const reqOffset = append ? nextOffsetRef.current : 0;
-        const qs = `start=${startDate}T00:00:00Z&end=${endDate}T23:59:59Z&limit=10&offset=${reqOffset}`;
-        const url = workspaceSlug
-          ? `/api/me/ws/${encodeURIComponent(workspaceSlug)}/events?${qs}`
-          : `/api/events?${qs}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        const nextEvents = (data.events ?? []) as TimelineEvent[];
-        setEvents((prev) => (append ? [...prev, ...nextEvents] : nextEvents));
-        setTotal(data.total ?? 0);
-        nextOffsetRef.current = reqOffset + nextEvents.length;
+        const qs = `start=${startDate}T00:00:00Z&end=${endDate}T23:59:59Z&limit=10&offset=${reqOffset}`
+        const res = await fetch(`/api/me/ws/${encodeURIComponent(slug)}/events?${qs}`)
+        const json = await res.json()
+        const nextEvents = (json.events ?? []) as TimelineEvent[]
+        setData((prev) => ({
+          slug,
+          // Only extend a page that belongs to this same workspace.
+          events: append && prev?.slug === slug ? [...prev.events, ...nextEvents] : nextEvents,
+          total: json.total ?? 0,
+        }))
+        nextOffsetRef.current = reqOffset + nextEvents.length
       } catch {
-        // silent
+        // A failed first page resolves to "nothing here" rather than a skeleton
+        // that never goes away.
+        if (!append) setData({ slug, events: [], total: 0 })
       } finally {
-        if (append) setLoadingMore(false);
-        else setLoading(false);
+        if (append) setLoadingMore(false)
       }
     },
-    [startDate, endDate, workspaceSlug],
-  );
+    [startDate, endDate, slug],
+  )
 
   useEffect(() => {
-    nextOffsetRef.current = 0;
     fetchEvents()
   }, [fetchEvents])
 
   function handleNoteUpdate(id: string, note: string) {
-    setEvents((prev) => prev.map((e) => (e.id === id ? { ...e, note } : e)))
+    setData((prev) =>
+      prev
+        ? { ...prev, events: prev.events.map((e) => (e.id === id ? { ...e, note } : e)) }
+        : prev,
+    )
   }
 
-  const showWorkspaceFilter = workspaces.length > 1;
-  const workspaceFilterDisabled = showWorkspaceFilter ? false : true;
-  const canViewMore = !loading && events.length < total;
+  const title = (
+    <h1 className="t-h1" style={{ color: 'var(--navy)', margin: 0 }}>
+      {meSettings.timeline.title}
+    </h1>
+  )
+
+  if (!slug) {
+    return (
+      <div className="stack">
+        {title}
+        <EmptyState
+          title={meScreens.common.noWorkspaceTitle}
+          hint={meScreens.common.noWorkspaceBody}
+        />
+      </div>
+    )
+  }
+
+  const fresh = data?.slug === slug ? data : null
+  const loading = fresh === null
+  const events = fresh?.events ?? []
+  const total = fresh?.total ?? 0
+  const regularizationByEventId =
+    regularizations?.slug === slug ? regularizations.byEventId : {}
+  const canViewMore = !loading && events.length < total
 
   const grouped = groupByDate(events)
   const sortedDates = Array.from(grouped.keys()).sort((a, b) => (a > b ? -1 : 1))
 
   return (
-    <div style={{ maxWidth: "480px", margin: "0 auto", padding: "20px 16px" }}>
-      {/* Header */}
-      <h1
-        style={{
-          fontFamily: "Syne, sans-serif",
-          fontSize: "22px",
-          fontWeight: 700,
-          color: "var(--navy)",
-          marginBottom: "16px",
-        }}
-      >
-        Timeline
-      </h1>
+    <div className="stack">
+      {title}
 
-      {/* Workspace filter (transparency context) */}
-      {showWorkspaceFilter && (
-        <div style={{ marginBottom: "16px" }}>
-          <label
-            style={{
-              display: "block",
-              fontSize: "11px",
-              color: "var(--text-muted)",
-              fontFamily: "DM Sans, sans-serif",
-              marginBottom: "4px",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            {en.meTimeline.workspaceLabel}
-          </label>
-          <select
-            value={workspaceSlug ?? ""}
-            disabled={workspaceFilterDisabled}
-            onChange={(e) =>
-              setWorkspaceSlug(e.target.value === "" ? null : e.target.value)
-            }
-            style={{
-              width: "100%",
-              height: "40px",
-              padding: "0 10px",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "13px",
-              fontFamily: "DM Sans, sans-serif",
-              background: "var(--surface-0)",
-              color: "var(--text-primary)",
-            }}
-          >
-            <option value="">{en.meTimeline.workspaceAll}</option>
-            {workspaces.map((w) => (
-              <option key={w.slug} value={w.slug}>
-                {w.name}
-              </option>
-            ))}
-          </select>
-          <p
-            style={{
-              fontSize: "12px",
-              color: "var(--text-muted)",
-              fontFamily: "DM Sans, sans-serif",
-              marginTop: "8px",
-              lineHeight: 1.45,
-            }}
-          >
-            {en.meTimeline.transparencyHint}
-          </p>
-        </div>
-      )}
-
-      {/* Date filter */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1fr 1fr",
-          gap: "8px",
-          marginBottom: "20px",
-        }}
-      >
-        <div>
-          <label
-            style={{
-              display: "block",
-              fontSize: "11px",
-              color: "var(--text-muted)",
-              fontFamily: "DM Sans, sans-serif",
-              marginBottom: "4px",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            From
-          </label>
-          <input
+      {/* Date range. `min` is the account's created_at - no events exist before it. */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+        <Field label={meSettings.timeline.rangeFrom} htmlFor="timeline-start">
+          <Input
+            id="timeline-start"
             type="date"
             value={startDate}
             min={joinedDate ?? undefined}
             max={endDate}
             onChange={(e) => setStartDate(e.target.value)}
-            style={{
-              width: "100%",
-              height: "40px",
-              padding: "0 10px",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "13px",
-              fontFamily: "DM Sans, sans-serif",
-              background: "var(--surface-0)",
-              color: "var(--text-primary)",
-            }}
           />
-        </div>
-        <div>
-          <label
-            style={{
-              display: "block",
-              fontSize: "11px",
-              color: "var(--text-muted)",
-              fontFamily: "DM Sans, sans-serif",
-              marginBottom: "4px",
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-            }}
-          >
-            To
-          </label>
-          <input
+        </Field>
+        <Field label={meSettings.timeline.rangeTo} htmlFor="timeline-end">
+          <Input
+            id="timeline-end"
             type="date"
             value={endDate}
             min={startDate}
             max={today}
             onChange={(e) => setEndDate(e.target.value)}
-            style={{
-              width: "100%",
-              height: "40px",
-              padding: "0 10px",
-              border: "1px solid var(--border)",
-              borderRadius: "var(--radius-sm)",
-              fontSize: "13px",
-              fontFamily: "DM Sans, sans-serif",
-              background: "var(--surface-0)",
-              color: "var(--text-primary)",
-            }}
           />
-        </div>
+        </Field>
       </div>
 
-      {/* Summary line */}
       {!loading && (
-        <p
-          style={{
-            fontSize: "13px",
-            color: "var(--text-muted)",
-            fontFamily: "DM Sans, sans-serif",
-            marginBottom: "16px",
-          }}
-        >
-          {total} check-in{total !== 1 ? "s" : ""} · {sortedDates.length} day
-          {sortedDates.length !== 1 ? "s" : ""}
+        <p className="t-muted" style={{ margin: 0 }}>
+          {meSettings.timeline.summary(total, sortedDates.length)}
         </p>
       )}
 
-      {/* Skeleton */}
-      {loading && (
-        <div>
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              style={{
-                height: "88px",
-                background: "var(--surface-2)",
-                borderRadius: "var(--radius-md)",
-                marginBottom: "8px",
-                animation: "pulse 1.5s ease-in-out infinite",
-              }}
-            />
-          ))}
-        </div>
-      )}
+      {loading && <EventSkeletons idPrefix="initial" />}
 
-      {/* Grouped events */}
       {!loading && sortedDates.length === 0 && (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "48px 0",
-            color: "var(--text-muted)",
-            fontFamily: "DM Sans, sans-serif",
-          }}
-        >
-          <p>{en.meTimeline.emptyNoCheckinsTitle}</p>
-          <p style={{ fontSize: "13px", marginTop: "4px" }}>
-            {en.meTimeline.emptyNoCheckinsBody}
-          </p>
-        </div>
+        <EmptyState
+          title={en.meTimeline.emptyNoCheckinsTitle}
+          hint={en.meTimeline.emptyNoCheckinsBody}
+        />
       )}
 
       {!loading &&
         sortedDates.map((date) => (
-          <section key={date} style={{ marginBottom: "20px" }}>
-            <h2
-              style={{
-                fontFamily: "DM Sans, sans-serif",
-                fontSize: "13px",
-                fontWeight: 500,
-                color: "var(--text-secondary)",
-                marginBottom: "8px",
-              }}
-            >
+          <section key={date}>
+            <h2 className="t-eyebrow" style={{ margin: '0 0 8px' }}>
               {formatDateHeading(date)}
             </h2>
             {grouped.get(date)!.map((event) => (
@@ -351,7 +260,7 @@ export default function TimelinePage() {
                 key={event.id}
                 event={event}
                 onNoteUpdate={handleNoteUpdate}
-                workspaceSlug={workspaceSlug}
+                workspaceSlug={slug}
                 regularizationStatus={regularizationByEventId[event.id]}
                 onRegularizationSubmitted={fetchRegularizations}
               />
@@ -359,46 +268,18 @@ export default function TimelinePage() {
           </section>
         ))}
 
-      {!loading && loadingMore && (
-        <div>
-          {[1, 2, 3].map((i) => (
-            <div
-              key={`load-more-${i}`}
-              style={{
-                height: "88px",
-                background: "var(--surface-2)",
-                borderRadius: "var(--radius-md)",
-                marginBottom: "8px",
-                animation: "pulse 1.5s ease-in-out infinite",
-              }}
-            />
-          ))}
-        </div>
-      )}
+      {!loading && loadingMore && <EventSkeletons idPrefix="more" />}
 
-      {/* View more */}
       {!loading && canViewMore && (
-        <div style={{ marginTop: "12px" }}>
-          <button
-            onClick={() => fetchEvents({ append: true })}
-            disabled={loadingMore}
-            style={{
-              width: "100%",
-              height: "44px",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--border)",
-              background: "var(--surface-0)",
-              fontFamily: "DM Sans, sans-serif",
-              fontSize: "13px",
-              fontWeight: 600,
-              color: "var(--text-primary)",
-              cursor: loadingMore ? "default" : "pointer",
-            }}
-          >
-            {loadingMore ? en.meTimeline.loadingMore : en.meTimeline.viewMore}
-          </button>
-        </div>
+        <Button
+          variant="secondary"
+          block
+          loading={loadingMore}
+          onClick={() => fetchEvents({ append: true })}
+        >
+          {loadingMore ? en.meTimeline.loadingMore : en.meTimeline.viewMore}
+        </Button>
       )}
     </div>
-  );
+  )
 }

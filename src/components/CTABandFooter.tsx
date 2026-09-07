@@ -1,41 +1,66 @@
-'use client';
-
+import Image from 'next/image';
 import Link from 'next/link';
+import { marketing } from '@/locales/en/marketing';
+
+const copy = marketing.ctaBand;
 
 export default function CTABandFooter() {
   return (
     <>
-      <div className="relative z-10 mx-6 mt-[80px] mb-[80px] overflow-hidden rounded-[24px] border border-[rgba(27,77,255,0.3)] bg-gradient-to-b from-[#1A2635] via-[#132131] to-[#0D1B2A] px-7 py-12 text-center md:mx-10 md:mb-[100px] md:px-[60px] md:py-[80px]">
-        <div className="pointer-events-none absolute left-1/2 top-[-60%] h-[400px] w-[600px] -translate-x-1/2 rounded-full" style={{ background: 'radial-gradient(ellipse, rgba(27,77,255,0.12) 0%, transparent 70%)' }} />
+      <div className="relative z-10 mx-6 mb-[80px] mt-[80px] overflow-hidden rounded-[24px] border border-[color-mix(in_srgb,var(--checkmark-brand)_30%,transparent)] bg-gradient-to-b from-checkmark-bg-card2 via-checkmark-bg-card to-checkmark-bg-dark px-7 py-12 text-center md:mx-10 md:mb-[100px] md:px-[60px] md:py-[80px]">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-[-60%] h-[400px] w-[600px] -translate-x-1/2 rounded-full"
+          style={{ background: 'radial-gradient(ellipse, var(--brand-glow) 0%, transparent 70%)' }}
+        />
 
         <div className="reveal relative z-10">
           <h2 className="mb-4 font-dm-sans text-3xl font-black leading-tight tracking-tight md:text-4xl">
-            Stop chasing<br /><em className="font-syne italic text-checkmark-brand">presence data.</em>
+            {copy.headingBefore}
+            <br />
+            <em className="font-syne italic text-checkmark-brand">{copy.headingEmphasis}</em>
           </h2>
-          <p className="mb-10 text-base text-checkmark-text-muted md:text-lg">
-            From one frustrated engineer's allowance hack to a platform that makes presence tracking invisible.
-          </p>
+          <p className="mb-10 text-base text-checkmark-text-muted md:text-lg">{copy.description}</p>
           <div className="flex flex-wrap items-center justify-center gap-3.5">
-            <Link href="/login" className="rounded-lg bg-checkmark-brand px-9 py-4 text-base font-bold text-white shadow-[0_0_40px_rgba(27,77,255,0.35)] transition-all hover:-translate-y-0.5 hover:bg-[#446CFF]">
-              Get Started - It's Free
+            <Link
+              href="/login"
+              className="rounded-lg bg-checkmark-brand px-9 py-4 text-base font-bold text-white no-underline transition-colors hover:bg-brand-hover"
+            >
+              {copy.primaryCta}
             </Link>
-            <button className="rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text transition-all hover:border-checkmark-brand hover:text-checkmark-brand">
-              Talk to us
-            </button>
+            <a
+              href="mailto:kabir.innovate@gmail.com"
+              className="rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text no-underline transition-colors hover:border-checkmark-brand hover:text-checkmark-brand"
+            >
+              {copy.secondaryCta}
+            </a>
           </div>
         </div>
       </div>
 
       <footer className="relative z-10 flex flex-wrap items-center justify-between gap-5 border-t border-checkmark-border px-6 py-10 md:px-[60px]">
-        <div className="flex items-center gap-3">
-          <img src="/logo.png" alt="CheckMark" className="h-[66px] w-auto" />
-        </div>
-        <div className="text-xs text-checkmark-text-muted">Copyright 2026 CheckMark. Presence Intelligence Platform.</div>
-        <div className="flex gap-6">
-          <a href="#" className="text-xs text-checkmark-text-muted transition-colors hover:text-checkmark-brand">Privacy</a>
-          <a href="#" className="text-xs text-checkmark-text-muted transition-colors hover:text-checkmark-brand">Terms</a>
-          <a href="#" className="text-xs text-checkmark-text-muted transition-colors hover:text-checkmark-brand">Contact</a>
-        </div>
+        <Link href="/" className="flex items-center no-underline">
+          <Image
+            src="/logo.png"
+            alt={marketing.nav.logoAlt}
+            width={117}
+            height={66}
+            className="h-[66px] w-auto"
+          />
+        </Link>
+        <p className="m-0 text-xs text-checkmark-text-muted">{copy.copyright}</p>
+        <ul className="flex list-none gap-6">
+          {copy.links.map((link) => (
+            <li key={link.href}>
+              <Link
+                href={link.href}
+                className="text-xs text-checkmark-text-muted no-underline transition-colors hover:text-checkmark-brand"
+              >
+                {link.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
       </footer>
     </>
   );

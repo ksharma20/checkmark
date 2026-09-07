@@ -19,6 +19,18 @@
   --radius-sm:       6px;
   --radius-md:       10px;
   --radius-lg:       16px;
+  --radius-xl:       22px;
+  --info:            #8B5CF6;
+  /* Focus rings, signal-dot halos, wizard step glow. Deliberately stronger than
+     --brand-glow, which stays weak because Hero's ambient blobs use it. */
+  --ring:            rgba(27,77,255,0.28);
+  /* Elevation is for overlays only - never inline cards. See docs/design. */
+  --shadow-sm:       0 1px 2px rgba(13,27,42,0.06);
+  --shadow-md:       0 4px 16px rgba(13,27,42,0.08);
+  --ease-out:        cubic-bezier(0.23,1,0.32,1);
+  --ease-inout:      cubic-bezier(0.77,0,0.175,1);
+  --ease-spring:     cubic-bezier(0.34,1.56,0.64,1);
+  --ease-drawer:     cubic-bezier(0.32,0.72,0,1);
   --checkmark-brand: #1B4DFF;
   --brand-dim:       #1640E0;
   --brand-glow:      rgba(27,77,255,0.18);
@@ -45,6 +57,11 @@
   --color-text-secondary: var(--text-secondary);
   --color-text-muted:     var(--text-muted);
   --color-border:         var(--border);
+  --color-info:           var(--info);
+  --radius-sm:            var(--radius-sm);
+  --radius-md:            var(--radius-md);
+  --radius-lg:            var(--radius-lg);
+  --radius-xl:            var(--radius-xl);
   --font-heading:         'Syne', sans-serif;
   --font-body:            'DM Sans', sans-serif;
   --font-mono:            'JetBrains Mono', monospace;
@@ -119,21 +136,6 @@ code, pre, .mono {
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* ── Dark theme - authenticated app pages ─────────────────────────────── */
-.vz-dark {
-  --surface-0:      #1A2635;
-  --surface-1:      #0D1B2A;
-  --surface-2:      #132131;
-  --text-primary:   #F1F5F9;
-  --text-secondary: #94A3B8;
-  --text-muted:     #64748B;
-  --border:         rgba(27, 77, 255, 0.2);
-  --brand:          #1B4DFF;
-  --brand-hover:    #1640E0;
-  --navy:           #F1F5F9;
-  color-scheme: dark;
-}
-
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.45; }
@@ -173,11 +175,6 @@ code, pre, .mono {
 @keyframes pulseDot {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.4; transform: scale(0.7); }
-}
-
-@keyframes vzToastIn {
-  from { opacity: 0; transform: translateY(14px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 @keyframes lineReveal {
@@ -345,59 +342,852 @@ a[href] {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* ── Workspace sidebar - collapsible ─────────────────────── */
-
-/* Mobile: JS controls collapse state; only lock max-width when fully collapsed */
-@media (max-width: 767px) {
-  .ws-sidebar-bottom  { display: none !important; }
-}
-
-/* ── People / member row - mobile layout ── */
-@media (max-width: 540px) {
-  .member-row {
-    flex-wrap: wrap !important;
-    align-items: flex-start !important;
-  }
-  .member-meta {
-    flex: 0 0 100% !important;
-    padding-left: 48px !important; /* align with name (36px avatar + 12px gap) */
-    margin-top: 6px !important;
-  }
-  .member-btn-label    { display: none !important; }
-  .member-btn-icon     { display: block !important; }
-  .member-status-badge { display: none !important; }
-  .member-status-dot   { display: block !important; }
-}
-
-/* Default: show label, hide icon */
-.member-btn-icon { display: none; }
-
-/* ── Dashboard responsive ─────────────────────────────────── */
-
-/* Mobile: tighten page padding */
-@media (max-width: 479px) {
-  .dash-page { padding: 12px !important; }
-}
-
-/* Mobile: stat cards go full-width */
-@media (max-width: 479px) {
-  .dash-stat-card { flex: 1 1 100% !important; min-width: 0 !important; }
-}
-
-/* Mobile + small tablet: graphs stack vertically */
-@media (max-width: 639px) {
-  .dash-graph-item { flex: 1 1 100% !important; min-width: 0 !important; }
-}
-
 /* Attendance table: horizontal scroll on small screens */
 .dash-table-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
-.dash-table-min { min-width: 640px; }
 
-.ws-card-link { transition: border-color 0.15s, box-shadow 0.15s; }
-.ws-card-link:hover {
-  border-color: var(--brand) !important;
-  box-shadow: 0 2px 12px color-mix(in srgb, var(--brand) 12%, transparent);
+/* ═══════════════════════════════════════════════════════════════════════════
+   APP DESIGN SYSTEM
+   Lifted from the approved revamp mock. These classes are the shared vocabulary
+   for the /me and /ws surfaces; React wrappers live in src/components/ui/.
+   Marketing pages keep their own Tailwind-utility styling and are untouched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── press / hover ─────────────────────────────────────────────────────────── */
+.pressable, .navitem, .rowlink {
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 140ms var(--ease-out), background 160ms var(--ease-out),
+              border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out),
+              opacity 160ms var(--ease-out);
 }
+.pressable:active, .navitem:active, .rowlink:active { transform: scale(0.97); }
+
+@media (hover: hover) and (pointer: fine) {
+  .hoverlift:hover { border-color: var(--brand); box-shadow: 0 2px 14px var(--ring); }
+  .navitem:hover   { background: var(--surface-2); }
+  .rowlink:hover   { background: var(--surface-2); }
+}
+
+/* ── shells ────────────────────────────────────────────────────────────────── */
+.shell-ws { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 228px; flex-shrink: 0; background: var(--surface-0);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  padding: 20px 14px; gap: 4px; position: sticky; top: 0; height: 100vh;
+}
+.sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+.brand-mark {
+  width: 30px; height: 30px; border-radius: 9px; background: var(--brand);
+  display: flex; align-items: center; justify-content: center; color: #fff;
+  font-weight: 800; font-family: var(--font-heading); font-size: 15px; flex-shrink: 0;
+}
+.brand-name { font-family: var(--font-heading); font-weight: 700; font-size: 17px; color: var(--navy); }
+.navitem {
+  display: flex; align-items: center; gap: 11px; padding: 10px 12px;
+  border-radius: var(--radius-md); color: var(--text-secondary);
+  font-size: 13.5px; font-weight: 500; cursor: pointer; text-decoration: none;
+}
+.navitem .ic { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.85; }
+.navitem.active {
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--brand); font-weight: 700;
+}
+.sidebar-foot { margin-top: auto; padding-top: 14px; border-top: 1px solid var(--border); position: relative; }
+.ws-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ws-topbar {
+  height: 64px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between;
+  padding: 0 28px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 5;
+  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--surface-0) 88%, transparent);
+}
+.ws-content { padding: 28px; max-width: 1180px; width: 100%; margin: 0 auto; }
+
+/* Desktop app shell: the frame owns the viewport and only `.ws-main` scrolls.
+   `html`/`body` carry `overflow-x: hidden` (kept - it is what stops horizontal
+   scroll on mobile), and that forces their computed `overflow-y` to `auto`,
+   making them scroll containers. `position: sticky` resolves against the
+   nearest scrolling ancestor, so a sticky sidebar stuck to something that was
+   itself scrolling - i.e. it did nothing. Giving the shell a fixed height and
+   moving the scroll into the main column fixes it without touching those rules.
+   Below 861px this block does not apply: the sidebar is a horizontal tab strip
+   and the page scrolls normally (see the max-width: 860px block). */
+@media (min-width: 861px) {
+  .shell-ws { min-height: 0; height: 100vh; height: 100dvh; overflow: hidden; }
+  /* No longer sticky - it is a full-height column of a non-scrolling frame.
+     `overflow-y: auto` only bites when the nav is taller than the viewport. */
+  .sidebar { position: static; height: 100%; overflow-y: auto; overflow-x: hidden; }
+  /* The page's scroll container. `.ws-topbar` sticks to the top of THIS.
+     `overflow-x: hidden` keeps the horizontal clipping that `body` used to do -
+     declaring only `overflow-y` would compute the x axis to `auto` and add a
+     horizontal scrollbar where there was none. */
+  .ws-main { overflow-y: auto; overflow-x: hidden; }
+}
+
+.shell-me {
+  max-width: 460px; margin: 0 auto; min-height: 100vh;
+  display: flex; flex-direction: column; position: relative;
+}
+.me-topbar { padding: 20px 20px 6px; }
+.me-content { flex: 1; padding: 6px 20px 100px; }
+.me-bottomnav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 460px; display: flex;
+  background: color-mix(in srgb, var(--surface-0) 85%, transparent);
+  backdrop-filter: blur(18px); border-top: 1px solid var(--border);
+  padding: 8px 6px calc(8px + env(safe-area-inset-bottom)); z-index: 10;
+}
+.me-navitem {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 7px 4px; border-radius: var(--radius-md); color: var(--text-muted);
+  font-size: 10.5px; font-weight: 600; cursor: pointer; text-decoration: none;
+  min-height: 44px; justify-content: center;
+}
+.me-navitem .ic { width: 20px; height: 20px; }
+.me-navitem.active { color: var(--brand); }
+
+/* ── typography scale ──────────────────────────────────────────────────────── */
+.t-display { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.05; letter-spacing: -0.025em; font-weight: 700; }
+.t-h1 { font-size: 21px; font-weight: 700; }
+.t-h2 { font-size: 16px; font-weight: 700; }
+.t-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-muted); }
+.t-secondary { color: var(--text-secondary); font-size: 13.5px; }
+.t-muted { color: var(--text-muted); font-size: 12.5px; }
+.stat-num { font-family: var(--font-mono); font-weight: 700; font-size: 30px; letter-spacing: -0.02em; color: var(--navy); }
+
+/* ── surfaces ──────────────────────────────────────────────────────────────── */
+.card { background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 20px; }
+.card + .card { margin-top: 14px; }
+.dash-ic {
+  position: absolute; top: 16px; right: 16px; width: 32px; height: 32px;
+  border-radius: 8px; background: var(--surface-2); color: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+}
+.card .t-eyebrow { padding-right: 40px; }
+.rowlink { cursor: pointer; border-radius: var(--radius-md); }
+.card-fixed-h { display: flex; flex-direction: column; min-height: 340px; max-height: 420px; }
+.card-fixed-h .scroll-body { flex: 1; overflow-y: auto; }
+.divider { height: 1px; background: var(--border); margin: 16px 0; }
+.empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+
+/* ── buttons ───────────────────────────────────────────────────────────────── */
+.btn {
+  height: 42px; padding: 0 18px; border-radius: var(--radius-md); font-size: 13.5px;
+  font-weight: 600; display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; cursor: pointer; border: none; background: none; font-family: inherit;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-primary { background: var(--brand); color: #fff; }
+.btn-primary:not(:disabled):hover { background: var(--brand-hover); }
+.btn-secondary { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); }
+.btn-ghost { background: transparent; color: var(--text-secondary); }
+.btn-danger { background: transparent; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); }
+.btn-sm { height: 34px; padding: 0 13px; font-size: 12.5px; }
+.btn-block { width: 100%; }
+.icon-btn { width: 32px; height: 32px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; cursor: pointer; border: none; }
+.icon-btn-approve { background: var(--brand); color: #fff; }
+.icon-btn-decline { background: transparent; color: var(--danger); border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent); }
+
+/* ── chips ─────────────────────────────────────────────────────────────────── */
+.chip {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 700;
+  padding: 3px 9px; border-radius: 999px; white-space: nowrap;
+}
+.chip-verified { background: color-mix(in srgb, var(--brand) 14%, transparent);  color: var(--brand); }
+.chip-partial  { background: color-mix(in srgb, var(--amber) 16%, transparent);  color: #9a6200; }
+.chip-none     { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+.chip-override { background: color-mix(in srgb, var(--info) 14%, transparent);   color: var(--info); }
+.chip-owner    { background: color-mix(in srgb, var(--navy) 14%, transparent);   color: var(--navy); }
+.chip-leave    { background: var(--surface-2); color: var(--text-secondary); }
+.chip-roadmap  { background: var(--surface-2); color: var(--text-muted); font-weight: 600; }
+
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: color-mix(in srgb, var(--brand) 16%, transparent); color: var(--brand);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 12.5px; flex-shrink: 0;
+}
+
+/* ── forms ─────────────────────────────────────────────────────────────────── */
+.field-label { display: block; font-size: 11.5px; font-weight: 600; color: var(--text-secondary); margin-bottom: 5px; }
+.input, select.input, textarea.input {
+  width: 100%; height: 42px; padding: 0 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-md); background: var(--surface-2); color: var(--text-primary);
+  font-size: 13.5px; font-family: inherit; outline: none;
+}
+textarea.input { height: auto; padding: 10px 12px; resize: vertical; }
+.input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px var(--ring); }
+.toggle {
+  width: 42px; height: 25px; border-radius: 999px; background: var(--surface-2);
+  border: 1px solid var(--border); position: relative; flex-shrink: 0; padding: 0; cursor: pointer;
+}
+.toggle .knob {
+  width: 19px; height: 19px; border-radius: 50%; background: #fff; position: absolute;
+  top: 2px; left: 2px; transition: transform 220ms var(--ease-spring); box-shadow: 0 1px 3px rgba(0,0,0,0.22);
+}
+.toggle.on { background: var(--brand); border-color: var(--brand); }
+.toggle.on .knob { transform: translateX(17px); }
+.dropzone {
+  display: flex; align-items: center; justify-content: center; gap: 8px; height: 64px;
+  border: 2px dashed var(--border); border-radius: var(--radius-md); background: var(--surface-2);
+  color: var(--text-secondary); font-size: 13px; font-weight: 600; cursor: pointer; text-align: center;
+}
+.dropzone:hover { border-color: var(--brand); color: var(--brand); }
+
+/* ── data display ──────────────────────────────────────────────────────────── */
+table.datatable { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.datatable th {
+  text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em;
+  color: var(--text-muted); font-weight: 700; padding: 14px 14px 12px;
+}
+table.datatable td { padding: 14px; border-top: 1px solid var(--border); vertical-align: middle; }
+table.datatable th:first-child, table.datatable td:first-child { padding-left: 20px; }
+table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 20px; }
+
+.tabbar { display: inline-flex; gap: 4px; padding: 4px; background: var(--surface-2); border-radius: 12px; flex-wrap: wrap; }
+.tabbar button {
+  height: 32px; padding: 0 14px; border-radius: 9px; font-size: 12.5px; font-weight: 600;
+  color: var(--text-secondary); border: none; background: none; cursor: pointer; font-family: inherit;
+}
+.tabbar button.active { background: var(--surface-0); color: var(--brand); box-shadow: var(--shadow-sm); }
+
+.progress { height: 7px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.progress > div { height: 100%; border-radius: 4px; background: var(--progress-fill, var(--brand)); transform-origin: left; animation: barGrow 560ms var(--ease-out) both; }
+@keyframes barGrow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.split-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--surface-2); }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 400% 100%; animation: skeletonShimmer 1.6s ease infinite; border-radius: var(--radius-sm);
+}
+@keyframes skeletonShimmer { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+
+/* Opacity-only placeholder pulse, for loading blocks that supply their own
+   fill instead of the .skeleton shimmer gradient. */
+.cm-pulse { animation: cm-pulse 1.5s ease-in-out infinite; }
+@keyframes cm-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.bar-wrap { display: flex; align-items: flex-end; gap: 5px; height: 110px; }
+.bar { flex: 1; background: color-mix(in srgb, var(--brand) 65%, transparent); border-radius: 4px 4px 0 0; min-height: 3px; transition: height 500ms var(--ease-out); }
+.bar.weekend { background: var(--border); }
+.livedot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); display: inline-block; animation: pulseDot 1.8s ease-in-out infinite; }
+
+/* ── steppers ──────────────────────────────────────────────────────────────── */
+.wizard-steps { display: flex; align-items: center; }
+.wizard-step-dot {
+  width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0;
+  background: var(--surface-2); color: var(--text-muted); border: 1.5px solid var(--border);
+  transition: background 220ms var(--ease-out), color 220ms var(--ease-out),
+              border-color 220ms var(--ease-out), box-shadow 220ms var(--ease-out);
+}
+.wizard-step-dot.done    { background: var(--brand); color: #fff; border-color: var(--brand); }
+/* A step left with a validation error. Declared BEFORE .current, at equal
+   specificity, so the step being edited still reads as current even while it is
+   the broken one - last rule wins in CSS, and "where am I" beats "what is
+   wrong" for the dot you are standing on. */
+.wizard-step-dot.invalid { border-color: var(--danger); color: var(--danger); background: var(--surface-0); }
+.wizard-step-dot.invalid.done { background: var(--danger); color: #fff; border-color: var(--danger); }
+.wizard-step-dot.current { border-color: var(--brand); color: var(--brand); background: var(--surface-0); box-shadow: 0 0 0 4px var(--ring); }
+.wizard-step-dot:enabled  { cursor: pointer; }
+.wizard-step-dot:disabled { cursor: default; }
+.wizard-connector { flex: 1; height: 2px; background: var(--border); margin: 0 4px; min-width: 12px; }
+.wizard-connector.done { background: var(--brand); }
+
+.stage-dot {
+  width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; background: var(--surface-2); color: var(--text-muted);
+  border: 1.5px solid var(--border); flex-shrink: 0; font-size: 10px;
+}
+.stage-dot.done    { background: var(--brand); color: #fff; border-color: var(--brand); }
+.stage-dot.current { border-color: var(--brand); box-shadow: 0 0 0 3px var(--ring); color: var(--brand); }
+.stage-connector { flex: 1; height: 2px; background: var(--border); min-width: 16px; }
+.stage-connector.done { background: var(--brand); }
+
+/* ── overlays (the only place elevation is allowed) ────────────────────────── */
+.slideover { position: fixed; inset: 0; z-index: 50; display: flex; justify-content: flex-end; }
+.slideover .scrim { position: absolute; inset: 0; background: rgba(13,27,42,0.4); animation: fadeIn 220ms var(--ease-out) both; }
+.slideover .panel {
+  position: relative; width: 380px; max-width: 92vw; background: var(--surface-0); height: 100%;
+  box-shadow: -8px 0 32px rgba(0,0,0,0.18); padding: 24px; overflow-y: auto;
+  animation: slideIn 280ms var(--ease-spring) both;
+}
+@keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideIn { from { transform: translateX(24px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+.modal { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.modal .scrim { position: absolute; inset: 0; background: rgba(13,27,42,0.5); animation: fadeIn 220ms var(--ease-out) both; }
+.modal .panel {
+  position: relative; width: 100%; max-width: 360px; background: var(--surface-0);
+  border-radius: var(--radius-xl); padding: 24px; box-shadow: var(--shadow-md);
+  animation: fxSpring 320ms var(--ease-spring) both;
+}
+
+.me-sheet { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
+.me-sheet .scrim { position: absolute; inset: 0; background: rgba(13,27,42,0.45); animation: fadeIn 220ms var(--ease-out) both; }
+.me-sheet .panel {
+  position: relative; width: 100%; max-width: 460px; background: var(--surface-0);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  padding: 10px 20px calc(20px + env(safe-area-inset-bottom));
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.18); max-height: 80vh; overflow-y: auto;
+  animation: sheetIn 340ms var(--ease-drawer) both;
+}
+.me-sheet .handle { width: 36px; height: 4px; border-radius: 999px; background: var(--border); margin: 0 auto 16px; }
+@keyframes sheetIn { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+/* Transient status message, rendered by ToastProvider. Bottom-RIGHT and with no
+   layout transform, so the reduced-motion guard's `transform: none` cannot
+   strand it off-centre the way a translateX(-50%) version would. */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 2000;
+  display: flex; align-items: center; gap: 10px;
+  background: var(--header-bg); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 11px; padding: 13px 18px;
+  box-shadow: 0 12px 40px rgba(13,27,42,0.4);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px; font-weight: 600; color: var(--checkmark-text);
+  animation: toastIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.toast .toast-dot {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  background: var(--toast-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--toast-accent) 30%, transparent);
+}
+.toast.kind-info    { --toast-accent: var(--brand); }
+.toast.kind-success { --toast-accent: var(--teal); }
+.toast.kind-error   { --toast-accent: var(--danger); }
+@keyframes toastIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Indeterminate navigation bar, rendered by TopProgressBar only while a
+   navigation is in flight. Under reduced motion the guard stops the sweep and
+   the bar settles to a static full-width fill - still a visible "working"
+   signal, which is why it is not in the `display: none` category. */
+.top-progress {
+  position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 9999;
+  overflow: hidden; background: transparent;
+}
+.top-progress > .bar-sweep {
+  height: 100%; background: var(--brand); transform-origin: left center;
+  animation: cm-progress 1.4s ease-in-out infinite;
+}
+@keyframes cm-progress {
+  0%   { transform: scaleX(0) translateX(0); }
+  50%  { transform: scaleX(0.6) translateX(80%); }
+  100% { transform: scaleX(0) translateX(300%); }
+}
+
+.dropdown-menu {
+  position: absolute; bottom: calc(100% + 8px); left: 8px; right: 8px;
+  background: var(--surface-0); border: 1px solid var(--border); border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md); padding: 6px; z-index: 30; animation: fxSnap 150ms var(--ease-out) both;
+}
+.dropdown-menu .rowlink { display: block; padding: 9px 10px; font-size: 13px; font-weight: 600; }
+.dropdown-menu.below { bottom: auto; top: calc(100% + 8px); left: auto; right: 0; width: 180px; }
+
+.ws-pill {
+  display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px 6px 6px;
+  border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 12.5px; font-weight: 700; color: var(--text-primary); cursor: pointer;
+}
+.ws-pill .swatch {
+  width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center;
+  justify-content: center; color: #fff; font-size: 9.5px; font-weight: 800; flex-shrink: 0;
+}
+.navbadge {
+  margin-left: auto; background: var(--danger); color: #fff; font-size: 10px; font-weight: 800;
+  min-width: 17px; height: 17px; border-radius: 999px; display: flex; align-items: center;
+  justify-content: center; padding: 0 5px;
+}
+.topbar-account { position: relative; display: none; }
+
+/* ── check-in ──────────────────────────────────────────────────────────────── */
+.checkin-btn {
+  width: 168px; height: 168px; border-radius: 50%; margin: 14px auto 6px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  background: var(--brand); color: #fff; border: none; cursor: pointer;
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.checkin-btn:active { transform: scale(0.96); }
+.checkin-btn .ic-big { font-size: 34px; }
+
+.signal-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface-2);
+}
+.signal-row .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.signal-row.ok .dot { background: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
+.signal-row.pulse .dot { animation: pulseDot 1s ease-in-out infinite; }
+
+.ci-stage { position: relative; width: 100%; height: 180px; display: flex; align-items: center; justify-content: center; }
+.ci-ring { position: absolute; width: 96px; height: 96px; border-radius: 50%; border: 2px solid var(--brand); opacity: 0; }
+.ci-ring.play { animation: ciRing 900ms var(--ease-inout) forwards; }
+.ci-ring.play.r2 { animation: ciRing2 1100ms var(--ease-inout) 120ms forwards; }
+@keyframes ciRing  { 0% { opacity: 0.75; transform: scale(0.7); } 100% { opacity: 0; transform: scale(2.1); } }
+@keyframes ciRing2 { 0% { opacity: 0.45; transform: scale(0.7); } 100% { opacity: 0; transform: scale(2.6); } }
+.ci-badge {
+  position: relative; width: 88px; height: 88px; border-radius: 50%;
+  background: color-mix(in srgb, var(--brand) 18%, transparent); border: 2.5px solid var(--brand);
+  display: flex; align-items: center; justify-content: center; color: var(--brand);
+  font-size: 38px; opacity: 1; z-index: 2;
+}
+.ci-badge.play { animation: ciBadge 640ms var(--ease-spring) forwards; }
+@keyframes ciBadge {
+  0%   { opacity: 0; transform: scale(0.4) rotate(-10deg); }
+  55%  { opacity: 1; transform: scale(1.22) rotate(4deg); }
+  78%  { transform: scale(0.94) rotate(-2deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+.ci-dot { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--brand); opacity: 1; z-index: 1; }
+.ci-dot.play { animation: ciDot 750ms var(--ease-out) 280ms forwards; }
+@keyframes ciDot { to { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); } }
+.ci-fade-target { transition: opacity 220ms var(--ease-out), transform 220ms var(--ease-out); }
+.ci-fade-target:not(.ci-fade-in) { opacity: 0; transform: translateY(4px); }
+
+/* ── motion tier: snap ─────────────────────────────────────────────────────── */
+.fx-snap { animation: fxSnap 150ms var(--ease-out) both; }
+@keyframes fxSnap { from { opacity: 0; transform: scale(0.96); } to { opacity: 1; transform: scale(1); } }
+
+/* ── report cards ──────────────────────────────────────────────────────────── */
+.report-card { display: flex; flex-direction: column; gap: 12px; }
+.report-card.disabled { opacity: 0.5; }
+.report-card.disabled button { cursor: not-allowed !important; }
+
+/* ── responsive: workspace shell collapses to a scrolling tab strip ────────── */
+@media (max-width: 860px) {
+  .shell-ws { flex-direction: column; padding-top: 54px; }
+  .sidebar {
+    width: 100%; height: auto; position: static; flex-direction: row; align-items: center;
+    overflow-x: auto; padding: 10px 12px; border-right: none;
+    border-bottom: 1px solid var(--border); gap: 2px;
+  }
+  .sidebar-brand { padding: 4px 12px 4px 2px; flex-shrink: 0; }
+  .navitem { flex-shrink: 0; white-space: nowrap; }
+  .sidebar-foot { display: none; }
+  .topbar-account { display: block; }
+  .ws-content { padding: 18px; }
+}
+
+/* ── reduced motion: comprehensive guard ───────────────────────────────────────
+   Every decorative
+   animation in this stylesheet is listed; add new ones here when introduced. */
+@media (prefers-reduced-motion: reduce) {
+  .fx-snap, .fx-spring, .fx-spring-stagger > *,
+  .ci-ring, .ci-badge, .ci-dot, .ci-fade-target,
+  .skeleton, .cm-pulse, .progress > div, .top-progress > .bar-sweep,
+  .livedot, .signal-row.pulse .dot,
+  .slideover .scrim, .slideover .panel,
+  .modal .scrim, .modal .panel,
+  .me-sheet .scrim, .me-sheet .panel,
+  .toast, .dropdown-menu,
+  .page-enter, .reveal,
+  .hero-anim, .hero-underline, .cs-ping {
+    animation: none !important;
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  /* `.top-progress > .bar-sweep` belongs in the block above rather than with
+     `.click-ripple`: with the sweep removed the identity transform leaves a
+     static full-width fill, so a navigation in flight is still communicated. */
+
+  /* Transition-only: these carry a MEANINGFUL transform in their end state.
+     Killing `transform` here would strand the toggle knob in the off position
+     and freeze bars at zero height, so only the easing is removed. */
+  .toggle .knob, .bar { transition: none !important; }
+
+  /* Purely decorative and injected at runtime by RippleProvider. Forcing
+     opacity/transform would leave a permanent visible circle, so remove it. */
+  .click-ripple { display: none !important; }
+
+  /* Marketing ambience */
+  .animate-float, .animate-marquee { animation: none !important; }
+
+  /* The scanline is a scanning beam - killing it outright and forcing full
+     opacity would leave a hard bright bar across the panel, so it settles at
+     half opacity instead of the guard's default 1. */
+  .cs-scanline { animation: none !important; opacity: 0.5 !important; }
+}
+
+/* ── gap-fill: classes the primitives needed that the mock did not name ──────
+   Reported by the three agents that built src/components/ui/. Each entry here
+   replaces an inline style that would otherwise have been repeated per caller. */
+
+/* Accents for stat values and their icon badge */
+.stat-num.accent-brand  { color: var(--brand); }
+.stat-num.accent-amber  { color: var(--amber); }
+.stat-num.accent-danger { color: var(--danger); }
+.dash-ic.accent-amber   { color: var(--amber); }
+.dash-ic.accent-danger  { color: var(--danger); }
+
+/* Form validation + helper text */
+.input[aria-invalid="true"],
+.input.invalid { border-color: var(--danger); }
+.input[aria-invalid="true"]:focus,
+.input.invalid:focus { box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 22%, transparent); }
+.field-hint  { font-size: 12.5px; color: var(--text-muted); margin-top: 5px; }
+.field-error { font-size: 12.5px; color: var(--danger);     margin-top: 5px; }
+
+/* Dropzone states */
+.dropzone.compact { height: 40px; font-size: 12px; }
+.dropzone[data-dragging="true"] { border-color: var(--brand); color: var(--brand); background: color-mix(in srgb, var(--brand) 8%, var(--surface-2)); }
+.dropzone[data-disabled="true"] { opacity: 0.5; cursor: not-allowed; }
+.dropzone[data-disabled="true"]:hover { border-color: var(--border); color: var(--text-secondary); }
+
+/* Neutral icon button (no approve/decline semantics) */
+.icon-btn-plain { background: transparent; color: var(--text-secondary); }
+.icon-btn-plain:hover { background: var(--surface-2); color: var(--text-primary); }
+
+/* Dropdown items are <button>s, so they need to fill and left-align */
+.dropdown-menu .rowlink { width: 100%; text-align: left; background: none; border: none; font-family: inherit; cursor: pointer; }
+
+/* Stepper labels sit beside the dot without squashing the flex:1 connector */
+.wizard-step-label { margin-left: 8px; flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: var(--text-secondary); }
+.wizard-step-label.current { color: var(--brand); }
+.stage-steps { display: flex; align-items: center; }
+
+/* Divider pulled in to match .card's 20px gutter */
+.divider.inset { margin-left: 20px; margin-right: 20px; }
+
+/* Overlay panel structure */
+.panel-title   { font-size: 16px; font-weight: 700; margin-bottom: 14px; }
+.panel-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* Layout helpers - these two patterns repeat constantly across both surfaces */
+.stack       { display: flex; flex-direction: column; gap: 12px; }
+.stack-sm    { display: flex; flex-direction: column; gap: 8px; }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+/* Table min-width without hardcoding 640px per caller */
+.dash-table-scroll > table { min-width: var(--table-min, 640px); }
+
+/* Taller bar track for the 14-day trend */
+.bar-wrap-lg { height: 150px; }
+
+/* Tab badge - .navbadge is sidebar-specific (margin-left:auto, danger red) */
+.tabbar .tab-badge {
+  margin-left: 6px; font-size: 10px; font-weight: 800; padding: 1px 6px;
+  border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent); color: var(--brand);
+}
+
+/* Four-across stat tiles on /me home. Denser than the .card/.stat-num defaults,
+   which are sized for the roomier /ws surface. */
+.me-statgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+.me-statgrid .card { padding: 12px 6px; text-align: center; }
+.me-statgrid .t-eyebrow { font-size: 9px; letter-spacing: 0.02em; line-height: 1.35; }
+.me-statgrid .stat-num { font-size: 19px; }
+
+/* ── marketing decoration ─────────────────────────────────────────────────────
+   Lifted out of per-component <style> blocks in Hero.tsx and ComingSoon.tsx.
+   Those blocks carried their own reduced-motion guards because the components
+   believed the stylesheet "could not reach them" - but these are all classes,
+   so it can. Only the per-element animation-delay stays inline. Keeping them
+   here means one reduced-motion guard instead of three that can drift. */
+.hero-underline {
+  transform: scaleX(0);
+  transform-origin: left;
+  animation: lineReveal 0.7s 1.1s ease forwards;
+}
+@keyframes scanline {
+  0%, 100% { top: 30%; opacity: 0; }
+  10%      { opacity: 1; }
+  50%      { top: 70%; opacity: 0.8; }
+  90%      { opacity: 1; }
+}
+
+/* Responsive rule from the /for-you privacy section. Not an animation - it was
+   inline only because the page had nowhere else to put it. */
+@media (max-width: 600px) {
+  .privacy-row { grid-template-columns: 1fr !important; gap: 8px !important; }
+}
+
+/* ── touch targets ────────────────────────────────────────────────────────────
+   CLAUDE.md sets a 44px minimum, stricter than WCAG 2.2 AA (24px) and matching
+   Apple HIG / WCAG 2.1 AAA. Applied uniformly on every device and both surfaces:
+   an admin actioning an approvals queue on a phone gets the same target as a
+   member checking in. This deliberately costs some of the mock's table density
+   - .icon-btn goes 32px -> 44px, so datatable rows are taller than the mock. */
+.btn,
+.btn-sm,
+.icon-btn,
+.dropzone,
+.me-navitem,
+.org-card,
+.org-toggle,
+.choice,
+.tabbar button { min-height: 44px; }
+.icon-btn { min-width: 44px; }
+.dropzone.compact { height: auto; min-height: 44px; }
+
+/* The switch is 42x25 by design - stretching the track to 44px tall would read
+   as a broken control. The rule is about the HIT area, so the visual stays and
+   an invisible overlay carries the target. */
+.toggle { position: relative; }
+.toggle::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px; height: 44px;
+}
+
+/* ── directory (People) ───────────────────────────────────────────────────────
+   The merged workforce directory. These live here rather than as inline style
+   objects because the reduced-motion guard, the 44px touch-target rule and the
+   elevation rule are all selector lists in this file - a declaration written in
+   a component is invisible to them and silently exempt (CLAUDE.md invariant 15). */
+/* The bar owns its own layout - it is not `.row-between` plus corrections. */
+.filter-bar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 14px 18px; border-bottom: 1px solid var(--border);
+}
+.filter-search { flex: 1 1 220px; min-width: 200px; }
+
+/* CHILD selectors, deliberately, and this is the whole bug that was here:
+   `.input` is declared as `.input, select.input, textarea.input`, so on a
+   <select> the winning rule is `select.input` at specificity 0,1,1. A bare
+   `.filter-select` is 0,1,0 and LOSES - every dropdown kept `width: 100%` and
+   wrapped the bar onto three rows. `.filter-bar > .filter-select` is 0,2,0 and
+   wins. Any utility class put on a Select or Textarea has the same problem. */
+.filter-bar > .filter-search { flex: 1 1 220px; width: auto; }
+.filter-bar > .filter-select { flex: 0 0 180px; width: auto; }
+
+/* Narrow: let the selects share a row before they stack. The wrapped look was
+   right for a phone and wrong for a 1440px desktop. */
+@media (max-width: 640px) {
+  .filter-bar > .filter-search { flex: 1 1 100%; }
+  .filter-bar > .filter-select { flex: 1 1 140px; }
+}
+.filter-note { padding: 10px 18px 0; font-size: 12px; }
+.table-head { padding: 14px 20px 12px; }
+.pad-list { padding: 18px 20px; }
+
+.row-gap-sm { display: flex; align-items: center; gap: 10px; }
+.row-end-sm { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.min-w-0 { min-width: 0; }
+.overflow-hidden { overflow: hidden; }
+.mt-12 { margin-top: 12px; }
+.page-subtitle { margin: 4px 0 16px; }
+.mt-16 { margin-top: 16px; }
+.link-plain { text-decoration: none; }
+.t-rowtitle { font-size: 13.5px; font-weight: 500; color: var(--text-primary); }
+.t-rowsub { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+/* Preserve the author's line breaks. Anything a human typed into a textarea and
+   expects to read back the way they wrote it - an announcement body, a rejection
+   reason - needs this, or the paragraph collapses into one run. */
+.t-prewrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+.icon-btn-danger { color: var(--danger); }
+
+/* ── org chart ────────────────────────────────────────────────────────────────
+   Hand-rolled, no layout engine. A strict tree never needs edge routing that
+   avoids nodes, which is the only thing a graph library would buy here. The
+   canvas scales; the container scrolls, so native scroll IS the pan. */
+.org-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+.org-toolbar .filter-search { min-width: 220px; }
+.org-zoom-label { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-secondary); min-width: 46px; text-align: center; }
+.org-viewport { overflow: auto; padding: 28px 20px 36px; max-height: 72vh; }
+.org-canvas {
+  transform: scale(var(--org-zoom, 1));
+  transform-origin: top center;
+  display: flex; justify-content: center; min-width: max-content;
+  transition: transform 220ms var(--ease-out);
+}
+/* Zoom steps. Discrete on purpose: the value has to live in this file to stay
+   inside the reduced-motion guard below, and the +/- buttons only ever produce
+   these ten. */
+.org-canvas[data-zoom="50"] { --org-zoom: 0.5; }
+.org-canvas[data-zoom="60"] { --org-zoom: 0.6; }
+.org-canvas[data-zoom="70"] { --org-zoom: 0.7; }
+.org-canvas[data-zoom="80"] { --org-zoom: 0.8; }
+.org-canvas[data-zoom="90"] { --org-zoom: 0.9; }
+.org-canvas[data-zoom="100"] { --org-zoom: 1.0; }
+.org-canvas[data-zoom="110"] { --org-zoom: 1.1; }
+.org-canvas[data-zoom="120"] { --org-zoom: 1.2; }
+.org-canvas[data-zoom="130"] { --org-zoom: 1.3; }
+.org-canvas[data-zoom="140"] { --org-zoom: 1.4; }
+
+.org-node { display: flex; flex-direction: column; align-items: center; }
+/* The stalk down out of a parent. */
+.org-node-children {
+  display: flex; justify-content: center; align-items: flex-start;
+  padding-top: 22px; position: relative;
+}
+.org-node-children::before {
+  content: ''; position: absolute; top: 0; left: 50%;
+  width: 2px; height: 22px; background: var(--border);
+}
+.org-child { position: relative; padding: 22px 12px 0; display: flex; flex-direction: column; align-items: center; }
+/* The horizontal rail joining siblings, trimmed at the two ends so it does not
+   overhang the outermost cards. */
+.org-child::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0;
+  height: 2px; background: var(--border);
+}
+.org-child:first-child::before { left: 50%; }
+.org-child:last-child::before { right: 50%; }
+.org-child:only-child::before { left: 50%; right: 50%; }
+/* The drop from the rail into this child's own card. */
+.org-child::after {
+  content: ''; position: absolute; top: 0; left: 50%;
+  width: 2px; height: 22px; background: var(--border);
+}
+
+.org-card {
+  display: flex; align-items: center; gap: 10px;
+  min-width: 208px; max-width: 240px;
+  padding: 10px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-lg); background: var(--surface-0);
+  text-align: left; position: relative;
+  transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out);
+}
+.org-card:hover { border-color: var(--brand); }
+.org-card.is-root { border-color: var(--brand); }
+.org-card.is-match { border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
+.org-card-body { min-width: 0; flex: 1; }
+.org-card-name { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+.org-card-meta { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+
+.org-toggle {
+  display: flex; align-items: center; justify-content: center; gap: 4px;
+  margin-top: 10px; padding: 2px 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface-0); color: var(--text-secondary);
+  font-size: 11px; font-weight: 600; cursor: pointer;
+}
+.org-toggle:hover { border-color: var(--brand); color: var(--brand); }
+
+@media (prefers-reduced-motion: reduce) {
+  .org-canvas { transition: none; }
+}
+
+/* ── employee record (read-only view + details page) ─────────────────────────── */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-top: 14px; }
+.field-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 16px; }
+.field-label { font-size: 11px; margin-bottom: 2px; }
+.field-value { font-size: 13.5px; font-weight: 500; overflow-wrap: anywhere; }
+.field-note { margin-top: 12px; font-size: 11.5px; }
+.field-row-label { font-size: 12.5px; }
+.field-row-value { font-size: 12.5px; font-weight: 600; }
+.mt-0 { margin-top: 0; }
+.mt-10 { margin-top: 10px; }
+.mb-12 { margin-bottom: 12px; }
+
+.person-header { margin-top: 10px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.person-header-main { flex: 1; min-width: 180px; }
+.person-header-titles { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.person-header-name { font-size: 20px; }
+.person-header-sub { margin-top: 2px; }
+.person-header-meta { margin-top: 4px; overflow-wrap: anywhere; }
+.person-header-side { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.access-section { max-width: 520px; }
+.btn-flush { padding-left: 0; }
+.modal-body { margin-bottom: 12px; line-height: 1.55; }
+
+/* ── employee record forms (the per-tab editors on the person screen) ──────────
+   One tab of the HR record is one form, so the grid, the full-width escape and
+   the footer are three classes rather than three inline style objects repeated
+   on every tab. They live here for the reason invariant 15 gives: the
+   reduced-motion, 44px touch-target and elevation rules in this file are
+   selector lists, and anything declared inline is silently exempt from them. */
+.employee-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+/* An address or a bank account is a line, not a column - it spans the grid. */
+.field-span-full { grid-column: 1 / -1; }
+.form-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.form-narrow { max-width: 520px; }
+
+/* A masked value with a reveal toggle.
+   The toggle sits BESIDE the input rather than floating inside it. Overlaying
+   it means shrinking the button below the 44px minimum to fit inside a 42px
+   control - which the old wizard did with an inline style, i.e. invisibly to
+   the rule. Laid out as a row, the eye keeps its full target and the input
+   keeps its full width. */
+.input-affix { display: flex; align-items: center; gap: 6px; }
+.input-affix > .input { flex: 1; min-width: 0; }
+
+/* ── choice list ──────────────────────────────────────────────────────────────
+   A radio group rendered as rows, for a small closed set where a <select> would
+   hide the options behind a tap. Built here rather than in the component that
+   needed it (the session-extension picker) because the 44px touch-target rule is
+   a selector list in this file - `.choice` is in it above, and a padding value
+   written inline would have been silently exempt (invariant 15).
+
+   The native radio is kept and left visible: it carries the group semantics, the
+   arrow-key roving focus and the announced state for free, and every attempt to
+   replace it with a styled span has to reimplement all three. */
+.choice-list { display: flex; flex-direction: column; gap: 8px; }
+.choice {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--surface-0);
+  font-size: 14px; color: var(--text-primary);
+  cursor: pointer;
+}
+.choice:hover { border-color: var(--brand); }
+/* No shadow - this is an inline surface inside the panel, not something floating
+   above it. The selected state is a border plus the focus-ring colour. */
+.choice.is-selected { border-color: var(--brand); box-shadow: 0 0 0 3px var(--ring); }
+.choice input { accent-color: var(--brand); width: 16px; height: 16px; margin: 0; }
+
+/* ── notification switchboard (ws Settings › Notifications, /me/settings) ───── */
+/* One row per notification category, on both surfaces, so the admin's view and
+   the member's view of the same catalogue cannot drift apart visually. Flat
+   fill and a border - it is an inline surface, so it carries no shadow. */
+.switch-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; margin-bottom: 10px;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+.switch-row:last-child { margin-bottom: 0; }
+.switch-row-body { min-width: 0; }
+.switch-row-title { font-size: 13.5px; font-weight: 600; }
+/* A locked category is still shown, quieter, with its reason in place of the
+   hint - an admin should be able to see what they cannot switch off. */
+.switch-row.is-locked { background: var(--surface-1); }
+
+/* The reminder-time pair, and the notification group headings. */
+.switch-group + .switch-group { margin-top: 18px; }
+.field-row { display: flex; gap: 16px; flex-wrap: wrap; }
+.mb-8  { margin-bottom: 8px; }
+.mb-16 { margin-bottom: 16px; }
+
+/* Off-screen but still focusable and still announced - for a real <input> that
+   a styled button stands in for. `display:none` would take it out of the
+   accessibility tree and stop the click ever reaching it. */
+.visually-hidden {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* Workspace logo, in Settings. The preview is a fixed box rather than the
+   image's own size so a 6000px-wide upload cannot blow the card open. */
+.logo-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.logo-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.logo-preview {
+  width: 96px; height: 54px; object-fit: contain;
+  border: 1px solid var(--border); border-radius: var(--radius-md);
+  background: var(--surface-2); padding: 6px;
+}
+.logo-preview.is-empty { background: var(--surface-2); }
+
+/* A workspace's mark, wherever a workspace is named. One class for both the
+   uploaded logo and the generated swatch, so the two cannot drift in size or
+   shape between the pill, the switcher sheet, the top bar and the picker. */
+.ws-avatar {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 9.5px; font-weight: 800;
+  /* `contain`, not `cover`: a logo is a mark, and cropping one to fill a circle
+     cuts the thing it identifies. The surface behind it shows through the
+     letterboxing, which is why it is a real colour rather than transparent. */
+  object-fit: contain; background: var(--surface-2);
+}
+.ws-avatar.is-lg { width: 36px; height: 36px; border-radius: 10px; font-size: 12px; }
+
+/* The result line under a settings Save button. Every settings tab wrote this
+   as an inline style object, which put it outside the reduced-motion and
+   touch-target selector lists and let five tabs drift on font size. New code
+   uses the class; the older tabs still carry their inline version. */
+.form-status { margin-top: 10px; font-size: 13px; }
+.form-status.is-ok    { color: var(--brand); }
+.form-status.is-error { color: var(--danger); }

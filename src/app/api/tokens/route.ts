@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getUserApiTokens, createApiToken } from '@/lib/db/queries/users'
+import { getUserApiTokens, createApiToken, type UserApiToken } from '@/lib/db/queries/users'
 import { tokenPrefix } from '@/lib/auth'
 import bcrypt from 'bcryptjs'
+
+/**
+ * `token_hash` is the only column on the row that must never reach the client.
+ * Stripping it by `delete` on a shallow copy rather than by destructuring it
+ * into a throwaway binding keeps the emitted JSON identical while leaving no
+ * unused variable behind.
+ */
+function withoutTokenHash(token: UserApiToken): Omit<UserApiToken, 'token_hash'> {
+  const safe: Partial<UserApiToken> = { ...token }
+  delete safe.token_hash
+  return safe as Omit<UserApiToken, 'token_hash'>
+}
 
 export async function GET(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -11,7 +23,7 @@ export async function GET(request: NextRequest) {
   const tokens = await getUserApiTokens(userId)
   // Never return token_hash to client
   return NextResponse.json({
-    tokens: tokens.map(({ token_hash: _h, ...t }) => t),
+    tokens: tokens.map(withoutTokenHash),
   })
 }
 

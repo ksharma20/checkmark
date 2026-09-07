@@ -194,7 +194,7 @@ export default function ForTeamsPage() {
                     >
                       <span
                         style={{
-                          color: "#00D4AA",
+                          color: "var(--brand)",
                           fontWeight: 700,
                           flexShrink: 0,
                         }}
@@ -289,7 +289,7 @@ export default function ForTeamsPage() {
                     fontFamily: "JetBrains Mono, monospace",
                     fontSize: "11px",
                     color: "var(--brand)",
-                    background: "#1B4DFF10",
+                    background: "color-mix(in srgb, var(--brand) 8%, transparent)",
                     padding: "6px 10px",
                     borderRadius: "8px",
                     flexShrink: 0,

@@ -1,6 +1,7 @@
 import { getServerUser } from '@/lib/auth'
 import { getUserWorkspaces, getMembershipsByEmail, getWorkspacesByIds } from '@/lib/db/queries/workspaces'
 import { getRoleNamesForUser } from '@/lib/db/queries/roles'
+import { meSettings } from '@/locales/en/me-settings'
 import OrgsClient from './OrgsClient'
 
 export default async function OrgsPage() {
@@ -26,17 +27,9 @@ export default async function OrgsPage() {
   const wsMap = new Map(workspaces.map((w) => [w.id, w]))
 
   return (
-    <div style={{ maxWidth: '480px', margin: '0 auto', padding: '20px 16px' }}>
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '20px',
-        }}
-      >
-        Workspaces
+    <div className="stack">
+      <h1 className="t-h1" style={{ color: 'var(--navy)', margin: 0 }}>
+        {meSettings.orgs.title}
       </h1>
 
       <OrgsClient
