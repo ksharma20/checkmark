@@ -225,24 +225,19 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
       {planLimitBanner}
 
       {/* ── Stat cards ── */}
-      <div
-        className="fx-spring-stagger"
-        style={{ display: 'flex', gap: '14px', marginTop: '16px', flexWrap: 'wrap' }}
-      >
-        <Link href={`/ws/${slug}/people`} style={{ flex: '1 1 200px', display: 'flex', textDecoration: 'none' }}>
+      <div className="fx-spring-stagger stat-row">
+        <Link href={`/ws/${slug}/people`}>
           <StatCard
             className="hoverlift"
-            style={{ flex: 1, marginTop: 0 }}
             label={wsAdmin.overview.headcountTitle}
             value={overview ? overview.activeMembers : <Skeleton width={48} height={28} />}
             hint={wsAdmin.overview.headcountHint}
             icon={<Users size={17} />}
           />
         </Link>
-        <Link href={`/ws/${slug}/attendance`} style={{ flex: '1 1 200px', display: 'flex', textDecoration: 'none' }}>
+        <Link href={`/ws/${slug}/attendance`}>
           <StatCard
             className="hoverlift"
-            style={{ flex: 1, marginTop: 0 }}
             label={wsAdmin.overview.inOfficeTitle}
             value={dashLoading ? <Skeleton width={48} height={28} /> : counts.office}
             hint={wsAdmin.overview.inOfficeHint}
@@ -250,10 +245,9 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
             icon={<Building2 size={17} />}
           />
         </Link>
-        <Link href={`/ws/${slug}/attendance`} style={{ flex: '1 1 200px', display: 'flex', textDecoration: 'none' }}>
+        <Link href={`/ws/${slug}/attendance`}>
           <StatCard
             className="hoverlift"
-            style={{ flex: 1, marginTop: 0 }}
             label={wsAdmin.overview.remoteTitle}
             value={dashLoading ? <Skeleton width={48} height={28} /> : counts.remote}
             hint={wsAdmin.overview.remoteHint}
@@ -261,10 +255,9 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
             icon={<Home size={17} />}
           />
         </Link>
-        <Link href={`/ws/${slug}/leaves`} style={{ flex: '1 1 200px', display: 'flex', textDecoration: 'none' }}>
+        <Link href={`/ws/${slug}/leaves`}>
           <StatCard
             className="hoverlift"
-            style={{ flex: 1, marginTop: 0 }}
             label={en.wsOverview.onLeaveTitle}
             value={overview ? overview.onLeaveToday : <Skeleton width={48} height={28} />}
             hint={en.wsOverview.onLeaveSub}

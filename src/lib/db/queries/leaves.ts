@@ -1,5 +1,5 @@
 import { db } from '../index'
-import { countWorkdays } from '@/lib/attendance-summary'
+import { countWorkdays, nextDateKey } from '@/lib/attendance-summary'
 
 export type AccrualFrequency = 'monthly' | 'quarterly' | 'half-yearly' | 'yearly'
 export type CreditTiming = 'start' | 'end'
@@ -79,6 +79,49 @@ export async function createLeaveType(params: {
   const row = await db.queryOne<LeaveType>('SELECT * FROM workspace_leave_types WHERE id = ?', [id])
   if (!row) throw new Error('Leave type insert succeeded but row not found')
   return row
+}
+
+/**
+ * Partial update of a leave type.
+ *
+ * The `'key' in input` idiom (as `updateAsset` / `updateMaternityCase` use)
+ * distinguishes "set this column" from "leave it alone", so a caller sending
+ * only `name` cannot silently reset the accrual settings to defaults.
+ *
+ * NOTE FOR CALLERS: no balance is materialised anywhere. `getLeaveTypesWithBalance`
+ * recomputes `opening_balance + total_accrued - used_days` on every read from
+ * `accrual_frequency`, `accrual_credits` and `credit_timing`, so editing any of
+ * those three retroactively changes the available balance of EVERY member in
+ * the workspace. Renaming is inert; the other three are not.
+ */
+export async function updateLeaveType(
+  id: string,
+  workspaceId: string,
+  input: {
+    name?: string
+    accrual_frequency?: AccrualFrequency
+    accrual_credits?: number
+    credit_timing?: CreditTiming
+  },
+): Promise<LeaveType | null> {
+  const sets: string[] = []
+  const values: unknown[] = []
+
+  if ('name' in input) { sets.push('name = ?'); values.push(input.name) }
+  if ('accrual_frequency' in input) { sets.push('accrual_frequency = ?'); values.push(input.accrual_frequency) }
+  if ('accrual_credits' in input) { sets.push('accrual_credits = ?'); values.push(input.accrual_credits) }
+  if ('credit_timing' in input) { sets.push('credit_timing = ?'); values.push(input.credit_timing) }
+
+  if (sets.length === 0) return getLeaveTypeById(id, workspaceId)
+
+  values.push(id, workspaceId)
+  const result = await db.execute(
+    `UPDATE workspace_leave_types SET ${sets.join(', ')}
+     WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+    values,
+  )
+  if (result.changes === 0) return null
+  return getLeaveTypeById(id, workspaceId)
 }
 
 export async function softDeleteLeaveType(id: string, workspaceId: string): Promise<boolean> {
@@ -371,6 +414,41 @@ export async function getLeaveRequestsInRange(
        AND end_date >= ?`,
     [workspaceId, endDate, startDate],
   )
+}
+
+/**
+ * The dates in `[startDate, endDate]` on which this member's leave blocks a
+ * correction request.
+ *
+ * The status set is `('approved', 'pending')` and it MUST stay identical to
+ * `hasOverlappingLeaveRequest()` above, which is what the POST
+ * `/api/me/ws/[slug]/regularizations` guard actually refuses on. This exists
+ * precisely so the correction form can leave those days out of its picker:
+ * reusing `getLeaveRequestsInRange()` - approved-only - would offer a day whose
+ * leave is still pending and then have the server answer `ON_LEAVE`.
+ */
+export async function getUserLeaveDatesInRange(
+  workspaceId: string,
+  userId: string,
+  startDate: string,
+  endDate: string,
+): Promise<Set<string>> {
+  const rows = await db.query<{ start_date: string; end_date: string }>(
+    `SELECT start_date, end_date FROM leave_requests
+     WHERE workspace_id = ? AND user_id = ?
+       AND status IN ('approved', 'pending')
+       AND start_date <= ? AND end_date >= ?`,
+    [workspaceId, userId, endDate, startDate],
+  )
+
+  const dates = new Set<string>()
+  for (const row of rows) {
+    // Clamp to the requested window - a request may run well past either end.
+    const from = row.start_date > startDate ? row.start_date : startDate
+    const to = row.end_date < endDate ? row.end_date : endDate
+    for (let date = from; date <= to; date = nextDateKey(date)) dates.add(date)
+  }
+  return dates
 }
 
 export interface MemberOnLeaveToday {

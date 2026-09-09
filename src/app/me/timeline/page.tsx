@@ -14,6 +14,12 @@
  * Loaded data carries the slug it was fetched for, so switching workspace
  * invalidates it by construction rather than by a reset effect - one
  * workspace's events are never painted while the pill names another.
+ *
+ * This screen is read-only about corrections. It used to offer "Request
+ * correction" on any event that came back `partial` or `none`, and to fetch
+ * `/regularizations` purely to badge those rows. Both moved to the Correction
+ * tab on `/me/leave`, which reaches the case an event row never could: forgot to
+ * check in at all, so there is no event and no row to hang a button on.
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -33,13 +39,6 @@ interface TimelineData {
   slug: string
   events: TimelineEvent[]
   total: number
-}
-
-type RegularizationStatus = 'pending' | 'approved' | 'rejected'
-
-interface RegularizationData {
-  slug: string
-  byEventId: Record<string, RegularizationStatus>
 }
 
 function getMonthBounds() {
@@ -97,25 +96,7 @@ export default function TimelinePage() {
   const [joinedDate, setJoinedDate] = useState<string | null>(null)
   const [data, setData] = useState<TimelineData | null>(null)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [regularizations, setRegularizations] = useState<RegularizationData | null>(null)
   const nextOffsetRef = useRef(0)
-
-  const fetchRegularizations = useCallback(async () => {
-    if (!slug) return
-    try {
-      const res = await fetch(`/api/me/ws/${encodeURIComponent(slug)}/regularizations`)
-      const json = await res.json()
-      const byEventId: Record<string, RegularizationStatus> = {}
-      for (const r of json.regularizationRequests ?? []) {
-        if (r.presence_event_id) byEventId[r.presence_event_id] = r.status
-      }
-      setRegularizations({ slug, byEventId })
-    } catch {
-      // silent - the "Request correction" button just won't reflect existing requests
-    }
-  }, [slug])
-
-  useEffect(() => { fetchRegularizations() }, [fetchRegularizations])
 
   // The account's created_at is the floor of the date pickers - no event can
   // predate it, so offering earlier dates only invites empty results.
@@ -199,8 +180,6 @@ export default function TimelinePage() {
   const loading = fresh === null
   const events = fresh?.events ?? []
   const total = fresh?.total ?? 0
-  const regularizationByEventId =
-    regularizations?.slug === slug ? regularizations.byEventId : {}
   const canViewMore = !loading && events.length < total
 
   const grouped = groupByDate(events)
@@ -256,14 +235,7 @@ export default function TimelinePage() {
               {formatDateHeading(date)}
             </h2>
             {grouped.get(date)!.map((event) => (
-              <EventCard
-                key={event.id}
-                event={event}
-                onNoteUpdate={handleNoteUpdate}
-                workspaceSlug={slug}
-                regularizationStatus={regularizationByEventId[event.id]}
-                onRegularizationSubmitted={fetchRegularizations}
-              />
+              <EventCard key={event.id} event={event} onNoteUpdate={handleNoteUpdate} />
             ))}
           </section>
         ))}

@@ -1,10 +1,24 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Field, Input, Modal, SkeletonText, Textarea } from '@/components/ui'
+import { Download, FileText } from 'lucide-react'
+import {
+  Button,
+  Card,
+  ConfirmDialog,
+  Dropzone,
+  Field,
+  Input,
+  SkeletonText,
+  Textarea,
+} from '@/components/ui'
 import { useToast } from '@/components/shared/Toast'
 import { fmtTimeOnDate } from '@/lib/client/format-time'
+import type { AnnouncementAttachmentPublic } from '@/lib/db/queries/announcements'
 import { wsAnnouncements as t } from '@/locales/en/ws-announcements'
+
+/** What the browser offers in the picker; the SERVER sniffs magic bytes. */
+const ACCEPT = 'application/pdf,image/png,image/jpeg'
 
 interface AnnouncementRow {
   id: string
@@ -12,12 +26,30 @@ interface AnnouncementRow {
   body: string
   created_at: string
   author_name: string | null
+  /** Metadata only - the bytes come from the `.../file` route, never from JSON. */
+  attachments: AnnouncementAttachmentPublic[]
 }
 
 interface Props {
   slug: string
   canWrite: boolean
   canDelete: boolean
+}
+
+/**
+ * The multipart body, built only when there is a file to send.
+ *
+ * The field names match what the route reads out of its single FormData pass:
+ * `title`, `body`, `file`. No MIME type is declared here on purpose - the
+ * server decides it by sniffing the leading bytes, because `File.type` is
+ * whatever the client says it is.
+ */
+function buildFormData(title: string, body: string, file: File): FormData {
+  const form = new FormData()
+  form.set('title', title)
+  form.set('body', body)
+  form.set('file', file)
+  return form
 }
 
 /**
@@ -39,6 +71,7 @@ export default function AnnouncementsSection({ slug, canWrite, canDelete }: Prop
   const [loading, setLoading] = useState(true)
   const [title, setTitle] = useState('')
   const [body, setBody] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [posting, setPosting] = useState(false)
   const [errors, setErrors] = useState<{ title?: string; body?: string }>({})
   const [pendingDelete, setPendingDelete] = useState<AnnouncementRow | null>(null)
@@ -73,10 +106,17 @@ export default function AnnouncementsSection({ slug, canWrite, canDelete }: Prop
 
     setPosting(true)
     try {
+      // Multipart ONLY when there is a file. The JSON path is what every other
+      // caller uses and stays the default - and letting the browser set the
+      // multipart boundary itself is why no Content-Type is passed below.
       const res = await fetch(`/api/ws/${slug}/announcements`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: trimmedTitle, body: trimmedBody }),
+        ...(file
+          ? { body: buildFormData(trimmedTitle, trimmedBody, file) }
+          : {
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: trimmedTitle, body: trimmedBody }),
+            }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -94,6 +134,7 @@ export default function AnnouncementsSection({ slug, canWrite, canDelete }: Prop
       setItems((prev) => [data.announcement as AnnouncementRow, ...prev])
       setTitle('')
       setBody('')
+      setFile(null)
       setErrors({})
       show(t.posted((data as { delivered: number }).delivered), 'success')
     } catch {
@@ -145,6 +186,29 @@ export default function AnnouncementsSection({ slug, canWrite, canDelete }: Prop
               onChange={(e) => setBody(e.target.value)}
             />
           </Field>
+          <Field label={t.fieldAttachment} hint={t.fieldAttachmentHint}>
+            {file ? (
+              <div className="row-between">
+                <span className="row-gap-sm">
+                  <FileText size={16} aria-hidden />
+                  <span className="t-rowtitle">
+                    {t.attachmentChosen(file.name, Math.max(1, Math.round(file.size / 1024)))}
+                  </span>
+                </span>
+                <Button variant="ghost" size="sm" onClick={() => setFile(null)}>
+                  {t.attachmentRemove}
+                </Button>
+              </div>
+            ) : (
+              <Dropzone
+                compact
+                accept={ACCEPT}
+                label={t.attachmentDropzone}
+                onFile={setFile}
+                disabled={posting}
+              />
+            )}
+          </Field>
           <div>
             <Button
               loading={posting}
@@ -181,6 +245,28 @@ export default function AnnouncementsSection({ slug, canWrite, canDelete }: Prop
                 )}
               </div>
               <p className="t-secondary t-prewrap">{a.body}</p>
+              {a.attachments?.length > 0 && (
+                <div className="stack-sm mt-12">
+                  <p className="t-eyebrow">{t.attachmentLabel}</p>
+                  {a.attachments.map((att) => (
+                    <a
+                      key={att.id}
+                      className="rowlink row-between"
+                      href={`/api/ws/${slug}/announcements/${a.id}/attachments/${att.id}/file`}
+                      download
+                    >
+                      <span className="row-gap-sm">
+                        <FileText size={16} aria-hidden />
+                        <span className="t-rowtitle">{att.file_name ?? att.name}</span>
+                      </span>
+                      <span className="row-gap-sm">
+                        <Download size={16} aria-hidden />
+                        <span className="t-secondary">{t.attachmentDownload}</span>
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              )}
               <p className="t-muted">
                 {t.postedBy(a.author_name ?? t.authorRemoved, fmtTimeOnDate(a.created_at))}
               </p>
@@ -189,31 +275,20 @@ export default function AnnouncementsSection({ slug, canWrite, canDelete }: Prop
         </div>
       )}
 
-      <Modal
+      {/* `t.deleteBody` says plainly that this is not a recall - a push already
+          delivered cannot be withdrawn, and implying otherwise is worse than
+          not offering the control at all. No `busyLabel`: this one never had a
+          second label, and the fallback keeps it at exactly one. */}
+      <ConfirmDialog
         open={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) void remove(pendingDelete.id) }}
         title={t.deleteTitle}
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setPendingDelete(null)}>
-              {t.deleteCancel}
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              loading={deleting}
-              onClick={() => { if (pendingDelete) void remove(pendingDelete.id) }}
-            >
-              {t.deleteConfirm}
-            </Button>
-          </>
-        }
-      >
-        {/* Say plainly that this is not a recall - a push already delivered
-            cannot be withdrawn, and implying otherwise is worse than not
-            offering the control at all. */}
-        <p className="t-secondary">{t.deleteBody}</p>
-      </Modal>
+        body={t.deleteBody}
+        confirmLabel={t.deleteConfirm}
+        cancelLabel={t.deleteCancel}
+        loading={deleting}
+      />
     </Card>
   )
 }

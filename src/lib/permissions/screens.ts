@@ -68,17 +68,19 @@ export enum WorkspaceFeature {
   Leaves = 'leaves',
 }
 
-/** Second-level links under a screen. Navigational only - not permissioned. */
-export enum SubScreen {
-  LeaveRequests = 'leaveRequests',
-  LeaveApplied = 'leaveApplied',
-}
-
-export interface SubScreenDef {
-  key: SubScreen
-  /** Appended to /ws/:slug, same as ScreenDef.path. */
-  path: string
-}
+/*
+ * There is no second-level link machinery here any more.
+ *
+ * `SubScreen` / `SubScreenDef` / `ScreenDef.subScreens` existed to name the two
+ * tabs inside /leaves. Nothing ever read them - not the sidebar, not the routes,
+ * only a matching block of labels in the locale file - and both entries pointed
+ * at the same `/leaves` path, so they could not have driven navigation even if
+ * something had. The tabs they named are being restructured; rather than carry a
+ * dead registry through that, it is gone.
+ *
+ * If a screen genuinely needs sub-navigation later, add it back with a consumer
+ * in the same change.
+ */
 
 export interface ScreenDef {
   key: Screen
@@ -89,7 +91,6 @@ export interface ScreenDef {
   resource: Resource
   /** Workspace switch that must be on, or null when the screen is always available. */
   feature: WorkspaceFeature | null
-  subScreens?: readonly SubScreenDef[]
 }
 
 /**
@@ -121,10 +122,6 @@ const SCREEN_DEFS: Record<Screen, ScreenDef> = {
   [Screen.Leave]: {
     key: Screen.Leave, path: '/leaves', group: ScreenGroup.Workforce,
     resource: Resource.Leaves, feature: WorkspaceFeature.Leaves,
-    subScreens: [
-      { key: SubScreen.LeaveRequests, path: '/leaves' },
-      { key: SubScreen.LeaveApplied, path: '/leaves' },
-    ],
   },
   [Screen.Holidays]: {
     key: Screen.Holidays, path: '/holidays', group: ScreenGroup.Workforce,
@@ -170,7 +167,7 @@ export function getScreen(key: Screen): ScreenDef {
 }
 
 /** Absolute href for a screen inside a given workspace. */
-export function screenHref(slug: string, screen: ScreenDef | SubScreenDef): string {
+export function screenHref(slug: string, screen: ScreenDef): string {
   return `/ws/${slug}${screen.path}`
 }
 

@@ -19,6 +19,12 @@ export const wsAdmin = {
     navLabel: 'Workspace sections',
     switchWorkspace: 'Switch workspace',
     accountMenu: 'Account menu',
+    /** The ≥861px rail toggle. Labels the ACTION, not the current state. */
+    collapseNav: 'Collapse sidebar',
+    expandNav: 'Expand sidebar',
+    /** The ≤860px drawer toggle. */
+    openNav: 'Open navigation',
+    closeNav: 'Close navigation',
     /** Rendered as a chip beside the role badge, e.g. "growth plan". */
     planChip: (plan: string) => `${plan} plan`,
     menuSettings: 'Settings',
@@ -84,7 +90,6 @@ export const wsAdmin = {
     verifiedWfoTitle: 'Verified WFO',
     onLeaveTitle: 'On leave',
     partialTitle: 'Partial / unverified',
-    regularizationsTitle: 'Regularizations',
 
     colName: 'Name',
     colRole: 'Role',
@@ -92,10 +97,6 @@ export const wsAdmin = {
     colTime: 'Time',
     rosterEmptyTitle: 'Nobody on the roster yet',
     rosterEmptyHint: 'Members appear here as soon as they join the workspace.',
-
-    queueTitle: 'Regularization requests',
-    queueEmptyTitle: 'No pending regularizations',
-    queueEmptyHint: 'Requests raised from a member timeline land here.',
 
     /** Drill-down slide-over. */
     statusEyebrow: "Today's status",
@@ -116,19 +117,6 @@ export const wsAdmin = {
     statusSuspicious: 'Suspicious',
     viewTimeline: 'Open full timeline',
     close: 'Close',
-
-    overrideEyebrow: 'Override to present',
-    overrideAction: 'Mark as present',
-    overrideNote:
-      'This never modifies the original event — it is stored as a separate, additive override.',
-    overrideDone: 'Marked as present — override recorded.',
-    overrideFailed: 'Could not record the override.',
-    overrideUnavailable:
-      'An admin override is recorded by approving this person’s regularization request. There is no pending request for them today.',
-    alreadyVerified: 'This day is already counted as in-office.',
-
-    declineDone: 'Regularization declined.',
-    declineFailed: 'Could not decline the request.',
   },
 
   /** /ws/:slug/approvals - additions to the existing en.wsApprovals block. */

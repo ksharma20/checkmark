@@ -10,10 +10,15 @@ import { marketing } from './en/marketing'
 import { documents, assets, maternity } from './en/documents'
 import { wsAdmin as wsAdminWorkforce } from './en/ws-overview'
 import { wsAdmin as wsAdminManage } from './en/ws-settings'
-import { wsEmployees, wsAssets, wsLeaveScreen, wsPeopleUi, wsOrg } from './en/ws-people'
+import { wsLeaveTypes } from './en/ws-leave-types'
+import { wsEmployees, wsLeaveScreen, wsPeopleUi, wsOrg } from './en/ws-people'
+import { wsAssets } from './en/ws-assets'
+import { wsParental } from './en/ws-parental'
+import { wsApprovals } from './en/ws-approvals'
 import { wsAnnouncements } from './en/ws-announcements'
 import { wsPerson } from './en/ws-person'
 import { wsReminders } from './en/ws-reminders'
+import { meAnnouncements } from './en/me-announcements'
 
 export const en = {
   // ── Per-area copy modules (src/locales/en/*.ts) ───────────────────────────
@@ -25,6 +30,7 @@ export const en = {
   me,
   meScreens,
   meSettings,
+  meAnnouncements,
   marketing,
   documents,
   assets,
@@ -32,6 +38,8 @@ export const en = {
   wsEmployees,
   wsAssets,
   wsLeaveScreen,
+  wsParental,
+  wsApprovals,
   wsPeopleUi,
   wsOrg,
   wsAnnouncements,
@@ -188,24 +196,7 @@ export const en = {
   },
 
   /** Workspace admin leave types settings (/ws/[slug]/settings) */
-  wsLeaveTypes: {
-    sectionTitle: "Leave Types",
-    sectionDescription: "Define leave types and how credits are accrued for team members. Credits accrue from each member's join date.",
-    addType: "Add type",
-    labelName: "Type name",
-    labelFrequency: "Accrual",
-    labelCredits: "Credits",
-    labelCreditTiming: "Apply",
-    optionTimingStart: "Start of period",
-    optionTimingEnd: "End of period",
-    optionMonthly: "Monthly",
-    optionQuarterly: "Quarterly",
-    optionHalfYearly: "Half Yearly",
-    optionYearly: "Yearly",
-    placeholderName: "e.g. Sick Leave",
-    emptyNoTypes: "No leave types yet. Add one below.",
-    deleteConfirm: "Remove this leave type? Existing leave requests are not affected.",
-  },
+  wsLeaveTypes,
 
   /** Workspace admin settings page (/ws/[slug]/settings) */
   wsSettings: {
@@ -291,10 +282,14 @@ export const en = {
   },
 
   /**
-   * Org-surface navigation labels, keyed by the Screen / ScreenGroup /
-   * SubScreen enums in src/lib/permissions/screens.ts. The sidebar asserts
-   * these against `Record<Screen, string>`, so a screen added to the registry
-   * without a label here is a build error.
+   * Org-surface navigation labels, keyed by the Screen / ScreenGroup enums in
+   * src/lib/permissions/screens.ts. The sidebar asserts these against
+   * `Record<Screen, string>`, so a screen added to the registry without a label
+   * here is a build error.
+   *
+   * There is no `subScreens` block any more: the registry's second-level link
+   * machinery is gone, and labels for an enum nobody declares are labels nobody
+   * can key.
    */
   wsNav: {
     groups: {
@@ -315,10 +310,6 @@ export const en = {
       reports: "Reports",
       roles: "Roles & Permissions",
       settings: "Settings",
-    },
-    subScreens: {
-      leaveRequests: "Requests",
-      leaveApplied: "Applied leaves",
     },
   },
 
@@ -451,7 +442,6 @@ export const en = {
     makeOwnerTitle: "Make owner",
     makeOwnerLabel: "Owner",
     removeTitle: "Remove",
-    removeConfirm: "Remove this member?",
 
     /** Role assignment (owner only) */
     roleColumn: "Role",
@@ -511,25 +501,6 @@ export const en = {
       `Ownership transferred to ${adminName}. You are now a member.`,
     errorRequestFailed: "Failed to send verification code",
     errorTransferFailed: "Transfer failed",
-  },
-
-  /** Reports placeholder (/ws/[slug]/reports) *//** Shared admin approval row (Overview widget, /ws/[slug]/approvals, People page section) */
-  wsApprovals: {
-    pageTitle: "Pending Approvals",
-    pageSubtitle: "Leave and attendance correction requests waiting on your review.",
-    filterAll: "All",
-    filterLeave: "Leave",
-    filterRegularization: "Regularization",
-    searchPlaceholder: "Search by employee name",
-    declineReasonPlaceholder: "Reason for declining…",
-    cancel: "Cancel",
-    confirmDecline: "Confirm decline",
-    decline: "Decline",
-    approve: "Approve",
-    emptyTitle: "Inbox zero 🎉",
-    emptyBody: "Every request has been actioned.",
-    markWfo: "Mark WFO",
-    markWfh: "Mark WFH",
   },
 
   wsOverview: {
@@ -594,6 +565,12 @@ export const en = {
     // readable by client code - and always re-validated against the caller's
     // real memberships server-side before anything is scoped to it.
     cookieWorkspace: "vnz_ws",
+    // Whether the /ws sidebar is collapsed to its icon rail. Same rationale as
+    // vnz_ws: a UI preference, not a credential, so it is written from the
+    // browser and read by the Server Component layout - which is the whole
+    // point. The layout has to know the width before it paints, or every
+    // navigation flashes an expanded sidebar and then snaps to the rail.
+    cookieNav: "vnz_nav",
 
     // ── Domain verification ───────────────────────────────────────────────────
     // DNS TXT: _venzio-verify.{domain}  IN TXT  "venzio-verify={token}"

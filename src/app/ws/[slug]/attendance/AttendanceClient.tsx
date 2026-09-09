@@ -5,31 +5,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronRight, X } from 'lucide-react'
 import type { DashboardMember, DashboardResponse } from '@/app/api/ws/[slug]/dashboard/route'
 import type { OverviewWidgetsResponse } from '@/app/api/ws/[slug]/overview/route'
-import type { ApprovalsResponse } from '@/app/api/ws/[slug]/approvals/route'
 import type {
   OfficeDayCounts,
   OfficeDayPreviewResponse,
   OfficeDayResultResponse,
   OfficeDaysListResponse,
 } from '@/app/api/ws/[slug]/office-days/route'
-import type { ApprovalItem } from '@/lib/approvals'
 import PresenceChip from '@/components/ws/PresenceChip'
 import {
-  Avatar, Button, Card, Chip, DataTable, Divider, EmptyState, Field, IconButton, Input,
-  Modal, SlideOver, Skeleton, StatCard, type Column,
+  Avatar, Button, Card, Chip, ConfirmDialog, DataTable, Divider, EmptyState, Field, IconButton,
+  Input, SlideOver, Skeleton, StatCard, type Column,
 } from '@/components/ui'
 import { useToast } from '@/components/shared/Toast'
-import { en } from '@/locales/en'
 import { wsAdmin } from '@/locales/en/ws-overview'
 
 interface Props {
   slug: string
-  /** `approvals:write` - drives whether the queue offers approve/decline. */
+  /** `approvals:write` - drives whether the bulk office day card is offered. */
   canAction: boolean
 }
-
-/** A pending regularization, narrowed out of the approvals union. */
-type RegularizationItem = Extract<ApprovalItem, { kind: 'regularization' }>
 
 /** Derived from the route's own response type so the two cannot drift. */
 type DeclaredOfficeDay = OfficeDaysListResponse['officeDays'][number]
@@ -65,12 +59,8 @@ export default function AttendanceClient({ slug, canAction }: Props) {
   const [dash, setDash] = useState<DashboardResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [overview, setOverview] = useState<OverviewWidgetsResponse | null>(null)
-  const [queue, setQueue] = useState<RegularizationItem[]>([])
 
   const [openMemberId, setOpenMemberId] = useState<string | null>(null)
-  const [busyId, setBusyId] = useState<string | null>(null)
-  const [decliningId, setDecliningId] = useState<string | null>(null)
-  const [declineReason, setDeclineReason] = useState('')
 
   // ── bulk office day ──
   const [officeDays, setOfficeDays] = useState<DeclaredOfficeDay[]>([])
@@ -102,16 +92,16 @@ export default function AttendanceClient({ slug, canAction }: Props) {
     }
   }, [slug])
 
-  const fetchQueue = useCallback(async () => {
-    const [queueRes, overviewRes] = await Promise.all([
-      fetch(`/api/ws/${slug}/approvals?type=regularization`, { cache: 'no-store' }),
-      fetch(`/api/ws/${slug}/overview`, { cache: 'no-store' }),
-    ])
-    if (queueRes.ok) {
-      const body = (await queueRes.json()) as ApprovalsResponse
-      setQueue(body.items.filter((i): i is RegularizationItem => i.kind === 'regularization'))
-    }
-    if (overviewRes.ok) setOverview(await overviewRes.json())
+  /**
+   * The "On leave" stat, and only that. This page is gated on `dashboard:read`,
+   * so it must not touch an `approvals:read` endpoint - it used to fetch the
+   * regularization queue alongside this and silently 403'd for roles that hold
+   * one permission but not the other. Pending regularizations are actioned on
+   * /ws/:slug/approvals, which is the one place that does it.
+   */
+  const fetchOverview = useCallback(async () => {
+    const res = await fetch(`/api/ws/${slug}/overview`, { cache: 'no-store' })
+    if (res.ok) setOverview(await res.json())
   }, [slug])
 
   const fetchOfficeDays = useCallback(async () => {
@@ -124,46 +114,14 @@ export default function AttendanceClient({ slug, canAction }: Props) {
 
   useEffect(() => {
     fetchDash()
-    fetchQueue().catch(() => {})
+    fetchOverview().catch(() => {})
     fetchOfficeDays().catch(() => {})
     const id = setInterval(() => fetchDash(true), 30_000)
     return () => clearInterval(id)
-  }, [fetchDash, fetchQueue, fetchOfficeDays])
+  }, [fetchDash, fetchOverview, fetchOfficeDays])
 
   const members = useMemo(() => dash?.all_members ?? [], [dash])
   const openMember = members.find((m) => m.member_id === openMemberId) ?? null
-
-  // Regularizations carry the requester's email but not their user id, so the
-  // roster row and its pending request are matched on email - the one field
-  // both sides are guaranteed to have.
-  const queueByEmail = useMemo(() => {
-    const map = new Map<string, RegularizationItem>()
-    for (const item of queue) map.set(item.user_email.toLowerCase(), item)
-    return map
-  }, [queue])
-
-  const openRequest = openMember ? queueByEmail.get(openMember.email.toLowerCase()) ?? null : null
-
-  async function actionRequest(item: RegularizationItem, action: 'approve' | 'reject', reason?: string) {
-    setBusyId(item.id)
-    try {
-      const res = await fetch(`/api/ws/${slug}/approvals/regularization/${item.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, rejection_reason: reason }),
-      })
-      if (!res.ok) {
-        showToast(action === 'approve' ? wsAdmin.attendance.overrideFailed : wsAdmin.attendance.declineFailed, 'error')
-        return
-      }
-      showToast(action === 'approve' ? wsAdmin.attendance.overrideDone : wsAdmin.attendance.declineDone, 'success')
-      setDecliningId(null)
-      setDeclineReason('')
-      await Promise.all([fetchQueue(), fetchDash(true)])
-    } finally {
-      setBusyId(null)
-    }
-  }
 
   /**
    * Step 1 of declaring an office day: a dry run.
@@ -354,11 +312,6 @@ export default function AttendanceClient({ slug, canAction }: Props) {
           accent="amber"
           value={loading ? <Skeleton width={48} height={30} /> : flaggedCount}
         />
-        <StatCard
-          style={{ flex: '1 1 200px', marginTop: 0 }}
-          label={wsAdmin.attendance.regularizationsTitle}
-          value={queue.length}
-        />
       </div>
 
       {/* ── Roster ── */}
@@ -384,107 +337,13 @@ export default function AttendanceClient({ slug, canAction }: Props) {
         )}
       </Card>
 
-      {/* ── Regularization queue ── */}
-      <Card className="fx-spring" padded={false} style={{ marginTop: '14px', overflow: 'hidden' }}>
-        <div style={{
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          gap: '10px', padding: '16px 20px', borderBottom: '1px solid var(--border)',
-        }}>
-          <p className="t-h2">{wsAdmin.attendance.queueTitle}</p>
-          {queue.length > 0 && <Chip tone="partial">{queue.length}</Chip>}
-        </div>
-
-        {queue.length === 0 ? (
-          <EmptyState
-            title={wsAdmin.attendance.queueEmptyTitle}
-            hint={wsAdmin.attendance.queueEmptyHint}
-          />
-        ) : (
-          queue.map((item) => {
-            const name = item.user_full_name ?? item.user_email
-            const declining = decliningId === item.id
-            return (
-              <div
-                key={item.id}
-                style={{
-                  display: 'flex', alignItems: declining ? 'stretch' : 'center', gap: '12px',
-                  padding: '13px 20px', borderTop: '1px solid var(--border)', flexWrap: 'wrap',
-                  flexDirection: declining ? 'column' : 'row',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: '1 1 220px', minWidth: 0 }}>
-                  <Avatar name={name} />
-                  <div style={{ minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: '13.5px', color: 'var(--text-primary)', margin: 0 }}>
-                      {name}
-                    </p>
-                    <p className="t-muted" style={{ margin: 0 }}>{item.reason}</p>
-                  </div>
-                </div>
-
-                <div style={{ textAlign: 'right', minWidth: '150px' }}>
-                  <p className="mono" style={{ fontSize: '12.5px', margin: 0 }}>{item.target_date}</p>
-                  <p className="t-muted mono" style={{ margin: 0 }}>
-                    {item.requested_type === 'office' ? en.wsApprovals.markWfo : en.wsApprovals.markWfh}
-                  </p>
-                </div>
-
-                {canAction && (declining ? (
-                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', width: '100%' }}>
-                    <Input
-                      autoFocus
-                      value={declineReason}
-                      onChange={(e) => setDeclineReason(e.target.value)}
-                      placeholder={en.wsApprovals.declineReasonPlaceholder}
-                      style={{ flex: '1 1 200px', height: '38px' }}
-                    />
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => { setDecliningId(null); setDeclineReason('') }}
-                    >
-                      {en.wsApprovals.cancel}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={busyId === item.id || !declineReason.trim()}
-                      onClick={() => actionRequest(item, 'reject', declineReason.trim())}
-                    >
-                      {en.wsApprovals.confirmDecline}
-                    </Button>
-                  </div>
-                ) : (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      disabled={busyId === item.id}
-                      onClick={() => { setDecliningId(item.id); setDeclineReason('') }}
-                    >
-                      {en.wsApprovals.decline}
-                    </Button>
-                    <Button
-                      size="sm"
-                      disabled={busyId === item.id}
-                      onClick={() => actionRequest(item, 'approve')}
-                    >
-                      {en.wsApprovals.approve}
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )
-          })
-        )}
-      </Card>
-
       {/* ── Bulk office day ──
-          Sits beside the regularization queue because it generalises it: a
-          regularization corrects one person's day, an office day corrects
-          everybody's at once. Same `approvals:write` permission, same
-          admin_overrides mechanism, so the monthly grid, analytics, the export
-          and /me all pick it up with no read-path change. */}
+          It generalises a regularization: a regularization corrects one
+          person's day, an office day corrects everybody's at once. Same
+          `approvals:write` permission, same admin_overrides mechanism, so the
+          monthly grid, analytics, the export and /me all pick it up with no
+          read-path change. Actioning an individual regularization lives on
+          /ws/:slug/approvals, not here. */}
       {canAction && (
         <Card className="fx-spring overflow-hidden" padded={false}>
           <div className="table-head">
@@ -547,39 +406,40 @@ export default function AttendanceClient({ slug, canAction }: Props) {
 
       {/* Confirm names the count BEFORE anything is written - the number comes
           from the dry run above, not from a guess made in the browser. */}
-      <Modal
+      {/* `tone="primary"`: declaring an office day writes overrides, it destroys
+          nothing. The two muted lines share the one `note` slot - the breakdown
+          and the caveat are read together, and splitting them would need a
+          shape `ConfirmDialog` deliberately does not have. */}
+      <ConfirmDialog
         open={!!officeDayPreview}
         onClose={() => setOfficeDayPreview(null)}
+        onConfirm={() => void declareOfficeDay()}
+        tone="primary"
         title={wsAdmin.officeDay.confirmTitle}
-        footer={(
-          <>
-            <Button variant="secondary" onClick={() => setOfficeDayPreview(null)}>
-              {wsAdmin.officeDay.confirmCancel}
-            </Button>
-            <Button
-              disabled={declaringOfficeDay || officeDayPreview?.converted === 0}
-              loading={declaringOfficeDay}
-              onClick={declareOfficeDay}
-            >
-              {wsAdmin.officeDay.confirmAction}
-            </Button>
-          </>
-        )}
-      >
-        {officeDayPreview && (
-          <div className="stack-sm">
-            <p className="t-secondary">
-              {officeDayPreview.converted > 0
+        body={
+          officeDayPreview
+            ? (officeDayPreview.converted > 0
                 ? wsAdmin.officeDay.confirmBody(officeDayPreview.converted, officeDayPreview.date)
-                : wsAdmin.officeDay.confirmNobody(officeDayPreview.date)}
-            </p>
-            <p className="t-muted">
+                : wsAdmin.officeDay.confirmNobody(officeDayPreview.date))
+            : ''
+        }
+        note={
+          officeDayPreview ? (
+            <>
               {wsAdmin.officeDay.confirmDetail(officeDayPreview.alreadyOffice, officeDayPreview.skipped)}
-            </p>
-            <p className="t-muted">{wsAdmin.officeDay.confirmNote}</p>
-          </div>
-        )}
-      </Modal>
+              <br />
+              {wsAdmin.officeDay.confirmNote}
+            </>
+          ) : undefined
+        }
+        confirmLabel={wsAdmin.officeDay.confirmAction}
+        cancelLabel={wsAdmin.officeDay.confirmCancel}
+        loading={declaringOfficeDay}
+        // A dry run that converts nobody has nothing to write, and the dialog
+        // already says so - `confirmNobody` above. Blocking the action keeps
+        // the explanation on screen instead of answering it with a no-op POST.
+        confirmDisabled={officeDayPreview?.converted === 0}
+      />
 
       {/* ── Drill-down ── */}
       <SlideOver open={!!openMember} onClose={() => setOpenMemberId(null)}>
@@ -666,36 +526,6 @@ export default function AttendanceClient({ slug, canAction }: Props) {
             ) : (
               <p className="t-secondary" style={{ marginTop: '12px' }}>
                 {wsAdmin.attendance.noEventToday}
-              </p>
-            )}
-
-            <Divider />
-
-            <p className="t-eyebrow">{wsAdmin.attendance.overrideEyebrow}</p>
-            {isOfficeCounted(openMember) ? (
-              <p className="t-secondary" style={{ marginTop: '8px' }}>
-                {wsAdmin.attendance.alreadyVerified}
-              </p>
-            ) : openRequest && canAction ? (
-              <>
-                <p className="t-secondary" style={{ marginTop: '8px' }}>
-                  {openRequest.target_date} · {openRequest.reason}
-                </p>
-                <Button
-                  block
-                  style={{ marginTop: '10px' }}
-                  disabled={busyId === openRequest.id}
-                  onClick={() => actionRequest(openRequest, 'approve')}
-                >
-                  {wsAdmin.attendance.overrideAction}
-                </Button>
-                <p className="t-muted" style={{ marginTop: '8px' }}>
-                  {wsAdmin.attendance.overrideNote}
-                </p>
-              </>
-            ) : (
-              <p className="t-secondary" style={{ marginTop: '8px' }}>
-                {wsAdmin.attendance.overrideUnavailable}
               </p>
             )}
 

@@ -3,24 +3,26 @@
 import { useState } from 'react'
 import type { PresenceEvent } from '@/lib/db/queries/events'
 import type { MatchedBy } from '@/lib/signals'
-import type { RegularizationStatus } from '@/lib/db/queries/regularizations'
 import { fmtTime, durationLabel } from '@/lib/client/format-time'
 import { Button, Card, Chip, Divider, Input, toneForMatchedBy } from '@/components/ui'
-import RegularizationRequestModal from './RegularizationRequestModal'
 import { en } from '@/locales/en'
 import { meSettings } from '@/locales/en/me-settings'
 
+/**
+ * One presence event on `/me/timeline`.
+ *
+ * This card used to carry the "Request correction" entry point, gated on
+ * `matched_by` being `'partial'` or `'none'`. It no longer does: corrections are
+ * filed from the Correction tab on `/me/leave`, which can also reach the days
+ * this card structurally could not - a day nobody checked in on has no event, so
+ * it had no card and therefore no button.
+ */
 interface EventCardProps {
   event: PresenceEvent & {
     matched_by?: MatchedBy
     matched_signals?: string[]
   }
   onNoteUpdate?: (id: string, note: string) => void
-  /** Workspace slug - only set when a specific workspace (not "All workspaces") is selected. */
-  workspaceSlug?: string | null
-  /** This event's own regularization status, if a request already exists for it. */
-  regularizationStatus?: RegularizationStatus
-  onRegularizationSubmitted?: () => void
 }
 
 const MATCHED_LABEL: Record<MatchedBy, string> = {
@@ -28,19 +30,6 @@ const MATCHED_LABEL: Record<MatchedBy, string> = {
   partial: en.meTimeline.matchedPartial,
   none: en.meTimeline.matchedNone,
   override: en.meTimeline.matchedOverride,
-}
-
-const REG_STATUS_LABEL: Record<RegularizationStatus, string> = {
-  pending: en.meWsRegularization.statusPending,
-  approved: en.meWsRegularization.statusApproved,
-  rejected: en.meWsRegularization.statusRejected,
-}
-
-/** Chip tone that matches how a correction request currently stands. */
-function regStatusTone(status: RegularizationStatus) {
-  if (status === 'approved') return 'verified' as const
-  if (status === 'rejected') return 'none' as const
-  return 'partial' as const
 }
 
 /** One "Check-in" / "Checkout" line inside the expanded detail panel. */
@@ -94,23 +83,13 @@ function LocationRow({
   )
 }
 
-export default function EventCard({
-  event,
-  onNoteUpdate,
-  workspaceSlug,
-  regularizationStatus,
-  onRegularizationSubmitted,
-}: EventCardProps) {
+export default function EventCard({ event, onNoteUpdate }: EventCardProps) {
   const geoLabel = event.location_label ?? null
   const [expanded, setExpanded] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
   const [noteValue, setNoteValue] = useState(event.note ?? '')
   const [saving, setSaving] = useState(false)
-  const [regModalOpen, setRegModalOpen] = useState(false)
   const isRemote = event.event_type === 'remote_checkin'
-  const eventDate = event.checkin_at.slice(0, 10)
-  const canRequestCorrection =
-    !!workspaceSlug && (event.matched_by === 'partial' || event.matched_by === 'none')
 
   const trustFlags: string[] = (() => {
     try { return event.trust_flags ? JSON.parse(event.trust_flags) as string[] : [] }
@@ -227,33 +206,21 @@ export default function EventCard({
         )}
       </div>
 
-      {/* Footer: detail toggle + the per-event regularization entry point. */}
-      {(hasDetail || canRequestCorrection || regularizationStatus) && (
+      {/* Footer: detail toggle. Corrections are filed from /me/leave, not here. */}
+      {hasDetail && (
         <div
           className="row-between"
           style={{ marginTop: '10px', gap: '8px', flexWrap: 'wrap' }}
         >
-          {hasDetail ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-expanded={expanded}
-              onClick={() => setExpanded((v) => !v)}
-              style={{ paddingLeft: 0, paddingRight: 0 }}
-            >
-              {expanded ? meSettings.event.detailsHide : meSettings.event.detailsShow}
-            </Button>
-          ) : <span />}
-
-          {regularizationStatus ? (
-            <Chip tone={regStatusTone(regularizationStatus)}>
-              {en.meTimeline.correctionRequested} {REG_STATUS_LABEL[regularizationStatus]}
-            </Chip>
-          ) : canRequestCorrection ? (
-            <Button variant="secondary" size="sm" onClick={() => setRegModalOpen(true)}>
-              {en.meTimeline.requestCorrection}
-            </Button>
-          ) : null}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((v) => !v)}
+            style={{ paddingLeft: 0, paddingRight: 0 }}
+          >
+            {expanded ? meSettings.event.detailsHide : meSettings.event.detailsShow}
+          </Button>
         </div>
       )}
 
@@ -300,16 +267,6 @@ export default function EventCard({
         </>
       )}
 
-      {regModalOpen && workspaceSlug && (
-        <RegularizationRequestModal
-          slug={workspaceSlug}
-          minDate={eventDate}
-          maxDate={eventDate}
-          prefillDate={eventDate}
-          onClose={() => setRegModalOpen(false)}
-          onSuccess={() => { setRegModalOpen(false); onRegularizationSubmitted?.() }}
-        />
-      )}
     </Card>
   )
 }

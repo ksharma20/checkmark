@@ -13,10 +13,11 @@ interface Props {
 /**
  * The equipment register.
  *
- * Gated on `assets:read`; write actions (add, assign, return, repair, retire)
- * additionally need `assets:write`, and the assign modal needs `employees:read`
- * because it lists people. All three are resolved here and passed down, so the
- * client never reasons about permissions itself. The routes re-check.
+ * Gated on `assets:read`; write actions (add, edit, assign, return, repair,
+ * retire) additionally need `assets:write`, removing a row needs
+ * `assets:delete`, and the assign modal needs `employees:read` because it lists
+ * people. All four are resolved here and passed down, so the client never
+ * reasons about permissions itself. The routes re-check.
  */
 export default async function AssetsPage({ params }: Props) {
   const { slug } = await params
@@ -36,6 +37,7 @@ export default async function AssetsPage({ params }: Props) {
     <AssetsClient
       slug={slug}
       canWrite={can(role.permissions, Resource.Assets, Action.Write)}
+      canDelete={can(role.permissions, Resource.Assets, Action.Delete)}
       canReadEmployees={can(role.permissions, Resource.Employees, Action.Read)}
     />
   )

@@ -16,7 +16,7 @@ Venzio is a **presence intelligence platform**. Two PWA surfaces:
 
 ### One workspace selector
 
-The top-bar pill in `src/components/user/MeTopbar.tsx` is the **single source of truth** for the active workspace on `/me`. Every screen below it — home, Timeline, Leave, Profile, Documents, the roster — reads `useWorkspaceScope()` from `src/app/me/workspace-scope.tsx` and scopes its fetches to that slug.
+The top-bar pill in `src/components/user/MeTopbar.tsx` is the **single source of truth** for the active workspace on `/me`. Every screen below it — home, Timeline, Leave, Profile, Documents, Announcements, the roster — reads `useWorkspaceScope()` from `src/app/me/workspace-scope.tsx` and scopes its fetches to that slug.
 
 It is backed by the `vnz_ws` cookie (`en.constants.cookieWorkspace`), written from the browser by `workspace-scope.tsx` and read on the server by `resolveActiveWorkspaceSlug()` in `src/app/me/active-workspace.ts`. **Deliberately not httpOnly** — it is a UI preference, not a credential, and `src/app/me/layout.tsx` is a Server Component that must read it to paint the pill correctly on first render. `localStorage` cannot do that.
 
@@ -47,6 +47,8 @@ Both entry points land on `/me/notifications`; the `?ws=` query param is what di
 |---|---|---|
 | Top-bar bell | `/me/notifications?ws=<active slug>` | The active workspace only, no per-row badges — the heading already names it. Polls `GET /api/me/ws/[slug]/notifications/unread-count` |
 | Avatar sheet → Notifications | `/me/notifications` | Every workspace, each row badged with its workspace colour. Polls `GET /api/me/notifications/unread-count` |
+
+**`/me/announcements`** is the member's policy archive — every notice posted to the active workspace, with any attached policy document. It is reached from the avatar sheet, not the bottom nav, which is deliberately fixed at three tabs; and it is where an `announcement` notification now lands, because a notification row has nowhere to put a file.
 
 `?ws=` is validated server-side in `src/app/me/notifications/page.tsx` against real memberships; a bogus slug falls back to the unified view. The client never reads `?ws=` itself. With no workspace at all the bell falls back to the global feed — that is where a pending invitation shows up.
 
@@ -160,7 +162,10 @@ Logic lives in `lib/db/queries/leaves.ts` — `getLeaveTypesWithBalance()` and `
 ### Admin API (`/api/ws/[slug]/leave-types`)
 - `GET` — list active leave types
 - `POST` JSON `{ name, accrual_frequency, accrual_credits, credit_timing? }` — create (`credit_timing` defaults to `'start'`)
-- `DELETE /[id]` — soft-delete; existing requests unaffected
+- `PATCH /[id]` — partial update of `name`, `accrual_frequency`, `accrual_credits`, `credit_timing`. Validation deliberately does **not** share a helper with `POST`: POST coerces a missing field to a default, which is right when creating and wrong when patching, where an omitted field means "leave it alone". The duplicate-name check excludes the row being edited, or saving without renaming would `409` against itself.
+- `DELETE /[id]` — soft-delete; existing requests unaffected. Requires `Leaves:Delete`, which the Settings page must resolve separately from `Leaves:Write` — it did not, so the button was shown to write-only roles and answered 403
+
+> **Editing a leave type rewrites history.** No balance is materialised: `getLeaveTypesWithBalance()` recomputes `opening_balance + total_accrued − used_days` on every read. So changing `accrual_frequency`, `accrual_credits` or `credit_timing` retroactively changes the available balance of **every member** in the workspace, including for leave already taken. Renaming is inert. The edit form says exactly this, and must keep saying it.
 
 ### Admin approve / reject (`/api/ws/[slug]/leaves`)
 - `GET` — all requests for the workspace
@@ -335,12 +340,31 @@ whoever actually inherits them.
 ### The chart at `/ws/:slug/org`
 
 Hand-rolled, no layout library. A strict tree never needs edge routing that
-avoids nodes, which is the only thing a graph engine would buy; connectors are
-four `::before`/`::after` borders. Collapse/expand is a `Set` of ids; search
-reveals a match by un-collapsing `ancestorsOf()` and centring it. The zoom step
-is a `data-zoom` attribute resolved to `--org-zoom` **in `globals.css`** — a
-custom property written inline would sit outside the reduced-motion and
-touch-target selector lists (invariant 15).
+avoids nodes, which is the only thing a graph engine would buy. Collapse/expand
+is a `Set` of ids; search reveals a match by un-collapsing `ancestorsOf()` and
+centring it. The zoom step is a `data-zoom` attribute resolved to `--org-zoom`
+**in `globals.css`** — a custom property written inline would sit outside the
+reduced-motion and touch-target selector lists (invariant 15).
+
+**It is an indented outline, not a top-down chart.** Siblings used to sit in a
+row joined by a horizontal rail, so a workspace with real headcount opened as a
+horizontal scroll and depth — the only thing the screen is for — was squeezed
+out of view. Depth is now indentation, which costs no width past the deepest
+branch. Do not put the levels back side by side.
+
+Three pieces of geometry hold it together, and each is load-bearing:
+
+| | |
+|---|---|
+| `.org-node::before` / `::after` | The shared **spine** and this node's **elbow**, both hanging 22px left of the node. `.org-branch` pays for that with `padding-left: 44px`, which is what lands the spine on the centre of the parent's 44px chevron. |
+| `.org-node:last-child::before` | Clips the spine to the last elbow. Without it the line runs on past the final card and down the side of its subtree, drawing a branch to nobody. |
+| `.org-row { min-height: 64px }` | The sibling gap lives **inside** the node, never as a `gap` on `.org-branch` — a gap between nodes would slice the spine at every row. |
+
+The card is a fixed 56px with both lines clipped to one line and a `title`
+carrying the full value. That is not a density choice: a card of unpredictable
+height has no knowable centre, so the elbow above it would have nothing to
+anchor to. A leaf renders `.org-toggle-spacer` in place of the chevron so its
+card keeps the level's `x`.
 
 ---
 
@@ -353,8 +377,13 @@ touch-target selector lists (invariant 15).
 | `leave` | A leave request awaiting action | `leave_requests` |
 | `regularization` | An employee asking to correct a past day (`office` / `remote`) | `regularization_requests` |
 | `doc` | An employee-uploaded document awaiting verification | `employee_documents` |
+| `extension` | A member asking to extend an open parental-leave case by **unpaid** days | `parental_leave_extensions` |
 
-`getPendingApprovalItems()` in `src/lib/approvals.ts` is the single source of truth, reused by the Overview widget, the Approvals page and the People page so all three always agree. Routes: `GET /api/ws/[slug]/approvals`, `PATCH /api/ws/[slug]/approvals/[kind]/[id]` — `Resource.Approvals` (`Read` / `Write`; it has no `Delete`).
+`getPendingApprovalItems()` in `src/lib/approvals.ts` is the single source of truth, reused by the Overview widget and the Approvals page so both always agree.
+
+**Approvals is the ONLY place a pending item is actioned.** It was previously actionable from five: this queue, a queue on `/ws/:slug/attendance`, a "Requests" tab on `/ws/:slug/leaves`, an echoed section on `/ws/:slug/people`, and the Overview widget. Four of those are gone — the attendance queue and its slide-over "Mark as present", the leaves Requests tab (and its `PATCH /api/ws/[slug]/leaves/[id]` route), and the People echo, which had **no permission gate at all**. The Overview widget stays because it is a five-item summary that links here.
+
+Read-only **listings** of the same rows are fine and deliberately kept — the Applied-leaves tab still lists pending requests, with a status filter. Listing is not actioning. Do not re-add an approve/decline control anywhere but `/ws/:slug/approvals`. Routes: `GET /api/ws/[slug]/approvals`, `PATCH /api/ws/[slug]/approvals/[kind]/[id]` — `Resource.Approvals` (`Read` / `Write`; it has no `Delete`).
 
 Approving a regularization does **not** edit a `presence_events` row: it writes an `admin_overrides` row and, where needed, a new regularized event. Invariant 7 still holds.
 
@@ -385,7 +414,9 @@ Status is one of `assigned | available | repair | retired`, mirrored by a `CHECK
 
 The second check is keyed on `assigned_employee_id`, **not** on the current status, so a row already in a broken state cannot be patched further sideways. `assigned → retired` is therefore **not** a legal direct edge: `DELETE .../assign` is the only thing that clears a holder, and it is the only way out. `POST .../assign` additionally refuses a `retired` asset (`409 ASSET_RETIRED`) and one already held by someone else (`409 ALREADY_ASSIGNED`).
 
-Guarded by `Resource.Assets` (`Read` / `Write` / `Delete`).
+Guarded by `Resource.Assets` (`Read` / `Write` / `Delete`). The screen resolves all three: `Assets:Delete` gates the remove action, which for a long time had a working route and **no caller at all**.
+
+Add and edit are one `AssetForm` modal keyed off an `initial` prop (the `HolidayForm` idiom), and the edit form **never sends `status`** — that is what keeps it clear of the two 409s above.
 
 ---
 
@@ -436,18 +467,29 @@ The `.../file` routes are the *only* way bytes reach a browser, and they return 
 
 ---
 
-## Maternity
+## Parental leave (maternity + paternity)
 
-`maternity_cases` — statutory maternity leave tracked as a **case with stages**, not as a leave request. Deliberately not modelled on `leave_requests`: those are immutable rows booked against an accrued balance, whereas a maternity case spans months, its dates shift as the due date moves, and an admin walks it through a lifecycle. Forcing it into an immutable table would mean deleting and re-creating rows, which those tables forbid.
+`maternity_cases` — statutory parental leave tracked as a **case with stages**, not as a leave request. The table keeps its original name; `case_type` (`'maternity' | 'paternity'`, default `'maternity'`) is the discriminator. One table because the lifecycle, the date columns and the reminder gate are identical for both — only the entitlement differs.
+
+**Constants and the `case_type` guard live in `src/lib/parental.ts`, which is pure** — no DB access, no query-layer imports, exactly like `src/lib/hierarchy.ts`. The reason is sharper here than there: the case-creation form is a **client** component, so importing a runtime value (`DEFAULT_CASE_WEEKS`) from `lib/db/queries/maternity.ts` pulls `lib/db/index.ts` into the browser bundle and with it better-sqlite3 and libSQL — a build failure whose error is a long `Can't resolve 'fs'` trace that names none of that. `import type` is erased and is always safe; a runtime import is not. `maternity.ts` re-exports them for its own callers.
+
+**`case_type` has no CHECK constraint.** It was added by `ALTER TABLE`, and SQLite cannot attach a CHECK to a column added that way, so `isParentalCaseType()` in `lib/db/queries/maternity.ts` is the *only* thing standing between a route and a garbage value. Every write path must run its input through it.
+
+Deliberately not modelled on `leave_requests`: those are immutable rows booked against an accrued balance, whereas a maternity case spans months, its dates shift as the due date moves, and an admin walks it through a lifecycle. Forcing it into an immutable table would mean deleting and re-creating rows, which those tables forbid.
 
 Stages: `requested → approved → onleave → returned`. Forward-only, one step at a time, so a case cannot jump straight to `returned` and leave no record of the leave starting. The single backward edge `approved → requested` exists because an approval given in error must be revocable before the leave begins. Enforced by `canTransition()` in `lib/db/queries/maternity.ts`.
 
-**One open case per employee**, guaranteed by the partial unique index `idx_maternity_cases_one_open`. `findOpenCaseForEmployee()` in the POST route is only a courtesy that turns the common case into a clean `409 CASE_OPEN` with no failed INSERT behind it — the pre-check and the insert are two statements, so the index is what actually holds. A lost race raises `MaternityCaseOpenError` and gets the same 409. Closed (`returned`) cases are history and do not block a later pregnancy.
+**One open case per employee, per case type**, guaranteed by the partial unique index `idx_parental_cases_one_open` on `(workspace_id, employee_id, case_type)`. It was renamed from `idx_maternity_cases_one_open` when the third column landed, and the **rename is load-bearing**: `scripts/migrate.js` swallows `already exists`, so re-issuing a `CREATE UNIQUE INDEX IF NOT EXISTS` under the old name with a new definition would be counted as skipped and leave the old two-column index in place — silently, with no failed run. A `DROP INDEX IF EXISTS` plus a `CREATE` under a new name is the only spelling whose outcome is observable. Never reuse a retired index name for a different definition.
 
-**An open case may not have its `start_date` / `end_date` cleared.** The dates, not the status, are the reminder gate: `getActiveMaternityUserIds()` matches `start_date <= today <= end_date`, so a case that keeps its status but loses a date drops silently out of the gate and the daily check-in reminder starts nagging someone on maternity leave. Dates may be *moved* while a case is open; clearing one returns `422 VALIDATION_ERROR` with `REQUIRED_WHILE_OPEN`. Only `returned` — where the gate no longer looks at the case — may hold nulls.
+`findOpenCaseForEmployee()` in the POST route is only a courtesy that turns the common case into a clean `409 CASE_OPEN` with no failed INSERT behind it — the pre-check and the insert are two statements, so the index is what actually holds. A lost race raises `MaternityCaseOpenError` and gets the same 409. Closed (`returned`) cases are history and do not block a later pregnancy.
 
-- `GET|POST /api/ws/[slug]/maternity`, `PATCH|DELETE /api/ws/[slug]/maternity/[id]`
-- Guarded by **`Resource.Leaves`** — maternity has no resource of its own.
+**An open case may not have its `start_date` / `end_date` cleared.** The dates, not the status, are the reminder gate: `getActiveParentalUserIds()` matches `start_date <= today <= end_date`, so a case that keeps its status but loses a date drops silently out of the gate and the daily check-in reminder starts nagging someone on parental leave. That function is deliberately **blind to `case_type`** — the gate asks "is this person on parental leave", and narrowing it by type would let one kind through and resume the nagging. Dates may be *moved* while a case is open; clearing one returns `422 VALIDATION_ERROR` with `REQUIRED_WHILE_OPEN`. Only `returned` — where the gate no longer looks at the case — may hold nulls.
+
+- `GET|POST /api/ws/[slug]/maternity` (both take/filter `case_type`), `PATCH|DELETE /api/ws/[slug]/maternity/[id]`
+- `GET|POST /api/me/ws/[slug]/parental-extensions` — member, `requireWsMember()`. **`unpaid_days` is never read from the body**: `computeUnpaidExtensionDays()` derives it server-side with `countWorkdays()` over `(day after the case's current end_date … requested_end_date)`, using the workspace's `working_days` and holiday calendar, so weekends and company holidays are excluded. The `/me` form's live preview is a server round trip against that same function rather than a client copy of the rule, and the count is **recomputed at approval time** because the holiday calendar can change in between
+- Guarded by **`Resource.Leaves`** — parental leave has no resource of its own.
+
+`parental_leave_extensions` is the sibling table: a member's request to extend an open case by **unpaid** days. Append-only in the `leave_requests` sense — `case_id`, the dates and `unpaid_days` are fixed at insert and the only mutation is the approve/reject transition out of `pending`. `previous_end_date` is stored rather than derived so the request still records what it was extending from after the case's `end_date` has moved. Notification types `extension_submitted` (category `approvals_inbox`) / `extension_approved` / `extension_rejected` (`approvals_outcome`) carry it, with `ref_type: 'parental_extension'`.
 
 ---
 
@@ -484,7 +526,19 @@ admin. Its own resource rather than a fold into `settings` because broadcasting
 to everyone's phone is a different trust level from editing signal config — an HR
 role should be able to do the first without the second.
 
-- `GET|POST /api/ws/[slug]/announcements` · `DELETE /api/ws/[slug]/announcements/[id]`
+Announcements may carry **attachments**: `announcement_attachments` (metadata,
+soft-deleted) plus `announcement_attachment_blobs` (bytes, base64), the same
+split and the same write order as employee documents — clear or create the slot
+with no `file_name`, write the bytes, only then let the row claim them. A
+notification row has nowhere to put a file, so a tapped announcement now opens
+the member archive at **`/me/announcements`** rather than the notification list;
+`notificationHref` resolves that, and nothing may hardcode the path.
+
+- `GET|POST /api/ws/[slug]/announcements` (POST takes JSON **or** `multipart/form-data`) · `DELETE /api/ws/[slug]/announcements/[id]`
+- `GET /api/ws/[slug]/announcements/[id]/attachments/[attachmentId]/file` — admin bytes
+- `GET /api/me/ws/[slug]/announcements` · `GET /api/me/ws/[slug]/announcements/[id]/attachments/[attachmentId]/file` — member, `requireWsMember()`
+
+Both `.../file` routes check the attachment belongs to that announcement **and** that workspace; the member one also loads the announcement, so a retracted notice's files stop serving immediately.
 
 ---
 
@@ -501,8 +555,8 @@ a compile error, not a notification that silently bypasses everyone's settings.
 | Category | Covers | Scope | Workspace can switch | Member can mute |
 |---|---|---|---|---|
 | `reminders` | `checkin_reminder`, `checkout_reminder` | workspace | yes | yes |
-| `approvals_inbox` | `leave_submitted`, `regularization_submitted` | workspace | yes | yes |
-| `approvals_outcome` | leave / regularization / document outcomes | workspace | **no** | **no** |
+| `approvals_inbox` | `leave_submitted`, `regularization_submitted`, `extension_submitted` | workspace | yes | yes |
+| `approvals_outcome` | leave / regularization / document / parental-extension outcomes | workspace | **no** | **no** |
 | `announcements` | `announcement` | workspace | **no** | **no** |
 | `presence` | the 5h / 10h / 12h check-in pushes | **account** | no | yes |
 
@@ -687,7 +741,7 @@ import { db } from '@/lib/db'
 - `employees-list.ts` - the directory/list read path, kept out of `employees.ts` so a list query can never accidentally decrypt sensitive columns
 - `assets.ts` - workspace asset register (hardware, assignment history)
 - `documents.ts` - employee document metadata **and** the blob helpers; the only file outside `src/lib/storage.ts` allowed to see base64
-- `maternity.ts` - maternity cases + their stage machine
+- `maternity.ts` - parental leave cases (maternity + paternity) + their stage machine; owns `isParentalCaseType()`, the only validation on `case_type`
 - `hierarchy.ts` - the reporting line (`workspace_members.manager_user_id`); the tree walk itself is pure and lives in `src/lib/hierarchy.ts`
 - `regularizations.ts` - employee requests to correct a past day
 - `roles.ts` - workspace roles and permission grids
@@ -743,7 +797,7 @@ WiFi SSID: bcryptjs hash - same library, raw SSID never persisted.
 - Never put business logic in Client Components - fetch from API routes instead
 
 ### Copy (strings)
-- English UI and marketing copy is assembled in `src/locales/en.ts`, but **new copy goes in a per-area module** under `src/locales/en/<area>.ts` (`me.ts`, `me-screens.ts`, `me-settings.ts`, `marketing.ts`, `documents.ts`, `ws-overview.ts`, `ws-people.ts` (which also holds `wsPeopleUi` and `wsOrg`), `ws-settings.ts`, `ws-reminders.ts`). `en.ts` imports each module and spreads it onto the `en` object.
+- English UI and marketing copy is assembled in `src/locales/en.ts`, but **new copy goes in a per-area module** under `src/locales/en/<area>.ts` (`me.ts`, `me-screens.ts`, `me-settings.ts`, `me-announcements.ts`, `marketing.ts`, `documents.ts`, `ws-overview.ts`, `ws-people.ts` (which also holds `wsPeopleUi` and `wsOrg`), `ws-assets.ts`, `ws-parental.ts`, `ws-approvals.ts`, `ws-announcements.ts`, `ws-person.ts`, `ws-settings.ts`, `ws-reminders.ts`). `en.ts` imports each module and spreads it onto the `en` object.
 - Both `en.me.x` and `import { me } from '@/locales/en/me'` resolve to the same object, so either import style works at a call site. Prefer the direct module import in new code — it keeps two agents editing two different areas out of the same file.
 - The groups still written inline in `en.ts` are the original single-file copy, kept so existing `en.x` call sites keep working. Move a group into a module as its screens are touched; do not add to them.
 - Technical identifiers (cookie names, DNS prefixes, DB filenames) live under `en.constants`.
@@ -751,7 +805,9 @@ WiFi SSID: bcryptjs hash - same library, raw SSID never persisted.
 ### Layouts
 - `src/app/(public)/layout.tsx` - passthrough, public pages
 - `src/app/me/layout.tsx` - `.shell-me`: 460px column, `.me-topbar`, `.me-content`, fixed `.me-bottomnav`. Safe-area insets on `html` (top/left/right) and on the bottom nav's padding
-- `src/app/ws/[slug]/layout.tsx` → `src/components/ws/WsLayoutClient.tsx` - `.shell-ws`: a sticky **228px sidebar** beside a column carrying the 64px `.ws-topbar` and the 1180px `.ws-content`. **Under 860px the sidebar becomes a horizontally scrolling tab strip** across the top, `.sidebar-foot` is hidden and `.topbar-account` takes over the account menu. The *page* scrolls (sidebar is `position: sticky`), not an inner div, so the topbar's own sticky works and browser scroll restoration behaves
+- `src/app/ws/[slug]/layout.tsx` → `src/components/ws/WsLayoutClient.tsx` - `.shell-ws`: a **collapsible sidebar** beside a column carrying the 64px `.ws-topbar` and the 1180px `.ws-content`. It is a sidebar at every width — the ≤860px horizontal tab strip is gone. The *page* scrolls, not an inner div, so the topbar's own sticky works and browser scroll restoration behaves
+- **Two independent states, and neither component reads the viewport.** `.shell-ws` carries `data-nav="expanded|collapsed"` (228px column ↔ 64px icon rail) and `data-drawer="open|closed"` (the off-canvas overlay). The stylesheet decides which one means anything at a given width: every rail rule lives inside `@media (min-width: 861px)`, every drawer rule inside `@media (max-width: 860px)`. `data-nav` is persisted to the `vnz_nav` cookie and **read by the Server Component layout**, so the first paint is already the right width; `data-drawer` is deliberately not persisted — a nav drawer that reopens itself on the next page is a bug, not a preference
+- **The drawer reuses `useOverlay`** (`src/components/ui/use-overlay.ts`) for Escape, body-scroll lock, focus-in/focus-return and the focus trap — the same contract `Modal`, `SlideOver` and `BottomSheet` share. It is not portalled, so the `mounted` guard is unused. The one piece of responsive JS in the shell is a `matchMedia` listener that force-closes the drawer at ≥861px, because the focus trap is only correct while the sidebar is an overlay
 - Sidebar entries come from `visibleScreenGroups()` in `src/lib/permissions/screens.ts` — never a hardcoded nav list. Hiding a tab is a courtesy; the matching route enforces the same permission independently
 
 See `docs/design/shells.md` for the full anatomy.
@@ -884,19 +940,48 @@ Rules:
     default is on, so nothing is ever seeded. `workspaces.notification_categories_off`
     stores the **disabled** set for the same reason. Never invert either one, and
     never write a preference row for a category whose `memberMutable` is false.
+26. **A pending item is actioned in exactly one place** - `/ws/:slug/approvals`.
+    `getPendingApprovalItems()` is the only source, and the four duplicate action
+    surfaces (attendance queue, leaves Requests tab, People echo, and the second
+    `PATCH /api/ws/[slug]/leaves/[id]` write path) were deleted, not hidden.
+    Read-only listings of the same rows are fine; an approve/decline control
+    anywhere else is not.
+27. **Every destructive action confirms through `ConfirmDialog`** -
+    `src/components/ui/ConfirmDialog.tsx`, built on `Modal` so it inherits the
+    portal, Escape, scroll-lock, focus-trap and focus-restore contract. Never
+    `window.confirm`: it cannot be styled or themed, blocks the main thread, and
+    sits outside every accessibility and 44px guarantee the rest of the system
+    makes.
+28. **A retired index name is never reused for a new definition** -
+    `scripts/migrate.js` swallows `already exists`, so re-issuing
+    `CREATE UNIQUE INDEX IF NOT EXISTS` under an existing name with a changed
+    `WHERE` clause is silently counted as skipped and the OLD definition
+    survives. `DROP INDEX IF EXISTS` plus a `CREATE` under a NEW name is the only
+    spelling whose outcome is observable. This is why the one-open-case index is
+    now `idx_parental_cases_one_open`.
 
 ---
 
 ## What NOT to Do
 
 - Never call `db.query()` / `db.execute()` outside of `lib/db/queries/`
+- Never re-add an approve/decline control outside `/ws/:slug/approvals` — a read-only listing is fine, an action surface is not
+- Never use `window.confirm` — every destructive action goes through `ConfirmDialog`
+- Never reuse a retired index name for a different definition; the migration runner will silently skip it
+- Never send `status` from the asset edit form — the assignment boundary is enforced with 409s and moves only through `.../assign`
+- Never let a leave-type edit ship without saying it recomputes everyone's balance
+- Never filter `getActiveParentalUserIds()` by `case_type` — the reminder gate must see both parents
 - Never accept `userId` or `workspaceId` from request body/params without verification
 - Never delete presence_events rows
 - Never store raw WiFi SSIDs
 - Never skip `requireWsAccess(req, slug, Resource, Action)` on a `/api/ws/[slug]/*` route — and never reintroduce `requireWsAdmin()`
 - Never put a shadow on an inline surface (cards, inputs, chips, rows); shadows are for overlays only
 - Never add gradients to app UI
-- Never write a `<style>` block in a component or an ad-hoc inline style object — add a class to `globals.css`
+- Never write a `<style>` block in a component or an ad-hoc inline style object — add a class to `globals.css`. An inline style is also unreachable by a media query, so anything that has to change at a breakpoint *must* be a class
+- Never put a breakpoint override for a selector *earlier* in `globals.css` than the base rule for the same selector — the file has no cascade layers, so the later rule wins and the override is silently dead. This has now bitten twice (`.stat-row`, `.nav-drawer-toggle` vs `.icon-btn`)
+- Never give a `/ws` screen an icon that only reads next to its own label — the 64px rail removes every label, so the glyph is the whole distinction
+- Never hide a collapsed nav label with `display: none` — it is the link's accessible name; hide it visually
+- Never leave `animation-fill-mode: both` on a class that animates `transform` and contains `position: fixed` children — the held transform becomes their containing block and they anchor to the document instead of the viewport (see `.page-enter` in `docs/design/shells.md`)
 - Never return document bytes (or base64) in a JSON response body
 - Never trust `otpVerified: true` from client
 - Never use spinners - use skeleton loaders

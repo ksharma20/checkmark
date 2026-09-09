@@ -14,6 +14,12 @@ export type NotificationType =
   // ref_type 'announcement'. Delivered by fanning one row out per active
   // member, which is what gives each of them their own read state.
   | 'announcement'
+  // An employee asked to extend a parental leave case by unpaid days, and the
+  // outcome of that request. ref_id is the `parental_leave_extensions` id,
+  // ref_type 'parental_extension'. Deliberately its own family rather than
+  // reusing 'leave_*': an extension is filed against a maternity/paternity case,
+  // not against an accrued balance, so it lands in a different queue.
+  | 'extension_submitted' | 'extension_approved' | 'extension_rejected'
 
 export interface Notification {
   id: string

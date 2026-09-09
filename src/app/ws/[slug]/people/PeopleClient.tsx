@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Lock, Plus, Trash2 } from 'lucide-react'
 import {
-  Avatar, Button, Card, Chip, DataTable, EmptyState, IconButton, Input,
+  Avatar, Button, Card, Chip, ConfirmDialog, DataTable, EmptyState, IconButton, Input,
   Select, SkeletonText,
   type ChipTone, type Column,
 } from '@/components/ui'
@@ -12,7 +12,6 @@ import { en } from '@/locales/en'
 import { wsPeopleUi } from '@/locales/en/ws-people'
 import { canManage } from '@/lib/permissions/ranks'
 import { personColor } from '@/lib/workspace-color'
-import RegularizationRequestsSection from './RegularizationRequests'
 
 /**
  * One row of the workforce directory.
@@ -145,6 +144,8 @@ export default function PeopleClient({ slug, viewerUserId }: Props) {
   const [departments, setDepartments] = useState<string[]>([])
 
   const [removingId, setRemovingId] = useState<string | null>(null)
+  const [pendingRemove, setPendingRemove] = useState<Member | null>(null)
+  const [removeError, setRemoveError] = useState<string | null>(null)
   const [roleNames, setRoleNames] = useState<Record<string, string>>({})
   const [viewerPermissions, setViewerPermissions] = useState<ViewerPermissions>({
     transferOwnership: false, removeMembers: false, readEmployees: false, writeEmployees: false,
@@ -216,15 +217,22 @@ export default function PeopleClient({ slug, viewerUserId }: Props) {
     }
   }
 
-  async function remove(memberId: string) {
-    if (!confirm(en.wsPeople.removeConfirm)) return
+  async function confirmRemove() {
+    if (!pendingRemove) return
+    const memberId = pendingRemove.member_id
     setRemovingId(memberId)
+    setRemoveError(null)
     try {
       const res = await fetch(`/api/ws/${slug}/members/${memberId}`, { method: 'DELETE' })
       if (res.ok) {
         setMembers(prev => prev.filter(m => m.member_id !== memberId))
         setTotal(t => Math.max(0, t - 1))
+        setPendingRemove(null)
+      } else {
+        setRemoveError(wsPeopleUi.accessRemoveFailed)
       }
+    } catch {
+      setRemoveError(wsPeopleUi.accessRemoveFailed)
     } finally {
       setRemovingId(null)
     }
@@ -327,7 +335,7 @@ export default function PeopleClient({ slug, viewerUserId }: Props) {
                   label={en.wsPeople.removeTitle}
                   icon={<Trash2 size={14} />}
                   disabled={removingId === m.member_id}
-                  onClick={() => remove(m.member_id)}
+                  onClick={() => { setRemoveError(null); setPendingRemove(m) }}
                   className="icon-btn-danger"
                 />
               )}
@@ -337,7 +345,6 @@ export default function PeopleClient({ slug, viewerUserId }: Props) {
     )
 
     return cols
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readEmployees, roleNames, viewerPermissions, viewerRoleKey, viewerUserId, removingId, slug])
 
   return (
@@ -411,7 +418,19 @@ export default function PeopleClient({ slug, viewerUserId }: Props) {
         </Button>
       )}
 
-      <RegularizationRequestsSection slug={slug} />
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        onClose={() => { setPendingRemove(null); setRemoveError(null) }}
+        onConfirm={() => void confirmRemove()}
+        title={wsPeopleUi.removeConfirmTitle}
+        body={pendingRemove ? wsPeopleUi.removeConfirmBody(pendingRemove.full_name ?? pendingRemove.email) : ''}
+        note={wsPeopleUi.removeConfirmNote}
+        confirmLabel={wsPeopleUi.removeConfirmAction}
+        busyLabel={wsPeopleUi.removeConfirmBusy}
+        cancelLabel={wsPeopleUi.removeConfirmCancel}
+        loading={removingId !== null}
+        error={removeError}
+      />
     </div>
   )
 }

@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { Lock } from 'lucide-react'
-import { Button, Card, Chip, Field, Input, Modal } from '@/components/ui'
+import { Button, Card, Chip, ConfirmDialog, Field, Input, Modal } from '@/components/ui'
 import { en } from '@/locales/en'
 import { wsAdmin } from '@/locales/en/ws-settings'
 import { Scope, type PermissionGrid, type Resource, type ResourceDef } from '@/lib/permissions/catalogue'
@@ -373,34 +373,28 @@ export default function RolesClient({ slug, initialRoles, resources, viewer }: P
       </Modal>
 
       {/* ── Delete ────────────────────────────────────────────────────── */}
-      <Modal
+      {/* The body still distinguishes a role somebody holds from an empty one -
+          that count is the whole consequence. The caveat and the error are the
+          primitive's `note` and `error` slots, which is what retired the two
+          inline style objects this block used to carry. */}
+      <ConfirmDialog
         open={roleToDelete !== null}
         onClose={() => { setRoleToDelete(null); setError(null) }}
+        onConfirm={remove}
         maxWidth={460}
-        title={roleToDelete ? en.wsRoles.deleteTitle(roleToDelete.name) : undefined}
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => { setRoleToDelete(null); setError(null) }}>
-              {en.wsRoles.cancelBtn}
-            </Button>
-            <Button variant="danger" size="sm" loading={dialogBusy} onClick={remove}>
-              {dialogBusy ? en.wsRoles.deletingConfirm : en.wsRoles.deleteConfirm}
-            </Button>
-          </>
+        title={roleToDelete ? en.wsRoles.deleteTitle(roleToDelete.name) : ''}
+        body={
+          roleToDelete && roleToDelete.memberCount > 0
+            ? en.wsRoles.deleteBodyWithMembers(roleToDelete.memberCount)
+            : en.wsRoles.deleteBodyEmpty
         }
-      >
-        {roleToDelete && (
-          <>
-            <p className="t-secondary">
-              {roleToDelete.memberCount > 0
-                ? en.wsRoles.deleteBodyWithMembers(roleToDelete.memberCount)
-                : en.wsRoles.deleteBodyEmpty}
-            </p>
-            <p className="t-muted" style={{ marginTop: '10px' }}>{en.wsRoles.deleteIrreversible}</p>
-            {error && <p style={{ fontSize: '12px', color: 'var(--danger)', marginTop: '10px' }}>{error}</p>}
-          </>
-        )}
-      </Modal>
+        note={en.wsRoles.deleteIrreversible}
+        confirmLabel={en.wsRoles.deleteConfirm}
+        busyLabel={en.wsRoles.deletingConfirm}
+        cancelLabel={en.wsRoles.cancelBtn}
+        loading={dialogBusy}
+        error={error}
+      />
     </div>
   )
 }

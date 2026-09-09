@@ -4,12 +4,12 @@ import { useCallback, useEffect, useState } from 'react'
 import { TabBar, type Tab } from '@/components/ui'
 import { useToast } from '@/components/shared/Toast'
 import { wsLeaveScreen } from '@/locales/en/ws-people'
+import { wsParental } from '@/locales/en/ws-parental'
 import LeaveAppliedTab from './LeaveAppliedTab'
-import LeaveRequestsTab from './LeaveRequestsTab'
-import MaternityTab from './MaternityTab'
+import ParentalCasesTab from './ParentalCasesTab'
 import type { LeaveRow } from './leave-shared'
 
-type TabKey = 'requests' | 'applied' | 'maternity'
+type TabKey = 'applied' | 'maternity' | 'paternity'
 
 interface Props {
   slug: string
@@ -18,18 +18,22 @@ interface Props {
 }
 
 /**
- * The Leave screen: one fetch, three views of it.
+ * The Leave screen: the applied-leave history, and the two parental case lists.
  *
- * Requests and Applied read the same `leaveRequests` payload, so it is loaded
- * once here and an approval updates the row in place - switching tabs after
- * approving must not show the stale queue. Maternity is a different table
- * entirely and owns its own fetch.
+ * There is deliberately NO pending-requests tab here any more. A leave request
+ * awaiting a decision is actioned in exactly one place - /ws/:slug/approvals -
+ * because the same item used to be approvable from here, from the Approvals
+ * page and from the Overview widget, and three surfaces over one decision is
+ * how an admin ends up approving something twice.
+ *
+ * Applied still LISTS pending rows (with a status filter); listing is not
+ * actioning, and the history is the point of the tab.
  */
 export default function LeavesClient({ slug, canWrite, canReadEmployees }: Props) {
   // Destructured: `show` is a stable useCallback, the context object is not,
   // so this is what makes it safe in a useCallback/useEffect dep array.
   const { show: toast } = useToast()
-  const [tab, setTab] = useState<TabKey>('requests')
+  const [tab, setTab] = useState<TabKey>('applied')
   const [rows, setRows] = useState<LeaveRow[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -47,17 +51,11 @@ export default function LeavesClient({ slug, canWrite, canReadEmployees }: Props
 
   useEffect(() => { void load() }, [load])
 
-  const pendingCount = rows.filter(r => r.status === 'pending').length
-
   const tabs: Tab[] = [
-    { key: 'requests', label: wsLeaveScreen.tabRequests, badge: pendingCount },
     { key: 'applied', label: wsLeaveScreen.tabApplied },
-    { key: 'maternity', label: wsLeaveScreen.tabMaternity },
+    { key: 'maternity', label: wsParental.tabMaternity },
+    { key: 'paternity', label: wsParental.tabPaternity },
   ]
-
-  function onActioned(id: string, status: 'approved' | 'rejected', reason: string | null) {
-    setRows(prev => prev.map(r => (r.id === id ? { ...r, status, rejection_reason: reason } : r)))
-  }
 
   return (
     <div>
@@ -70,22 +68,21 @@ export default function LeavesClient({ slug, canWrite, canReadEmployees }: Props
         style={{ margin: '12px 0 16px' }}
       />
 
-      {tab === 'requests' && (
-        <LeaveRequestsTab
-          slug={slug}
-          rows={rows}
-          loading={loading}
-          canWrite={canWrite}
-          onActioned={onActioned}
-        />
-      )}
-
       {tab === 'applied' && (
         <LeaveAppliedTab rows={rows} loading={loading} />
       )}
 
-      {tab === 'maternity' && (
-        <MaternityTab slug={slug} canWrite={canWrite} canReadEmployees={canReadEmployees} />
+      {/* One component, two case types. `key` remounts it on a tab change so
+          the fetch, the stat cards and any open dialog belong to the tab you
+          are looking at rather than being reused across the two. */}
+      {(tab === 'maternity' || tab === 'paternity') && (
+        <ParentalCasesTab
+          key={tab}
+          slug={slug}
+          caseType={tab}
+          canWrite={canWrite}
+          canReadEmployees={canReadEmployees}
+        />
       )}
     </div>
   )

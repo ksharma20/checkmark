@@ -267,13 +267,35 @@ code, pre, .mono {
 
 /* ── Page entrance animation ─────────────────────────── */
 
+/* The settled state is `transform: none`, NOT `translateY(0)`, and the
+   difference is not cosmetic: `.page-enter` runs with `animation-fill-mode:
+   both`, so whatever the last keyframe says is held forever. `translateY(0)`
+   computes to a real matrix, and ANY transform other than `none` makes the
+   element a containing block for `position: fixed` descendants - which silently
+   re-anchored every fixed element inside the shell (the nav drawer, its scrim,
+   the PWA install prompt) to the full document box instead of the viewport, so
+   they sized to the page height and scrolled away with it. Interpolating to
+   `none` is visually identical and leaves no containing block behind. */
 @keyframes page-enter {
   from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0);     }
+  to   { opacity: 1; transform: none;             }
 }
 
+/* No `both`, and that is load-bearing rather than a tidy-up. `both` fills
+   FORWARDS, so the element kept the animation's final transform for the life of
+   the page - and a transform interpolation resolves `none` to the identity
+   MATRIX, not to the keyword, so even a `transform: none` end keyframe left a
+   real matrix behind. Any transform other than `none` makes the element a
+   containing block for `position: fixed` descendants, which re-anchored every
+   fixed thing in the shell (the nav drawer, its scrim, the PWA install prompt)
+   to the whole document box instead of the viewport: they sized to the page
+   height and scrolled away with it.
+   With no fill mode the element drops back to its own computed style the moment
+   the animation ends, which is what the last keyframe already describes - so
+   nothing moves, and the containing block goes away. There is no
+   `animation-delay` here, so the backwards half of `both` was buying nothing. */
 .page-enter {
-  animation: page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /* ── Spring entrance (dashboard sections) ─────────────── */
@@ -376,8 +398,29 @@ a[href] {
   width: 228px; flex-shrink: 0; background: var(--surface-0);
   border-right: 1px solid var(--border); display: flex; flex-direction: column;
   padding: 20px 14px; gap: 4px; position: sticky; top: 0; height: 100vh;
+  /* Width for the ≥861px rail, transform for the ≤860px drawer. Declared once
+     here so both breakpoints animate the same way. Listed in the reduced-motion
+     guard as TRANSITION-only: killing `transform` outright would strand a
+     closed drawer on screen. */
+  transition: width 220ms var(--ease-out), transform 280ms var(--ease-drawer);
 }
-.sidebar-brand { display: flex; align-items: center; gap: 10px; padding: 6px 10px 22px; }
+/* Only ever painted at ≤860px, where the sidebar is an overlay. `display` is
+   declared explicitly so the `hidden` attribute the shell toggles is what
+   decides, rather than relying on the UA sheet winning against this rule. */
+.ws-scrim {
+  display: block; position: fixed; inset: 0; z-index: 60;
+  background: rgba(6,16,13,0.45);
+  animation: fadeIn 220ms var(--ease-out) both;
+}
+.ws-scrim[hidden] { display: none; }
+/* Brand row + the rail toggle. `.sidebar-brand` used to live here; nothing has
+   rendered it since the sidebar started drawing the wordmark directly. */
+.sidebar-head { display: flex; align-items: center; gap: 8px; padding: 2px 4px 18px; }
+.sidebar-wordmark { display: block; min-width: 0; }
+/* The pin on its own, for the 64px rail. Hidden until the rail asks for it. */
+.sidebar-mark { display: none; width: 28px; height: 28px; object-fit: contain; }
+/* Pushed to the far end of the head row while there is a wordmark beside it. */
+.nav-rail-toggle { margin-left: auto; flex-shrink: 0; }
 .brand-mark {
   width: 30px; height: 30px; border-radius: 9px; background: var(--brand);
   display: flex; align-items: center; justify-content: center; color: #fff;
@@ -390,6 +433,16 @@ a[href] {
   font-size: 13.5px; font-weight: 500; cursor: pointer; text-decoration: none;
 }
 .navitem .ic { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.85; }
+/* The screen name beside the icon. Its own element because the rail hides it
+   VISUALLY while leaving it in the accessibility tree - the link's accessible
+   name has to survive the collapse, so this can never become `display: none`. */
+.navitem-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The "Workforce" / "Manage" heading above each nav group. A class rather than
+   the inline margin it used to carry, because the ≤860px strip has to override
+   that margin and an inline declaration cannot be reached by a media query
+   (invariant 15 - the same reason the touch-target and motion guards live here). */
+.sidebar-group-label { margin: 18px 12px 6px; }
+.sidebar-group-label.is-first { margin-top: 2px; }
 .navitem.active {
   background: color-mix(in srgb, var(--brand) 12%, transparent);
   color: var(--brand); font-weight: 700;
@@ -411,13 +464,74 @@ a[href] {
    nearest scrolling ancestor, so a sticky sidebar stuck to something that was
    itself scrolling - i.e. it did nothing. Giving the shell a fixed height and
    moving the scroll into the main column fixes it without touching those rules.
-   Below 861px this block does not apply: the sidebar is a horizontal tab strip
-   and the page scrolls normally (see the max-width: 860px block). */
+   Below 861px this block does not apply: the sidebar lifts out of the flow as
+   an off-canvas drawer and the page scrolls normally (see the max-width: 860px
+   block).
+
+   THE COLLAPSED RAIL LIVES HERE, and only here. `data-nav` is set on
+   `.shell-ws` at every width, but it means nothing below the breakpoint: an
+   overlay has no width to trade back to the content, so a drawer is either open
+   or shut and collapsing it would just be a smaller overlay. Keeping every rail
+   rule inside this block is what makes that true without the component having
+   to know the viewport. */
 @media (min-width: 861px) {
   .shell-ws { min-height: 0; height: 100vh; height: 100dvh; overflow: hidden; }
   /* No longer sticky - it is a full-height column of a non-scrolling frame.
      `overflow-y: auto` only bites when the nav is taller than the viewport. */
   .sidebar { position: static; height: 100%; overflow-y: auto; overflow-x: hidden; }
+
+  /* The drawer toggle is hidden here too, but that rule cannot live in this
+     block - see the note beside `.topbar-lead`. */
+  .ws-scrim { display: none; }
+
+  /* ── the 64px icon rail ─────────────────────────────────────────────────
+     228 -> 64. The 8px gutters leave a 48px track, which is what lets a
+     `.navitem` keep the 44px minimum target while centring an 18px glyph. */
+  .shell-ws[data-nav="collapsed"] .sidebar { width: 64px; padding-left: 8px; padding-right: 8px; }
+  .shell-ws[data-nav="collapsed"] .sidebar-wordmark { display: none; }
+  .shell-ws[data-nav="collapsed"] .sidebar-mark { display: block; }
+  .shell-ws[data-nav="collapsed"] .sidebar-head { flex-direction: column; gap: 10px; padding: 2px 0 14px; }
+  .shell-ws[data-nav="collapsed"] .nav-rail-toggle { margin-left: 0; }
+
+  .shell-ws[data-nav="collapsed"] .navitem { justify-content: center; padding: 10px 0; gap: 0; position: relative; }
+  /* Visually gone, still the link's accessible name. This is `.visually-hidden`
+     written out rather than the class applied, because the element also has to
+     keep participating in the flex row at full width. */
+  .shell-ws[data-nav="collapsed"] .navitem-label {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+  /* `margin-left: auto` is meaningless once the row is centred, so the count
+     moves onto the glyph. Dropping it instead would remove the only reason to
+     glance at a collapsed nav. */
+  .shell-ws[data-nav="collapsed"] .navbadge {
+    position: absolute; top: 3px; right: 5px; margin-left: 0;
+    min-width: 15px; height: 15px; font-size: 9px; padding: 0 4px;
+    border: 1.5px solid var(--surface-0);
+  }
+  /* A group heading has no room for its text, but it still separates two
+     groups - so it becomes the rule it was implying. Image-replacement rather
+     than `display: none` keeps "Workforce" and "Manage" in the a11y tree. */
+  .shell-ws[data-nav="collapsed"] .sidebar-group-label {
+    height: 1px; margin: 12px 10px 8px; padding: 0;
+    background: var(--border); border-radius: 1px;
+    overflow: hidden; text-indent: 101%; white-space: nowrap;
+  }
+  /* The first group already has the head's padding above it; a rule there would
+     read as a second border. Kept in the tree, painted as nothing. */
+  .shell-ws[data-nav="collapsed"] .sidebar-group-label.is-first {
+    height: 0; margin: 2px 0 4px; background: transparent;
+  }
+
+  .shell-ws[data-nav="collapsed"] .account-trigger { justify-content: center; padding: 8px 0; gap: 0; }
+  .shell-ws[data-nav="collapsed"] .account-identity,
+  .shell-ws[data-nav="collapsed"] .account-more { display: none; }
+  /* The foot is `position: relative` and the menu stretches to its edges, which
+     is 48px in the rail. Anchor it to the left edge and give it a real width so
+     it opens over the content instead of inside the track. */
+  .shell-ws[data-nav="collapsed"] .sidebar-foot .dropdown-menu {
+    left: 0; right: auto; width: 190px;
+  }
   /* The page's scroll container. `.ws-topbar` sticks to the top of THIS.
      `overflow-x: hidden` keeps the horizontal clipping that `body` used to do -
      declaring only `overflow-y` would compute the x axis to `auto` and add a
@@ -683,13 +797,39 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   box-shadow: var(--shadow-md); padding: 6px; z-index: 30; animation: fxSnap 150ms var(--ease-out) both;
 }
 .dropdown-menu .rowlink { display: block; padding: 9px 10px; font-size: 13px; font-weight: 600; }
+/* Static identity row above the items - not a menuitem, so it is deliberately
+   inert: no hover fill, no pointer. `.account-name` / `.account-role` are both
+   display:block and carry their own type, so this only owns the spacing and the
+   rule that separates it from the items. */
+.dropdown-menu-header {
+  padding: 7px 10px 9px; margin-bottom: 4px; border-bottom: 1px solid var(--border);
+}
 .dropdown-menu.below { bottom: auto; top: calc(100% + 8px); left: auto; right: 0; width: 180px; }
 
 .ws-pill {
   display: inline-flex; align-items: center; gap: 7px; padding: 6px 11px 6px 6px;
   border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border);
   font-size: 12.5px; font-weight: 700; color: var(--text-primary); cursor: pointer;
+  text-decoration: none; max-width: 46vw; overflow: hidden;
 }
+.ws-pill-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ws-pill-caret { opacity: 0.6; flex-shrink: 0; }
+/* The topbar's LEFT cluster: the drawer toggle and the workspace pill. Paired
+   so the hamburger sits beside the workspace it opens the nav for, rather than
+   floating alone at the edge. */
+.topbar-lead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* The drawer toggle exists only below the breakpoint, where the sidebar is an
+   overlay with no other way in. This override sits HERE, after `.icon-btn`,
+   and not in the `@media (min-width: 861px)` shell block further up the file:
+   `.icon-btn` sets `display: flex` and is declared after that block, so at
+   equal specificity it wins and the hamburger stayed on screen at every width.
+   Same trap `.stat-row` hit - a breakpoint override has to follow every base
+   rule it means to beat. */
+@media (min-width: 861px) {
+  .nav-drawer-toggle { display: none; }
+}
+.topbar-bell { position: relative; display: flex; align-items: center; }
+.topbar-bell-panel { position: absolute; top: calc(100% + 10px); right: 0; z-index: 200; }
 .ws-pill .swatch {
   width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center;
   justify-content: center; color: #fff; font-size: 9.5px; font-weight: 800; flex-shrink: 0;
@@ -700,6 +840,34 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   justify-content: center; padding: 0 5px;
 }
 .topbar-account { position: relative; display: none; }
+
+/* The account row pinned to `.sidebar-foot`. Classes rather than the inline
+   styles it carried, because the 64px rail has to drop the name, the role and
+   the chevron and keep only the avatar - which a media query cannot do to an
+   inline declaration. */
+.account-trigger {
+  display: flex; align-items: center; gap: 9px; padding: 8px; width: 100%;
+  background: none; border: none; cursor: pointer; text-align: left; min-height: 44px;
+}
+.account-identity { flex: 1; min-width: 0; }
+.account-name {
+  display: block; font-size: 12.5px; font-weight: 700; color: var(--text-primary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.account-role { display: block; font-size: 11px; }
+.account-more { color: var(--text-muted); flex-shrink: 0; }
+.account-trigger-bare { background: none; border: none; padding: 0; cursor: pointer; }
+
+/* The topbar's right-hand cluster. A class rather than the inline flex row it
+   was, because the ≤860px block has to reach inside it and a media query cannot
+   reach an inline style (invariant 15). */
+.topbar-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* A chip states one short fact, and `.chip` is `white-space: nowrap` - so
+   letting one shrink does not reflow it, it CLIPS the word. In the topbar there
+   is nothing to gain by shrinking them: the workspace pill beside them already
+   carries the ellipsis and is what should absorb a squeeze. */
+.topbar-actions .chip { flex-shrink: 0; }
+.topbar-plan-chip { text-transform: capitalize; }
 
 /* ── check-in ──────────────────────────────────────────────────────────────── */
 .checkin-btn {
@@ -753,18 +921,67 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 .report-card.disabled { opacity: 0.5; }
 .report-card.disabled button { cursor: not-allowed !important; }
 
-/* ── responsive: workspace shell collapses to a scrolling tab strip ────────── */
+/* ── responsive: the sidebar lifts out of the flow as an off-canvas drawer ───
+   It is a SIDEBAR at every width now. This block used to turn it into a
+   horizontally scrolling tab strip across the top; that kept the current tab
+   and its neighbours in view, but it cost the content a band of vertical space
+   on every screen and put every tab past the fold behind a horizontal swipe.
+   As a drawer it costs the content nothing while shut. */
 @media (max-width: 860px) {
-  .shell-ws { flex-direction: column; padding-top: 54px; }
   .sidebar {
-    width: 100%; height: auto; position: static; flex-direction: row; align-items: center;
-    overflow-x: auto; padding: 10px 12px; border-right: none;
-    border-bottom: 1px solid var(--border); gap: 2px;
+    /* Out of the flex flow entirely - `.ws-main` gets the whole width. */
+    position: fixed; top: 0; bottom: 0; left: 0; z-index: 70;
+    width: 264px; max-width: 84vw; height: 100%;
+    border-right: 1px solid var(--border);
+    padding: 20px 14px calc(20px + env(safe-area-inset-bottom));
+    padding-left: calc(14px + env(safe-area-inset-left));
+    overflow-y: auto;
+    /* It floats above the page, so unlike the rail it may carry elevation. */
+    box-shadow: 4px 0 28px rgba(10,35,24,0.18);
+    /* `visibility` is doing real work: a drawer translated off-screen is still
+       in the tab order, so a keyboard user would tab into an invisible nav.
+
+       The delay, not a duration, is what makes it correct in BOTH directions.
+       Closing: hold `visible` for the length of the slide (`0s linear 280ms`)
+       so the drawer is not cut off at frame one. Opening: flip to `visible`
+       with no delay at all - a *duration* here meant the computed value was
+       still `hidden` in the same tick the shell set `data-drawer="open"`, and
+       `useOverlay` focuses the panel in exactly that tick. Focus on a
+       visibility:hidden element is silently refused, so the drawer opened with
+       focus stranded on `<body>` and the trap holding nothing. */
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform 280ms var(--ease-drawer), visibility 0s linear 280ms;
   }
-  .sidebar-brand { padding: 4px 12px 4px 2px; flex-shrink: 0; }
-  .navitem { flex-shrink: 0; white-space: nowrap; }
+  .shell-ws[data-drawer="open"] .sidebar {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform 280ms var(--ease-drawer), visibility 0s;
+  }
+
+  /* The rail toggle has nothing to trade here - see the min-width block. */
+  .nav-rail-toggle { display: none; }
+
+  /* The drawer is 264px, so the wordmark fits and the pin is not needed. */
+  .sidebar-wordmark { display: block; }
+  .sidebar-mark { display: none; }
+
+  .navitem { white-space: nowrap; }
+
   .sidebar-foot { display: none; }
   .topbar-account { display: block; }
+
+  /* The topbar carries five controls, and a 360px phone fits about three of
+     them beside the workspace name. Both chips go, and neither is lost: the
+     plan is a billing fact one tap away in Settings › Billing, and the role -
+     which is what tells an admin why their screen differs from a colleague's -
+     moves into the account menu's header, because `.sidebar-foot` is hidden at
+     this width too and that menu is the only place left that can carry it. */
+  .topbar-plan-chip, .topbar-role-chip { display: none; }
+
+  /* 28px of gutter either side is a desktop measure. On a phone it is 56px of
+     the 360 the topbar has to lay out in. */
+  .ws-topbar { padding: 0 16px; }
   .ws-content { padding: 18px; }
 }
 
@@ -779,7 +996,7 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   .slideover .scrim, .slideover .panel,
   .modal .scrim, .modal .panel,
   .me-sheet .scrim, .me-sheet .panel,
-  .toast, .dropdown-menu,
+  .toast, .dropdown-menu, .ws-scrim,
   .page-enter, .reveal,
   .hero-anim, .hero-underline, .cs-ping {
     animation: none !important;
@@ -792,9 +1009,11 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
      static full-width fill, so a navigation in flight is still communicated. */
 
   /* Transition-only: these carry a MEANINGFUL transform in their end state.
-     Killing `transform` here would strand the toggle knob in the off position
-     and freeze bars at zero height, so only the easing is removed. */
-  .toggle .knob, .bar { transition: none !important; }
+     Killing `transform` here would strand the toggle knob in the off position,
+     freeze bars at zero height, and - worst of the three - park the closed
+     navigation drawer at `translateX(0)`, i.e. permanently across the page.
+     Only the easing is removed; the drawer still snaps open and shut. */
+  .toggle .knob, .bar, .sidebar { transition: none !important; }
 
   /* Purely decorative and injected at runtime by RippleProvider. Forcing
      opacity/transform would leave a permanent visible circle, so remove it. */
@@ -870,6 +1089,41 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   border-radius: 999px; background: color-mix(in srgb, var(--brand) 16%, transparent); color: var(--brand);
 }
 
+/* The /ws dashboard's four headline tiles. A grid rather than the wrapping flex
+   row it replaced: at `flex: 1 1 200px` a second tile needs 414px, so a 354px
+   phone column fell straight to ONE per row and stacked 571px of tiles above
+   everything else on the page. `auto-fit` answers every width from the one
+   declaration - four across on a desktop, two on a phone, one only when the box
+   is genuinely too narrow for two.
+
+   The 200px floor here is the old `flex-basis` exactly: `auto-fit` seats n
+   tracks while n*200 + (n-1)*14 <= W, which is the same test the wrapping flex
+   row applied - so every width above the breakpoint keeps the tile count and
+   the tile width it already had. Only the phone rule in the ≤860px block
+   changes the answer. */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+/* Each tile is a link wrapping a `.card`, so the link is the grid item and the
+   card has to be told to fill it. `.card + .card` margin does not apply across
+   grid items, but the tiles are also rendered elsewhere - keep it explicit. */
+.stat-row > a { display: flex; text-decoration: none; }
+.stat-row > a > .card { flex: 1; margin-top: 0; }
+
+/* Two tiles, not one. A 200px floor needs 414px to seat a pair, so a 354px
+   phone column dropped to a single tile per row and stacked 571px of headline
+   numbers above everything else on the dashboard. 150px seats two from 320px
+   up. This override lives HERE, beside the rule it modifies, and not in the
+   ≤860px shell block further up the file: the two selectors have equal
+   specificity, so the one written later wins and a copy up there would be
+   silently overridden by the base rule below it. */
+@media (max-width: 860px) {
+  .stat-row { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+}
+
 /* Four-across stat tiles on /me home. Denser than the .card/.stat-num defaults,
    which are sized for the roomier /ws surface. */
 .me-statgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
@@ -912,6 +1166,12 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 .icon-btn,
 .dropzone,
 .me-navitem,
+/* `.navitem` sat outside this list at 40px for as long as it was a desktop-only
+   sidebar row. It is now the primary navigation on a phone as well - every tap
+   target in the drawer - so it belongs under the same rule as everything else
+   a thumb has to hit. Costs 4px per row on desktop; the sidebar already
+   scrolls when the nav is taller than the viewport. */
+.navitem,
 .org-card,
 .org-toggle,
 .choice,
@@ -955,6 +1215,14 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 @media (max-width: 640px) {
   .filter-bar > .filter-search { flex: 1 1 100%; }
   .filter-bar > .filter-select { flex: 1 1 140px; }
+
+  /* A floor of 340px is what stops the desktop's side-by-side panels from
+     jumping as each finishes loading. On a phone they are stacked one per row,
+     so there is no neighbour to stay level with and the floor is just void
+     under a one-row list - four panels of it is most of a screen of blank. The
+     CEILING stays: a long queue must still scroll inside its card rather than
+     run the page out to arm's length. */
+  .card-fixed-h { min-height: 0; }
 }
 .filter-note { padding: 10px 18px 0; font-size: 12px; }
 .table-head { padding: 14px 20px 12px; }
@@ -979,15 +1247,29 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 /* ── org chart ────────────────────────────────────────────────────────────────
    Hand-rolled, no layout engine. A strict tree never needs edge routing that
    avoids nodes, which is the only thing a graph library would buy here. The
-   canvas scales; the container scrolls, so native scroll IS the pan. */
+   canvas scales; the container scrolls, so native scroll IS the pan.
+
+   The layout is an INDENTED OUTLINE, not a top-down chart: children stack
+   downward and indent one step per level, the way a file explorer draws a
+   directory. The top-down version spread siblings across a row, so a workspace
+   with any real headcount was one long horizontal scroll and depth stopped
+   being legible - the thing the screen exists to show. Depth is now
+   indentation, which costs nothing horizontally past the deepest branch.
+
+   Every connector is two pseudo-elements on `.org-node`: `::before` is the
+   vertical spine its siblings share, `::after` the elbow into its own card. */
 .org-toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--border); }
 .org-toolbar .filter-search { min-width: 220px; }
 .org-zoom-label { font-family: var(--font-mono, monospace); font-size: 12px; color: var(--text-secondary); min-width: 46px; text-align: center; }
-.org-viewport { overflow: auto; padding: 28px 20px 36px; max-height: 72vh; }
+.org-viewport { overflow: auto; padding: 20px 20px 32px; max-height: 72vh; }
+/* `top left`, not `top center`: an outline grows down and to the right from a
+   fixed corner, so scaling about the centre would slide the whole tree sideways
+   on every zoom step. No `min-width: max-content` either - refusing to shrink
+   is what forced the horizontal scroll this layout exists to remove. */
 .org-canvas {
   transform: scale(var(--org-zoom, 1));
-  transform-origin: top center;
-  display: flex; justify-content: center; min-width: max-content;
+  transform-origin: top left;
+  display: flex; flex-direction: column; align-items: flex-start;
   transition: transform 220ms var(--ease-out);
 }
 /* Zoom steps. Discrete on purpose: the value has to live in this file to stay
@@ -1004,36 +1286,65 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 .org-canvas[data-zoom="130"] { --org-zoom: 1.3; }
 .org-canvas[data-zoom="140"] { --org-zoom: 1.4; }
 
-.org-node { display: flex; flex-direction: column; align-items: center; }
-/* The stalk down out of a parent. */
-.org-node-children {
-  display: flex; justify-content: center; align-items: flex-start;
-  padding-top: 22px; position: relative;
-}
-.org-node-children::before {
-  content: ''; position: absolute; top: 0; left: 50%;
-  width: 2px; height: 22px; background: var(--border);
-}
-.org-child { position: relative; padding: 22px 12px 0; display: flex; flex-direction: column; align-items: center; }
-/* The horizontal rail joining siblings, trimmed at the two ends so it does not
-   overhang the outermost cards. */
-.org-child::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0;
-  height: 2px; background: var(--border);
-}
-.org-child:first-child::before { left: 50%; }
-.org-child:last-child::before { right: 50%; }
-.org-child:only-child::before { left: 50%; right: 50%; }
-/* The drop from the rail into this child's own card. */
-.org-child::after {
-  content: ''; position: absolute; top: 0; left: 50%;
-  width: 2px; height: 22px; background: var(--border);
-}
+/* One person and their whole subtree. `position: relative` is load-bearing:
+   both connectors are pseudo-elements measured from this box. */
+.org-node { position: relative; display: flex; flex-direction: column; }
 
+/* The spine this node shares with its siblings, and the elbow into its own
+   card. Both hang 22px to the LEFT of the node, which `.org-branch` pays for
+   with its padding - so the spine lands under the parent's chevron rather than
+   under an arbitrary point of the parent card. */
+.org-node::before,
+.org-node::after { content: ''; position: absolute; background: var(--border); }
+.org-node::before { left: -22px; top: 0; bottom: 0; width: 2px; }
+.org-node::after { left: -22px; top: 32px; width: 22px; height: 2px; }
+/* The LAST child stops its spine at its own elbow. Without this the line runs
+   on past the final card and down the side of that card's subtree, drawing a
+   branch to nobody. 34px = the 32px elbow plus its 2px, so the corner closes. */
+.org-node:last-child::before { bottom: auto; height: 34px; }
+/* The FIRST child reaches 32px UP - half a row - so the spine starts at the
+   parent's chevron instead of below its row. Otherwise the line begins in mid
+   air under the control it hangs from, and the tree reads as loose indent
+   guides rather than as one connected structure. A root never matches: the
+   rule below has already blanked its connectors. */
+.org-node:first-child::before { top: -32px; }
+.org-node:first-child:last-child::before { height: 66px; }
+/* A root hangs from nothing. */
+.org-canvas > .org-node::before,
+.org-canvas > .org-node::after { content: none; }
+
+/* The row IS the rhythm: 64px around a 56px card gives 4px of air above and
+   below, and because the gap lives inside the node rather than between nodes,
+   the spine stays unbroken from one sibling to the next. A `gap` on the branch
+   would slice it. */
+.org-row { display: flex; align-items: center; gap: 6px; min-height: 64px; }
+/* 44px of padding, so a child's spine (at its own -22px) lands on 22px - dead
+   centre of the parent's 44px chevron. */
+.org-branch { display: flex; flex-direction: column; padding-left: 44px; }
+
+/* Icon-only disclosure, deliberately quiet - the border and fill of a button
+   here would read as a second card. It still carries the full 44px target from
+   the selector list above. `.org-toggle-spacer` keeps a childless person's card
+   on the same x as their siblings' - an outline whose cards do not line up is
+   just an indented list. */
+.org-toggle {
+  display: flex; align-items: center; justify-content: center;
+  flex: 0 0 44px; min-width: 44px;
+  border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--text-secondary); cursor: pointer;
+  transition: color 200ms var(--ease-out), background 200ms var(--ease-out);
+}
+.org-toggle:hover { color: var(--brand); background: var(--surface-2); }
+.org-toggle-spacer { flex: 0 0 44px; }
+
+/* Fixed height, single line, ellipsis. Two reasons, and neither is taste: a
+   card of unpredictable height has no knowable centre, so the elbow above could
+   not anchor to one; and uniform rows are what make an outline scan as a list.
+   The full name and email stay reachable through `title`. */
 .org-card {
   display: flex; align-items: center; gap: 10px;
-  min-width: 208px; max-width: 240px;
-  padding: 10px 12px; border: 1px solid var(--border);
+  flex: 0 0 auto; width: 320px; height: 56px;
+  padding: 0 14px; border: 1px solid var(--border);
   border-radius: var(--radius-lg); background: var(--surface-0);
   text-align: left; position: relative;
   transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out);
@@ -1041,18 +1352,21 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 .org-card:hover { border-color: var(--brand); }
 .org-card.is-root { border-color: var(--brand); }
 .org-card.is-match { border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
-.org-card-body { min-width: 0; flex: 1; }
-.org-card-name { font-size: 13px; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
-.org-card-meta { font-size: 11px; color: var(--text-muted); overflow-wrap: anywhere; }
+.org-card-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
+.org-card-name,
+.org-card-meta { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.org-card-name { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.org-card-meta { font-size: 11px; color: var(--text-muted); }
 
-.org-toggle {
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  margin-top: 10px; padding: 2px 10px;
-  border: 1px solid var(--border); border-radius: var(--radius-sm);
-  background: var(--surface-0); color: var(--text-secondary);
-  font-size: 11px; font-weight: 600; cursor: pointer;
+/* On a phone the indent is the scarce resource, not the card. The elbow shortens
+   and the padding follows it down by the same 6px, so the spine still lands on
+   22px - the chevron does not shrink, so neither may its alignment. */
+@media (max-width: 640px) {
+  .org-card { width: 232px; }
+  .org-branch { padding-left: 38px; }
+  .org-node::before { left: -16px; }
+  .org-node::after { left: -16px; width: 16px; }
 }
-.org-toggle:hover { border-color: var(--brand); color: var(--brand); }
 
 @media (prefers-reduced-motion: reduce) {
   .org-canvas { transition: none; }
@@ -1088,7 +1402,7 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
    reduced-motion, 44px touch-target and elevation rules in this file are
    selector lists, and anything declared inline is silently exempt from them. */
 .employee-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
-/* An address or a bank account is a line, not a column - it spans the grid. */
+/* An address is a line, not a column - it spans the grid. */
 .field-span-full { grid-column: 1 / -1; }
 .form-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
 .form-narrow { max-width: 520px; }

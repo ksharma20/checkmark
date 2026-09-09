@@ -76,7 +76,13 @@ const DESCRIPTORS: Record<EmployeeFormKey, Descriptor> = {
   aadhaar: { kind: 'sensitive', placeholder: '12-digit number', maxLength: 12 },
   uan: { kind: 'sensitive', placeholder: 'Universal Account Number', maxLength: 12 },
   passport_number: { kind: 'sensitive', placeholder: 'A1234567', maxLength: 8 },
-  bank_account: { kind: 'sensitive', full: true, placeholder: 'Account number', maxLength: 18 },
+  // Plain text, not `sensitive`: it is a name, and the record prints the same
+  // person's first and last name unmasked on the Basic step.
+  //
+  // Neither spans the grid: the name on an account and the number it belongs to
+  // are read together, so they sit side by side on one line.
+  bank_account_holder_name: { kind: 'text', placeholder: 'Name as it appears on the account', maxLength: 100 },
+  bank_account: { kind: 'sensitive', placeholder: 'Account number', maxLength: 18 },
   bank_ifsc: { kind: 'sensitive', placeholder: 'IFSC code' },
   bank_name: { kind: 'text', placeholder: 'e.g. HDFC Bank' },
 

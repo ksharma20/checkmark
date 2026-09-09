@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
-import { Avatar, Button, DropdownMenu, Modal, type DropdownMenuItem } from '@/components/ui'
+import { Avatar, ConfirmDialog, DropdownMenu, type DropdownMenuItem } from '@/components/ui'
 import { en } from '@/locales/en'
 import { wsAdmin } from '@/locales/en/ws-overview'
 
@@ -42,47 +42,42 @@ export default function WsAccountMenu({ slug, userName, userRoleName, variant }:
     window.location.href = '/login'
   }
 
+  // Narrowing scope: this person, then the workspaces they belong to, then this
+  // one workspace's settings - with the destructive action last and apart.
   const items: DropdownMenuItem[] = [
-    { key: 'settings', label: wsAdmin.shell.menuSettings, onSelect: () => router.push(`/ws/${slug}/settings`) },
-    { key: 'workspaces', label: wsAdmin.shell.menuWorkspaces, onSelect: () => router.push('/ws') },
     { key: 'profile', label: wsAdmin.shell.menuProfile, onSelect: () => router.push('/me') },
+    { key: 'workspaces', label: wsAdmin.shell.menuWorkspaces, onSelect: () => router.push('/ws') },
+    { key: 'settings', label: wsAdmin.shell.menuSettings, onSelect: () => router.push(`/ws/${slug}/settings`) },
     { key: 'signout', label: wsAdmin.shell.menuSignOut, onSelect: () => setConfirmOpen(true), danger: true },
   ]
 
+  // Classes, not inline styles: the sidebar trigger has to shed its name, role
+  // and chevron in the 64px rail, and a media query cannot reach an inline
+  // declaration (invariant 15).
   const trigger = variant === 'sidebar' ? (
     <button
       type="button"
-      className="rowlink pressable"
+      className="rowlink pressable account-trigger"
       onClick={() => setMenuOpen((v) => !v)}
       aria-haspopup="menu"
       aria-expanded={menuOpen}
       aria-label={wsAdmin.shell.accountMenu}
-      style={{
-        display: 'flex', alignItems: 'center', gap: '9px', padding: '8px', width: '100%',
-        background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', minHeight: '44px',
-      }}
     >
       <Avatar name={userName} size={30} />
-      <span style={{ flex: 1, minWidth: 0 }}>
-        <span style={{
-          display: 'block', fontSize: '12.5px', fontWeight: 700, color: 'var(--text-primary)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
-          {userName}
-        </span>
-        <span className="t-muted" style={{ display: 'block', fontSize: '11px' }}>{userRoleName}</span>
+      <span className="account-identity">
+        <span className="account-name">{userName}</span>
+        <span className="t-muted account-role">{userRoleName}</span>
       </span>
-      <MoreHorizontal size={16} aria-hidden style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
+      <MoreHorizontal size={16} aria-hidden className="account-more" />
     </button>
   ) : (
     <button
       type="button"
-      className="pressable"
+      className="pressable account-trigger-bare"
       onClick={() => setMenuOpen((v) => !v)}
       aria-haspopup="menu"
       aria-expanded={menuOpen}
       aria-label={wsAdmin.shell.accountMenu}
-      style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
     >
       <Avatar name={userName} size={32} />
     </button>
@@ -96,24 +91,34 @@ export default function WsAccountMenu({ slug, userName, userRoleName, variant }:
         onClose={() => setMenuOpen(false)}
         items={items}
         placement={variant === 'sidebar' ? 'above' : 'below'}
-      />
-      <Modal
-        open={confirmOpen}
-        onClose={() => { if (!loggingOut) setConfirmOpen(false) }}
-        title={en.wsSidebar.signOutTitle}
-        footer={
-          <>
-            <Button variant="secondary" disabled={loggingOut} onClick={() => setConfirmOpen(false)}>
-              {en.wsSidebar.cancelBtn}
-            </Button>
-            <Button variant="danger" loading={loggingOut} onClick={signOut}>
-              {loggingOut ? en.wsSidebar.signingOutBtn : en.wsSidebar.signOutConfirmBtn}
-            </Button>
-          </>
+        /* Topbar only. This variant's trigger is a bare avatar, and below 860px
+           `.sidebar-foot` and the topbar's role chip are both hidden - so
+           without this the role name appears nowhere on a phone. The sidebar
+           variant needs no header: its own trigger already prints name + role
+           directly above the menu. */
+        header={
+          variant === 'topbar' ? (
+            <>
+              <span className="account-name">{userName}</span>
+              <span className="t-muted account-role">{userRoleName}</span>
+            </>
+          ) : undefined
         }
-      >
-        <p className="t-secondary">{en.wsSidebar.signOutBody}</p>
-      </Modal>
+      />
+      {/* `tone="primary"`: signing out is consequential enough to confirm, but
+          it destroys nothing - the red button was overstating it. */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void signOut()}
+        tone="primary"
+        title={en.wsSidebar.signOutTitle}
+        body={en.wsSidebar.signOutBody}
+        confirmLabel={en.wsSidebar.signOutConfirmBtn}
+        busyLabel={en.wsSidebar.signingOutBtn}
+        cancelLabel={en.wsSidebar.cancelBtn}
+        loading={loggingOut}
+      />
     </>
   )
 }

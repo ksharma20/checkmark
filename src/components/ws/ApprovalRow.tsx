@@ -9,28 +9,38 @@ import { Avatar, Button, Chip, IconButton, Input, type ChipTone } from '@/compon
 import { en } from '@/locales/en'
 import { wsAdmin } from '@/locales/en/ws-overview'
 import { documents } from '@/locales/en/documents'
+import { wsParental } from '@/locales/en/ws-parental'
 
 // A switch on `kind` rather than a ternary: ApprovalItem is a discriminated
-// union, so adding a fourth kind becomes a compile error here instead of a row
-// that silently renders the wrong fields.
+// union, so adding a kind becomes a compile error here instead of a row that
+// silently renders the wrong fields. `extension` proved it - the `default`
+// branch stopped compiling the moment the union grew, because `requested_type`
+// is not on every member of it.
 export function itemLabel(item: ApprovalItem): string {
   switch (item.kind) {
-    case 'leave': return item.leave_type_name
-    case 'doc':   return documents.approvals.label
-    default:      return item.requested_type === 'office' ? en.wsApprovals.markWfo : en.wsApprovals.markWfh
+    case 'leave':     return item.leave_type_name
+    case 'doc':       return documents.approvals.label
+    // The chip is the only place the word UNPAID appears before an admin
+    // clicks approve, so it carries it - the decision is "give away days that
+    // cost the company nothing but the absence", not "spend a balance".
+    case 'extension': return wsParental.extensionLabel(item.case_type)
+    default:          return item.requested_type === 'office' ? en.wsApprovals.markWfo : en.wsApprovals.markWfh
   }
 }
 
 export function itemDetail(item: ApprovalItem): string {
   switch (item.kind) {
-    case 'leave': return `${item.start_date} → ${item.end_date} · ${item.days}d`
-    case 'doc':   return documents.approvals.detail(item.doc_name, item.file_name)
-    default:      return `${item.target_date} · ${item.reason}`
+    case 'leave':     return `${item.start_date} → ${item.end_date} · ${item.days}d`
+    case 'doc':       return documents.approvals.detail(item.doc_name, item.file_name)
+    // Day count first, then the new return date: those are the two facts the
+    // decision turns on, and the old one is already on the case screen.
+    case 'extension': return wsParental.extensionDetail(item.unpaid_days, item.requested_end_date)
+    default:          return `${item.target_date} · ${item.reason}`
   }
 }
 
 function itemTone(item: ApprovalItem): ChipTone {
-  return item.kind === 'leave' ? 'leave' : 'partial'
+  return item.kind === 'leave' || item.kind === 'extension' ? 'leave' : 'partial'
 }
 
 interface Props {
@@ -52,8 +62,8 @@ interface Props {
  * `kind: 'doc'` is deliberately NOT actionable inline: verifying a document
  * means looking at the file, so the row links into the employee record instead
  * of offering an approve button that would act on something unseen. The
- * approvals PATCH route only accepts `leave` and `regularization` for the same
- * reason.
+ * approvals PATCH route refuses `doc` for the same reason; it accepts `leave`,
+ * `regularization` and `extension`, all of which can be judged from the row.
  *
  * The workspace slug comes from the route rather than a prop: this row is only
  * ever rendered under /ws/[slug], and threading it through three unrelated
