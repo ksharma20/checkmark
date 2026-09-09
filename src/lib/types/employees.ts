@@ -60,6 +60,7 @@ export interface EmployeeSensitiveInfo {
   bank_account: string | null
   bank_ifsc: string | null
   bank_name: string | null
+  bank_account_holder_name: string | null
 }
 
 export interface EmployeePublic extends Employee {

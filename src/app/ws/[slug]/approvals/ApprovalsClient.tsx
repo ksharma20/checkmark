@@ -15,11 +15,14 @@ interface Props {
   canAction: boolean
 }
 
-type TypeFilter = 'all' | 'leave' | 'regularization' | 'doc'
+type TypeFilter = 'all' | 'leave' | 'extension' | 'regularization' | 'doc'
 
+// Next to Leave rather than at the end: an extension IS leave, filed against a
+// parental case, and an admin clearing leave decisions wants the two together.
 const TYPE_FILTERS: Tab[] = [
   { key: 'all', label: en.wsApprovals.filterAll },
   { key: 'leave', label: en.wsApprovals.filterLeave },
+  { key: 'extension', label: en.wsApprovals.filterExtension },
   { key: 'regularization', label: en.wsApprovals.filterRegularization },
   { key: 'doc', label: wsAdmin.approvals.filterDocuments },
 ]

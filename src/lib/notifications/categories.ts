@@ -6,8 +6,8 @@
  * categories on or off for everybody, a member mutes the push for the ones they
  * are allowed to. Nothing in the system may invent a category outside this file.
  *
- * Why categories and not `NotificationType` directly: there are eleven types and
- * a member does not want eleven switches. "Leave approved" and "Document
+ * Why categories and not `NotificationType` directly: there are fourteen types
+ * and a member does not want fourteen switches. "Leave approved" and "Document
  * verified" are the same thing to a person - the outcome of something they asked
  * for - and the day a twelfth type lands it should inherit an existing switch
  * rather than silently arrive unswitchable.
@@ -41,6 +41,7 @@ export const CATEGORY_OF: Record<NotificationType, NotificationCategory> = {
 
   leave_submitted: 'approvals_inbox',
   regularization_submitted: 'approvals_inbox',
+  extension_submitted: 'approvals_inbox',
 
   leave_approved: 'approvals_outcome',
   leave_rejected: 'approvals_outcome',
@@ -48,6 +49,8 @@ export const CATEGORY_OF: Record<NotificationType, NotificationCategory> = {
   regularization_rejected: 'approvals_outcome',
   document_verified: 'approvals_outcome',
   document_rejected: 'approvals_outcome',
+  extension_approved: 'approvals_outcome',
+  extension_rejected: 'approvals_outcome',
 
   announcement: 'announcements',
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Button, Card, Divider, Field, Input, Skeleton, Toggle } from '@/components/ui'
+import { Button, Card, ConfirmDialog, Divider, Field, Input, Skeleton, Toggle } from '@/components/ui'
 import { en } from '@/locales/en'
 import { meSettings } from '@/locales/en/me-settings'
 import {
@@ -317,6 +317,9 @@ function TokensSection() {
   const [newName, setNewName] = useState('')
   const [creating, setCreating] = useState(false)
   const [newToken, setNewToken] = useState<string | null>(null)
+  const [pendingRevoke, setPendingRevoke] = useState<ApiToken | null>(null)
+  const [revoking, setRevoking] = useState(false)
+  const [revokeError, setRevokeError] = useState<string | null>(null)
   const [status, setStatus] = useState<Status>(null)
 
   useEffect(() => {
@@ -350,10 +353,24 @@ function TokensSection() {
     }
   }
 
-  async function revoke(id: string) {
-    if (!confirm(t.tokens.revokeConfirm)) return
-    const res = await fetch(`/api/tokens/${id}`, { method: 'DELETE' })
-    if (res.ok) setTokens((prev) => prev.filter((token) => token.id !== id))
+  async function confirmRevoke() {
+    if (!pendingRevoke) return
+    const id = pendingRevoke.id
+    setRevoking(true)
+    setRevokeError(null)
+    try {
+      const res = await fetch(`/api/tokens/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        setTokens((prev) => prev.filter((token) => token.id !== id))
+        setPendingRevoke(null)
+      } else {
+        setRevokeError(t.tokens.revokeError)
+      }
+    } catch {
+      setRevokeError(t.tokens.revokeError)
+    } finally {
+      setRevoking(false)
+    }
   }
 
   return (
@@ -424,7 +441,11 @@ function TokensSection() {
                       ` · ${t.tokens.lastUsed(new Date(token.last_used_at).toLocaleDateString())}`}
                   </p>
                 </div>
-                <Button variant="danger" size="sm" onClick={() => revoke(token.id)}>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => { setRevokeError(null); setPendingRevoke(token) }}
+                >
                   {t.tokens.revoke}
                 </Button>
               </div>
@@ -432,6 +453,19 @@ function TokensSection() {
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={pendingRevoke !== null}
+        onClose={() => { setPendingRevoke(null); setRevokeError(null) }}
+        onConfirm={() => void confirmRevoke()}
+        title={t.tokens.revokeTitle}
+        body={t.tokens.revokeConfirm}
+        confirmLabel={t.tokens.revokeConfirmAction}
+        busyLabel={t.tokens.revokeBusy}
+        cancelLabel={t.tokens.revokeCancel}
+        loading={revoking}
+        error={revokeError}
+      />
     </SectionCard>
   )
 }

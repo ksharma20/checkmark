@@ -9,7 +9,7 @@ import {
 } from '@/lib/db/queries/reminders'
 import { listHolidayDatesInRange } from '@/lib/db/queries/holidays'
 import { getLeaveRequestsInRange } from '@/lib/db/queries/leaves'
-import { getActiveMaternityUserIds } from '@/lib/db/queries/maternity'
+import { getActiveParentalUserIds } from '@/lib/db/queries/maternity'
 import { createNotification } from '@/lib/db/queries/notifications'
 import { mutedUserIdsFor } from '@/lib/db/queries/notification-prefs'
 import { parseCategoriesOff } from '@/lib/notifications/categories'
@@ -210,17 +210,20 @@ async function processWorkspaceReminders(
   // Two independent sources. `leave_requests` covers ordinary leave;
   // `maternity_cases` is a separate table keyed by employee_id, so the leave
   // query cannot see it. Missing the second one means reminding someone to
-  // check in every working day of their maternity leave.
+  // check in every working day of their parental leave.
+  //
+  // `getActiveParentalUserIds` covers BOTH case types - maternity and
+  // paternity. It takes no case_type argument on purpose; see its doc comment.
   //
   // ── Gate 7 (gathered once per workspace): members who muted the push ─────
   // Read here, alongside the leave sets, for the same reason: this pass walks
   // workspaces, so one query answers the question for every member of it.
-  const [leaves, onMaternity, mutedPush] = await Promise.all([
+  const [leaves, onParentalLeave, mutedPush] = await Promise.all([
     getLeaveRequestsInRange(ws.id, localDate, localDate),
-    getActiveMaternityUserIds(ws.id, localDate),
+    getActiveParentalUserIds(ws.id, localDate),
     mutedUserIdsFor(ws.id, 'reminders'),
   ])
-  const onLeave = new Set([...leaves.map((l) => l.user_id), ...onMaternity])
+  const onLeave = new Set([...leaves.map((l) => l.user_id), ...onParentalLeave])
 
   // ── Gate 4: is now at, or shortly after, the configured time? ─────────────
   const due = (target: number | null): boolean =>

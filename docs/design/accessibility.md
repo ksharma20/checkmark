@@ -94,11 +94,11 @@ Overlays move focus to the panel on open (`tabIndex={-1}`) and restore it to the
 
 Listed here so nobody has to rediscover them, and so nobody assumes they are handled.
 
-### 1. No overlay implements a focus trap
+### 1. ~~No overlay implements a focus trap~~ — FIXED
 
-`Modal`, `SlideOver` and `BottomSheet` all set `role="dialog"` and `aria-modal="true"`, move focus in on open, restore it on close, close on Escape and lock body scroll. **None of them traps Tab.** Pressing Tab from the last control in an open modal moves focus into the page behind it, which is still fully tabbable, while `aria-modal="true"` tells assistive technology the background is inert. The markup and the behaviour disagree.
+This entry described `Modal`, `SlideOver` and `BottomSheet` setting `aria-modal="true"` over a background that was still fully tabbable. **That is no longer true, and had not been for some time before the doc was corrected.** The trap lives in `useFocusTrap` (`src/components/ui/use-focus-trap.ts`), applied by `useOverlay` as `useFocusTrap(panelRef, open && mounted)` — so all three overlays get it from the one shared implementation, exactly as this entry recommended. The `/ws` navigation drawer reuses the same hook.
 
-This is the most significant accessibility gap in the design system. Fixing it means adding a trap to the shared overlay implementation — one fix, all three components — and it should be done there, not per call site.
+Kept rather than deleted because the claim was cited elsewhere: anything still asserting the gap is stale, not describing a regression.
 
 ### 2. `Field` does not wire `aria-describedby`
 

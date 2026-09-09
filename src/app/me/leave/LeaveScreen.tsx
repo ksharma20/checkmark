@@ -45,7 +45,11 @@ import {
 import { useToast } from '@/components/shared/Toast'
 import type { LeaveTypeWithBalance, LeaveRequestWithType } from '@/lib/db/queries/leaves'
 import type { RegularizationRequest } from '@/lib/db/queries/regularizations'
+import type { MaternityCase } from '@/lib/db/queries/maternity'
+import type { ParentalExtension } from '@/lib/db/queries/parental-extensions'
+import { en } from '@/locales/en'
 import { meScreens } from '@/locales/en/me-screens'
+import { parentalExtension as extensionCopy } from '@/locales/en/ws-parental'
 import { useWorkspaceScope } from '../workspace-scope'
 
 interface Holiday {
@@ -55,14 +59,32 @@ interface Holiday {
   description: string | null
 }
 
-type TabKey = 'balance' | 'apply' | 'history' | 'holidays'
+type TabKey = 'balance' | 'apply' | 'correction' | 'extension' | 'history' | 'holidays'
 
-const TABS: Tab[] = [
+const BASE_TABS: Tab[] = [
   { key: 'balance', label: meScreens.leave.tabBalance },
   { key: 'apply', label: meScreens.leave.tabApply },
+  { key: 'correction', label: meScreens.leave.tabCorrection },
+]
+
+const TAIL_TABS: Tab[] = [
   { key: 'history', label: meScreens.leave.tabHistory },
   { key: 'holidays', label: meScreens.leave.tabHolidays },
 ]
+
+/**
+ * The extension tab exists ONLY while the member has an open parental case.
+ *
+ * It is not a permission - anyone may file one, there is just nothing to file
+ * it against otherwise, and a tab that only ever shows an empty state is worse
+ * than no tab. It slots in after Correction because it is the same shape of
+ * thing: a request the member sends to the approvals queue.
+ */
+function tabsFor(hasOpenCase: boolean): Tab[] {
+  return hasOpenCase
+    ? [...BASE_TABS, { key: 'extension', label: extensionCopy.tab }, ...TAIL_TABS]
+    : [...BASE_TABS, ...TAIL_TABS]
+}
 
 // ─── formatting ───────────────────────────────────────────────────────────────
 
@@ -340,6 +362,362 @@ function ApplyTab({
   )
 }
 
+// ─── Correction ───────────────────────────────────────────────────────────────
+
+/**
+ * Ask an admin to correct a past working day.
+ *
+ * This form used to be a modal opened from a row on `/me/timeline`, which meant
+ * it could only ever reach a day that already had a presence event - and the
+ * case members actually hit is the opposite one: worked, forgot to check in, so
+ * there is no event, no row, and nowhere to click. It lives here now, and the
+ * day comes from a picker rather than from the row that opened it.
+ *
+ * The picker is NOT a free date input. `correctableDates` arrives from
+ * `GET /api/me/ws/[slug]/regularizations`, which has already excluded weekends,
+ * holidays, verified days, leave, the plan history floor and days with a request
+ * already open - every guard `POST` would refuse on. A free input would let a
+ * member pick a Sunday and learn about it only after submitting.
+ */
+function CorrectionTab({
+  slug,
+  correctableDates,
+  loading,
+  onSubmitted,
+}: {
+  slug: string
+  correctableDates: string[]
+  loading: boolean
+  onSubmitted: () => void
+}) {
+  const [date, setDate] = useState('')
+  const [requestedType, setRequestedType] = useState<'office' | 'remote'>('office')
+  const [reason, setReason] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
+
+  if (loading) return <ListSkeleton rows={1} />
+  if (correctableDates.length === 0) {
+    return (
+      <EmptyState
+        title={meScreens.leave.correctionNoDays}
+        hint={meScreens.leave.correctionNoDaysHint}
+      />
+    )
+  }
+
+  const canSubmit = !!date && !!reason.trim() && !submitting
+
+  async function submit() {
+    if (!canSubmit) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/me/ws/${encodeURIComponent(slug)}/regularizations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_date: date,
+          requested_type: requestedType,
+          reason: reason.trim(),
+        }),
+      })
+      const body = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        // The server is the judge - render whatever it refused with.
+        setError(body.error ?? en.meWsRegularization.submitErrorGeneric)
+        setSubmitting(false)
+        return
+      }
+      toast.show(meScreens.leave.correctionSubmitSuccess, 'success')
+      onSubmitted()
+    } catch {
+      setError(en.meWsRegularization.submitErrorGeneric)
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Card>
+      <p className="t-eyebrow" style={{ marginBottom: '8px' }}>
+        {meScreens.leave.correctionHeading}
+      </p>
+      <p className="t-muted" style={{ margin: '0 0 12px' }}>
+        {meScreens.leave.correctionIntro}
+      </p>
+
+      <Field label={meScreens.leave.correctionFieldDay} htmlFor="cr-date" required>
+        <Select
+          id="cr-date"
+          value={date}
+          onChange={(e) => setDate(e.target.value)}
+          placeholder={meScreens.leave.correctionFieldDayPlaceholder}
+          options={correctableDates.map((d) => ({ value: d, label: fmtDate(d, true) }))}
+        />
+      </Field>
+
+      <Field
+        label={en.meWsRegularization.fieldType}
+        htmlFor="cr-type-office"
+        style={{ marginTop: '12px' }}
+        required
+      >
+        <div role="radiogroup" style={{ display: 'flex', gap: '8px' }}>
+          {(['office', 'remote'] as const).map((t) => (
+            <Button
+              key={t}
+              id={`cr-type-${t}`}
+              role="radio"
+              aria-checked={requestedType === t}
+              variant={requestedType === t ? 'primary' : 'secondary'}
+              block
+              onClick={() => setRequestedType(t)}
+            >
+              {t === 'office' ? en.meWsRegularization.typeOffice : en.meWsRegularization.typeRemote}
+            </Button>
+          ))}
+        </div>
+      </Field>
+
+      {/* Required here, unlike leave: an admin approving a correction is
+          overriding the signals, so they need the reason it is warranted. */}
+      <Field
+        label={en.meWsRegularization.fieldReason}
+        htmlFor="cr-reason"
+        style={{ marginTop: '12px' }}
+        required
+      >
+        <Textarea
+          id="cr-reason"
+          value={reason}
+          placeholder={en.meWsRegularization.fieldReasonPlaceholder}
+          onChange={(e) => setReason(e.target.value)}
+        />
+      </Field>
+
+      {error && (
+        <p className="field-error" role="alert">
+          {error}
+        </p>
+      )}
+
+      <Button
+        block
+        style={{ marginTop: '14px' }}
+        disabled={!canSubmit}
+        loading={submitting}
+        onClick={() => void submit()}
+      >
+        {submitting ? en.meWsRegularization.submitting : en.meWsRegularization.submit}
+      </Button>
+    </Card>
+  )
+}
+
+// ─── Extension ────────────────────────────────────────────────────────────────
+
+/**
+ * Ask for more UNPAID days at the end of an open parental leave case.
+ *
+ * Modelled on `CorrectionTab` above - the established shape for "a member files
+ * a request that lands in the admin approvals queue": a constrained picker, a
+ * reason, the server as the only judge, and its `error` string rendered
+ * verbatim rather than second-guessed.
+ *
+ * The unpaid day count shown before submit is FETCHED, not computed here. The
+ * rule is the workspace's working days minus its holiday calendar, and
+ * `computeUnpaidExtensionDays()` on the server is the one implementation of it
+ * - used for this preview, for the stored figure at submit, and again at
+ * approval. A copy in the browser would be a second thing to keep in step and
+ * would disagree the first time an admin added a holiday.
+ *
+ * These days consume no balance and write no `leave_requests` row: approving
+ * one simply moves the case's end date.
+ */
+function ExtensionTab({
+  slug,
+  openCases,
+  extensions,
+  loading,
+  onSubmitted,
+}: {
+  slug: string
+  openCases: MaternityCase[]
+  extensions: ParentalExtension[]
+  loading: boolean
+  onSubmitted: () => void
+}) {
+  const [caseId, setCaseId] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [reason, setReason] = useState('')
+  const [preview, setPreview] = useState<{ key: string; days: number | null } | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
+
+  // One case is the overwhelmingly common shape, so it is preselected rather
+  // than making the member pick from a list of one.
+  const selectedCase = openCases.find((c) => c.id === caseId) ?? (openCases.length === 1 ? openCases[0] : undefined)
+  const effectiveCaseId = selectedCase?.id ?? ''
+
+  // The answer is tagged with the question it answers, and both "is it still
+  // counting" and "what did it say" are DERIVED from that rather than being two
+  // more pieces of state. An effect that also set state synchronously would
+  // cascade a render on every keystroke in the date field, and a separate
+  // `counting` flag could disagree with the number beside it.
+  const previewKey = effectiveCaseId && endDate ? `${effectiveCaseId}|${endDate}` : ''
+
+  useEffect(() => {
+    if (!previewKey) return
+    let cancelled = false
+    const [caseIdPart, endPart] = previewKey.split('|')
+    const qs = new URLSearchParams({ case_id: caseIdPart, requested_end_date: endPart })
+    fetch(`/api/me/ws/${encodeURIComponent(slug)}/parental-extensions?${qs}`)
+      .then((r) => r.json())
+      .then((data: { preview?: { unpaid_days?: number } | null }) => {
+        if (cancelled) return
+        setPreview({
+          key: previewKey,
+          days: typeof data.preview?.unpaid_days === 'number' ? data.preview.unpaid_days : null,
+        })
+      })
+      // A failed count is answered, not left spinning - the button stays
+      // disabled and the server would refuse the submit anyway.
+      .catch(() => { if (!cancelled) setPreview({ key: previewKey, days: null }) })
+    return () => { cancelled = true }
+  }, [slug, previewKey])
+
+  const answered = preview?.key === previewKey
+  const unpaidDays = answered ? preview.days : null
+  const counting = !!previewKey && !answered
+
+  if (loading) return <ListSkeleton rows={1} />
+  if (openCases.length === 0) {
+    return <EmptyState title={extensionCopy.noCaseTitle} hint={extensionCopy.noCaseHint} />
+  }
+
+  const canSubmit = !!effectiveCaseId && !!endDate && !submitting && (unpaidDays ?? 0) > 0
+
+  async function submit() {
+    if (!canSubmit) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/me/ws/${encodeURIComponent(slug)}/parental-extensions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          case_id: effectiveCaseId,
+          requested_end_date: endDate,
+          reason: reason.trim() || undefined,
+        }),
+      })
+      const body = (await res.json().catch(() => ({}))) as { error?: string }
+      if (!res.ok) {
+        // The server is the judge - render whatever it refused with.
+        setError(body.error ?? extensionCopy.submitErrorGeneric)
+        setSubmitting(false)
+        return
+      }
+      toast.show(extensionCopy.submitted, 'success')
+      onSubmitted()
+    } catch {
+      setError(extensionCopy.submitErrorGeneric)
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <>
+      <Card>
+        <p className="t-eyebrow" style={{ marginBottom: '8px' }}>{extensionCopy.heading}</p>
+        <p className="t-muted" style={{ margin: '0 0 12px' }}>{extensionCopy.intro}</p>
+
+        <Field label={extensionCopy.caseLabel} htmlFor="ex-case" required>
+          <Select
+            id="ex-case"
+            value={effectiveCaseId}
+            onChange={(e) => setCaseId(e.target.value)}
+            placeholder={extensionCopy.casePlaceholder}
+            options={openCases.map((c) => ({
+              value: c.id,
+              label: extensionCopy.caseOption(c.case_type, fmtDate(c.end_date ?? '', true)),
+            }))}
+          />
+        </Field>
+
+        {selectedCase?.end_date && (
+          <p className="field-hint">{extensionCopy.currentEnd(fmtDate(selectedCase.end_date, true))}</p>
+        )}
+
+        <Field label={extensionCopy.fieldNewEnd} htmlFor="ex-end" style={{ marginTop: '12px' }} required>
+          <Input
+            id="ex-end"
+            type="date"
+            value={endDate}
+            min={selectedCase?.end_date ?? undefined}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </Field>
+
+        {/* The cost, stated before the button rather than after the fact. */}
+        {(counting || unpaidDays !== null) && (
+          <p className="field-hint">
+            {counting ? extensionCopy.unpaidCounting : extensionCopy.unpaidCount(unpaidDays ?? 0)}
+          </p>
+        )}
+
+        <Field label={extensionCopy.fieldReason} htmlFor="ex-reason" style={{ marginTop: '12px' }}>
+          <Textarea
+            id="ex-reason"
+            value={reason}
+            placeholder={extensionCopy.fieldReasonPlaceholder}
+            onChange={(e) => setReason(e.target.value)}
+          />
+        </Field>
+
+        {error && <p className="field-error" role="alert">{error}</p>}
+
+        <Button
+          block
+          style={{ marginTop: '14px' }}
+          disabled={!canSubmit}
+          loading={submitting}
+          onClick={() => void submit()}
+        >
+          {submitting ? extensionCopy.submitting : extensionCopy.submit}
+        </Button>
+      </Card>
+
+      {extensions.length > 0 && (
+        <>
+          <p className="t-eyebrow" style={{ margin: '16px 0 4px' }}>{extensionCopy.historyHeading}</p>
+          {extensions.map((x) => (
+            <Card key={x.id} style={{ marginTop: '10px' }}>
+              <div className="row-between">
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontWeight: 700, fontSize: '13px' }}>
+                    {extensionCopy.historyRow(x.unpaid_days, fmtDate(x.requested_end_date, true))}
+                  </p>
+                  {x.rejection_reason && <p className="t-muted">{x.rejection_reason}</p>}
+                </div>
+                <Chip tone={statusTone(x.status)}>
+                  {x.status === 'approved'
+                    ? extensionCopy.statusApproved
+                    : x.status === 'rejected'
+                      ? extensionCopy.statusRejected
+                      : extensionCopy.statusPending}
+                </Chip>
+              </div>
+            </Card>
+          ))}
+        </>
+      )}
+    </>
+  )
+}
+
 // ─── History ──────────────────────────────────────────────────────────────────
 
 function HistoryTab({
@@ -522,7 +900,19 @@ interface LeaveData {
   types: LeaveTypeWithBalance[]
   requests: LeaveRequestWithType[]
   regularizations: RegularizationRequest[]
+  /**
+   * Which past days the Correction tab may offer. Server-decided and shipped on
+   * the same `/regularizations` read that fills `regularizations` above, so the
+   * tab costs no extra request - see `getCorrectableDates()`.
+   */
+  correctableDates: string[]
   holidays: Holiday[]
+  /**
+   * The member's own open parental cases. Empty for almost everybody, and that
+   * is exactly what decides whether the Extend tab exists at all.
+   */
+  openParentalCases: MaternityCase[]
+  parentalExtensions: ParentalExtension[]
 }
 
 export default function LeaveScreen() {
@@ -550,7 +940,8 @@ export default function LeaveScreen() {
       json('/leave-requests'),
       json('/regularizations'),
       json(`/holidays?year=${year}`),
-    ]).then(([types, requests, regularizations, holidays]) => {
+      json('/parental-extensions'),
+    ]).then(([types, requests, regularizations, holidays, extensions]) => {
       if (cancelled) return
       setData({
         slug,
@@ -559,7 +950,12 @@ export default function LeaveScreen() {
         regularizations: Array.isArray(regularizations.regularizationRequests)
           ? regularizations.regularizationRequests
           : [],
+        correctableDates: Array.isArray(regularizations.correctableDates)
+          ? regularizations.correctableDates
+          : [],
         holidays: Array.isArray(holidays.holidays) ? holidays.holidays : [],
+        openParentalCases: Array.isArray(extensions.openCases) ? extensions.openCases : [],
+        parentalExtensions: Array.isArray(extensions.extensions) ? extensions.extensions : [],
       })
     })
 
@@ -583,13 +979,14 @@ export default function LeaveScreen() {
   // Data tagged with another workspace is not this screen's data.
   const fresh = data?.slug === slug ? data : null
   const loading = fresh === null
+  const hasOpenParentalCase = (fresh?.openParentalCases.length ?? 0) > 0
 
   return (
     <>
       <h1 className="t-h1">{meScreens.leave.title}</h1>
 
       <TabBar
-        tabs={TABS}
+        tabs={tabsFor(hasOpenParentalCase)}
         active={tab}
         onChange={(key) => setTab(key as TabKey)}
         style={{ margin: '4px 0 16px' }}
@@ -607,6 +1004,35 @@ export default function LeaveScreen() {
           onSubmitted={() => {
             setRefreshKey((n) => n + 1)
             setTab('history')
+          }}
+        />
+      )}
+
+      {tab === 'correction' && (
+        <CorrectionTab
+          key={slug}
+          slug={slug}
+          correctableDates={fresh?.correctableDates ?? []}
+          loading={loading}
+          onSubmitted={() => {
+            setRefreshKey((n) => n + 1)
+            setTab('history')
+          }}
+        />
+      )}
+
+      {/* Guarded on the case, not only on the tab: the tab disappears when the
+          last case closes, and a stale `tab` state must not render a form with
+          nothing to file against. */}
+      {tab === 'extension' && hasOpenParentalCase && (
+        <ExtensionTab
+          key={slug}
+          slug={slug}
+          openCases={fresh?.openParentalCases ?? []}
+          extensions={fresh?.parentalExtensions ?? []}
+          loading={loading}
+          onSubmitted={() => {
+            setRefreshKey((n) => n + 1)
           }}
         />
       )}

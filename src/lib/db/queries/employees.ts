@@ -45,6 +45,7 @@ interface EmployeeSensitiveRow {
   bank_account_encrypted: string | null
   bank_ifsc: string | null
   bank_name: string | null
+  bank_account_holder_name: string | null
 }
 
 export type EmployeeRow = Employee & EmploymentDetailsRow & EmployeeSensitiveRow
@@ -121,6 +122,7 @@ export function toPublic(row: EmployeeRow, includeSensitive = false): EmployeePu
       bank_account: safeDecrypt(row.bank_account_encrypted ?? null, 'bank_account', row.id),
       bank_ifsc: row.bank_ifsc ?? null,
       bank_name: row.bank_name ?? null,
+      bank_account_holder_name: row.bank_account_holder_name ?? null,
     } : null,
     age: computeAge(row.date_of_birth),
   }
@@ -169,7 +171,7 @@ const SENSITIVE_FIELDS: FieldMap = [
   ['aadhaar', 'aadhaar_encrypted', v => encryptFieldOrNull(v as string | null)],
   ['bank_account', 'bank_account_encrypted', v => encryptFieldOrNull(v as string | null)],
   ['uan'], ['passport_number'],
-  ['bank_ifsc'], ['bank_name'],
+  ['bank_ifsc'], ['bank_name'], ['bank_account_holder_name'],
 ]
 
 export const EMPLOYMENT_JOIN = `
@@ -182,7 +184,7 @@ export const EMPLOYMENT_COLS = `
   ed.total_work_experience, ed.date_of_joining, ed.confirmation_date,
   ed.probation_end_date, ed.exit_date, ed.exit_reason,
   es.pan_encrypted, es.aadhaar_encrypted, es.uan, es.passport_number,
-  es.bank_account_encrypted, es.bank_ifsc, es.bank_name`
+  es.bank_account_encrypted, es.bank_ifsc, es.bank_name, es.bank_account_holder_name`
 
 // ─── Reads ────────────────────────────────────────────────────────────────────
 
@@ -289,13 +291,14 @@ export async function createEmployee(input: CreateEmployeeInput): Promise<Employ
       `INSERT INTO employee_sensitive (
         id, employee_id, workspace_id,
         pan_encrypted, aadhaar_encrypted, uan, passport_number,
-        bank_account_encrypted, bank_ifsc, bank_name
-      ) VALUES (?,?,?,?,?,?,?,?,?,?)`,
+        bank_account_encrypted, bank_ifsc, bank_name, bank_account_holder_name
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [
         generateId(), id, input.workspace_id,
         encryptFieldOrNull(input.pan), encryptFieldOrNull(input.aadhaar),
         input.uan ?? null, input.passport_number ?? null,
         encryptFieldOrNull(input.bank_account), input.bank_ifsc ?? null, input.bank_name ?? null,
+        input.bank_account_holder_name ?? null,
       ],
     )
 

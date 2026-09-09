@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Chip, Input, Modal } from '@/components/ui'
+import { Button, Card, Chip, ConfirmDialog, Input } from '@/components/ui'
 import { en } from '@/locales/en'
 
 const t = en.wsSettings
@@ -208,23 +208,16 @@ export default function DomainsTab({ slug, canWrite, canDelete }: Props) {
         </p>
       )}
 
-      <Modal
+      {/* The body is the domain itself, so it keeps `.mono`. */}
+      <ConfirmDialog
         open={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) removeDomain(pendingDelete.id) }}
         title={t.domainRemoveConfirm}
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setPendingDelete(null)}>
-              {t.cancelBtn}
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => pendingDelete && removeDomain(pendingDelete.id)}>
-              {t.domainRemove}
-            </Button>
-          </>
-        }
-      >
-        {pendingDelete && <p className="mono t-secondary">{pendingDelete.domain}</p>}
-      </Modal>
+        body={pendingDelete ? <span className="mono">{pendingDelete.domain}</span> : ''}
+        confirmLabel={t.domainRemove}
+        cancelLabel={t.cancelBtn}
+      />
     </Card>
   )
 }

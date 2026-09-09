@@ -123,6 +123,7 @@ const SECTIONS: ProfileSection[] = [
     label: P.sectionBank,
     hint: P.sensitiveHint,
     fields: [
+      { key: 'bank_account_holder_name', kind: 'text', full: true, placeholder: P.placeholder.bank_account_holder_name },
       { key: 'bank_account', kind: 'text', full: true, placeholder: P.placeholder.bank_account },
       { key: 'bank_ifsc', kind: 'text', placeholder: P.placeholder.bank_ifsc },
       { key: 'bank_name', kind: 'text', placeholder: P.placeholder.bank_name },
@@ -141,6 +142,7 @@ const SENSITIVE_KEYS = new Set([
   'bank_account',
   'bank_ifsc',
   'bank_name',
+  'bank_account_holder_name',
 ])
 
 /** Required in the database, so clearing them is a no-op rather than a null. */

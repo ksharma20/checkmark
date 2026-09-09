@@ -47,6 +47,7 @@ export { default as Textarea, type TextareaProps } from './Textarea'
 
 // ── overlays ────────────────────────────────────────────────────────────────
 export { default as Modal } from './Modal'
+export { default as ConfirmDialog } from './ConfirmDialog'
 export { default as SlideOver } from './SlideOver'
 export { default as BottomSheet } from './BottomSheet'
 

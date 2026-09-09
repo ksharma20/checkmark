@@ -25,9 +25,16 @@ const ZOOM_STEP = 0.1
  *
  * No layout library. A strict tree needs no edge routing that avoids nodes,
  * which is the only thing a graph engine would buy here - the connectors are
- * four `::before`/`::after` borders and the browser's own flex layout does the
- * rest. `src/components/ui/index.ts` records that the absence of a charting
- * dependency is deliberate; this follows it.
+ * two `::before`/`::after` borders per node and the browser's own flex layout
+ * does the rest. `src/components/ui/index.ts` records that the absence of a
+ * charting dependency is deliberate; this follows it.
+ *
+ * It draws as an INDENTED OUTLINE, not a top-down chart. Siblings used to sit
+ * in a row, which meant a workspace of any real size opened as a horizontal
+ * scroll with the depth - the only thing the screen is for - squeezed out of
+ * view. Depth is now indentation: it costs no width past the deepest branch,
+ * and every card in a level starts on the same x, so the eye can run down a
+ * team the way it runs down a list.
  *
  * The tree is built by `src/lib/hierarchy.ts`, the same pure module the server
  * uses to decide whether a reporting change would create a loop. Reusing it
@@ -142,46 +149,57 @@ export default function OrgTreeClient({ slug, viewerUserId }: { slug: string; vi
     const isCollapsed = collapsed.has(userId)
     const isMatch = match?.userId === userId
 
+    const label = member.name + (member.userId === viewerUserId ? ` ${wsOrg.youSuffix}` : '')
+    const meta = children.length > 0 ? wsOrg.reportCount(children.length) : member.email
+
     return (
       <div className="org-node" key={userId}>
-        <button
-          type="button"
-          ref={isMatch ? matchRef : undefined}
-          className={[
-            'org-card',
-            depth === 0 && 'is-root',
-            isMatch && 'is-match',
-          ].filter(Boolean).join(' ')}
-          onClick={() => router.push(`/ws/${slug}/people?search=${encodeURIComponent(member.email)}`)}
-          aria-label={wsOrg.openPerson(member.name)}
-        >
-          <Avatar name={member.name} color={personColor(member.userId)} />
-          <span className="org-card-body">
-            <span className="org-card-name">
-              {member.name}
-              {member.userId === viewerUserId && ` ${wsOrg.youSuffix}`}
-            </span>
-            <span className="org-card-meta">
-              {children.length > 0 ? wsOrg.reportCount(children.length) : member.email}
-            </span>
-          </span>
-        </button>
+        <div className="org-row">
+          {/* A leaf gets a spacer rather than nothing: the chevron's 44px is
+              what puts every card in a level on the same x, and a row that
+              simply omitted it would step its card left and break the column. */}
+          {children.length > 0 ? (
+            <button
+              type="button"
+              className="org-toggle"
+              onClick={() => toggle(userId)}
+              aria-expanded={!isCollapsed}
+              aria-label={isCollapsed
+                ? wsOrg.expandAria(member.name, children.length)
+                : wsOrg.collapseAria(member.name)}
+            >
+              {isCollapsed
+                ? <ChevronRight size={16} aria-hidden />
+                : <ChevronDown size={16} aria-hidden />}
+            </button>
+          ) : (
+            <span className="org-toggle-spacer" aria-hidden />
+          )}
 
-        {children.length > 0 && (
-          <button type="button" className="org-toggle" onClick={() => toggle(userId)}>
-            {isCollapsed
-              ? <><ChevronRight size={12} aria-hidden />{wsOrg.expand(children.length)}</>
-              : <><ChevronDown size={12} aria-hidden />{wsOrg.collapse}</>}
+          <button
+            type="button"
+            ref={isMatch ? matchRef : undefined}
+            className={[
+              'org-card',
+              depth === 0 && 'is-root',
+              isMatch && 'is-match',
+            ].filter(Boolean).join(' ')}
+            onClick={() => router.push(`/ws/${slug}/people?search=${encodeURIComponent(member.email)}`)}
+            aria-label={wsOrg.openPerson(member.name)}
+          >
+            <Avatar name={member.name} color={personColor(member.userId)} />
+            {/* The card is a fixed height and each line is clipped, so `title`
+                is what keeps a long name or address readable at all. */}
+            <span className="org-card-body">
+              <span className="org-card-name" title={label}>{label}</span>
+              <span className="org-card-meta" title={meta}>{meta}</span>
+            </span>
           </button>
-        )}
+        </div>
 
         {children.length > 0 && !isCollapsed && (
-          <div className="org-node-children">
-            {children.map(childId => (
-              <div className="org-child" key={childId}>
-                {renderNode(childId, depth + 1)}
-              </div>
-            ))}
+          <div className="org-branch">
+            {children.map(childId => renderNode(childId, depth + 1))}
           </div>
         )}
       </div>

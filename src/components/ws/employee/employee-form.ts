@@ -36,6 +36,7 @@ export interface EmployeeFormData {
   source_of_hire: string; total_work_experience: string
   employee_status: string
   pan: string; aadhaar: string; uan: string; passport_number: string
+  bank_account_holder_name: string
   bank_account: string; bank_ifsc: string; bank_name: string
   emergency_contact_name: string; emergency_contact_relationship: string
   emergency_contact_phone: string
@@ -56,6 +57,7 @@ export const EMPTY_EMPLOYEE_FORM: EmployeeFormData = {
   source_of_hire: '', total_work_experience: '',
   employee_status: EmployeeStatus.Active,
   pan: '', aadhaar: '', uan: '', passport_number: '',
+  bank_account_holder_name: '',
   bank_account: '', bank_ifsc: '', bank_name: '',
   emergency_contact_name: '', emergency_contact_relationship: '',
   emergency_contact_phone: '',
@@ -95,6 +97,7 @@ export function formFromEmployee(employee: EmployeePublic): EmployeeFormData {
     aadhaar: employee.sensitive?.aadhaar ?? '',
     uan: employee.sensitive?.uan ?? '',
     passport_number: employee.sensitive?.passport_number ?? '',
+    bank_account_holder_name: employee.sensitive?.bank_account_holder_name ?? '',
     bank_account: employee.sensitive?.bank_account ?? '',
     bank_ifsc: employee.sensitive?.bank_ifsc ?? '',
     bank_name: employee.sensitive?.bank_name ?? '',
@@ -145,7 +148,10 @@ export const EMPLOYEE_STEPS: readonly EmployeeStep[] = [
     key: 'bank',
     label: wsEmployees.stepBank,
     subtitle: wsEmployees.stepBankSub,
-    fields: ['pan', 'aadhaar', 'uan', 'passport_number', 'bank_account', 'bank_ifsc', 'bank_name'],
+    fields: [
+      'pan', 'aadhaar', 'uan', 'passport_number',
+      'bank_account_holder_name', 'bank_account', 'bank_ifsc', 'bank_name',
+    ],
   },
   {
     key: 'emergency',
@@ -193,6 +199,7 @@ export const FIELD_LABELS: Record<EmployeeFormKey, string> = {
   aadhaar: 'Aadhaar',
   uan: 'UAN',
   passport_number: 'Passport number',
+  bank_account_holder_name: 'Account holder name',
   bank_account: 'Bank account number',
   bank_ifsc: 'Bank IFSC',
   bank_name: 'Bank name',

@@ -1,6 +1,17 @@
 /**
  * The document storage seam.
  *
+ * TWO STORES, ONE INTERFACE. `documentStore` holds employee documents
+ * (`employee_documents` + `employee_document_blobs`); `announcementStore` holds
+ * the files hung off a workspace announcement (`announcement_attachments` +
+ * `announcement_attachment_blobs`). They share this file, the `DocumentStore`
+ * interface, `MAX_FILE_BYTES`, `ALLOWED_MIME_TYPES` and `sniffMimeType` - the
+ * only thing that differs is which table pair each one reads, because the
+ * MIME type is resolved by joining the metadata row and the two metadata
+ * tables are different. Reusing `DbBase64Store` for attachments would join
+ * `employee_documents`, match nothing, and make `get` return null for every
+ * attachment ever uploaded.
+ *
  * Employee documents are small, private files (offer letters, ID scans,
  * payslips). Today they live in the database as base64 TEXT, which keeps the
  * whole product on a single Turso connection with no bucket, no signed URLs
@@ -12,7 +23,10 @@
  *
  * Two rules keep that seam honest:
  *
- *   1. Nothing outside this file and `db/queries/documents.ts` may see base64.
+ *   1. Nothing outside this file and `db/queries/documents.ts` may see base64 -
+ *      for EITHER store; the announcement blob helpers live at the bottom of
+ *      that same query file for exactly this reason, while the attachment
+ *      METADATA lives in `db/queries/announcements.ts` where it belongs.
  *      Callers hand over and receive `Buffer`. If a route ever string-handles
  *      the payload, the S3 swap stops being a one-file change.
  *   2. Bytes and metadata live in separate tables. `employee_documents` is
@@ -50,6 +64,9 @@ import {
   insertDocumentBlob,
   getDocumentBlob,
   deleteDocumentBlob,
+  insertAnnouncementAttachmentBlob,
+  getAnnouncementAttachmentBlob,
+  deleteAnnouncementAttachmentBlob,
 } from './db/queries/documents'
 
 /** Hard ceiling on a single upload, matching the holiday-import limit. */
@@ -176,7 +193,61 @@ class DbBase64Store implements DocumentStore {
 }
 
 /**
- * The process-wide store. A future S3 implementation is selected here, by
+ * The database-backed store for announcement attachments: base64 TEXT in
+ * `announcement_attachment_blobs`.
+ *
+ * A second class rather than a parameterised one because the difference is a
+ * JOIN target, not a value: `get` takes the MIME type back from the metadata
+ * row, and for an attachment that row lives in `announcement_attachments`. A
+ * shared implementation would need to know which table to join anyway, so it
+ * would be the same code with an extra branch in it - and the branch is the
+ * part that could get the tenant scoping wrong.
+ *
+ * The same ordering rules apply, and the announcement upload path follows
+ * them: the announcement row, then an empty attachment row, then `put()`, then
+ * the row claims the file. Delete is the mirror - soft-delete the metadata
+ * first, then `delete()`.
+ */
+class AnnouncementBase64Store implements DocumentStore {
+  async put(
+    workspaceId: string,
+    attachmentId: string,
+    bytes: Buffer,
+    // Unused here for the same reason as above: the type already lives on the
+    // metadata row, and storing it twice gives it two places to disagree. It
+    // stays in the signature because an S3 store needs it for Content-Type.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _mime: string,
+  ): Promise<{ size: number }> {
+    await insertAnnouncementAttachmentBlob(workspaceId, attachmentId, bytes.toString('base64'))
+    return { size: bytes.length }
+  }
+
+  async get(
+    workspaceId: string,
+    attachmentId: string,
+  ): Promise<{ bytes: Buffer; mime: string } | null> {
+    const row = await getAnnouncementAttachmentBlob(workspaceId, attachmentId)
+    if (!row) return null
+    return {
+      bytes: Buffer.from(row.data_base64, 'base64'),
+      // Same fallback as documents: a generic type makes the browser download
+      // rather than guess, which is the safe default for user-supplied bytes.
+      mime: row.mime_type ?? 'application/octet-stream',
+    }
+  }
+
+  async delete(workspaceId: string, attachmentId: string): Promise<void> {
+    await deleteAnnouncementAttachmentBlob(workspaceId, attachmentId)
+  }
+}
+
+/**
+ * The process-wide stores. A future S3 implementation is selected here, by
  * config, so no call site changes.
+ *
+ * `workspaceId` stays a parameter on every method of both: it keeps the tenant
+ * boundary visible at the storage layer and would become the S3 key prefix.
  */
 export const documentStore: DocumentStore = new DbBase64Store()
+export const announcementStore: DocumentStore = new AnnouncementBase64Store()

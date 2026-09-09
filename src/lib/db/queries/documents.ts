@@ -27,6 +27,14 @@
  * bytes, then claim them. Every crash point in that sequence leaves either an
  * empty slot or a row pointing at exactly the bytes it describes - never a
  * download that 404s, and never an old file wearing a new name.
+ *
+ * TWO DOMAINS, ONE BASE64 SECTION. The blob helpers at the bottom of this file
+ * now serve employee documents AND announcement attachments
+ * (`announcement_attachment_blobs`). The attachment METADATA lives in
+ * `announcements.ts` where it belongs - only the base64 is here, because the
+ * rule worth defending is "base64 exists in exactly two files" (this one and
+ * lib/storage.ts), not "one file per table pair". Both sets are exported for
+ * lib/storage.ts and nothing else.
  */
 
 import { db } from '../index'
@@ -449,5 +457,86 @@ export async function deleteDocumentBlob(
   await db.execute(
     `DELETE FROM employee_document_blobs WHERE document_id = ? AND workspace_id = ?`,
     [documentId, workspaceId],
+  )
+}
+
+// ─── Announcement attachment blobs (lib/storage.ts only) ─────────────────────
+//
+// The second domain this file's base64 section serves. Announcement
+// attachments are a different table pair - `announcement_attachments` for the
+// metadata, `announcement_attachment_blobs` for the bytes - but they are the
+// same kind of thing, and the rule that base64 exists in exactly two files
+// (this one and lib/storage.ts) is worth more than a tidier file boundary.
+//
+// A separate store was needed rather than reusing DbBase64Store because that
+// implementation resolves the MIME type by joining `employee_documents`; an
+// announcement attachment would never match, so `get` would return null for
+// every file. See `AnnouncementBase64Store` in lib/storage.ts.
+//
+// Exported for that store and nothing else - a route importing these is
+// bypassing the storage seam and defeating the S3 swap.
+
+export interface AnnouncementAttachmentBlobRow {
+  data_base64: string
+  mime_type: string | null
+}
+
+/**
+ * Write (or replace) the bytes for an announcement attachment.
+ *
+ * DELETE-then-INSERT inside a transaction, exactly as `insertDocumentBlob`
+ * does: `attachment_id` is UNIQUE, and this keeps the statement portable
+ * across better-sqlite3 and libSQL without relying on ON CONFLICT behaving
+ * identically on both.
+ */
+export async function insertAnnouncementAttachmentBlob(
+  workspaceId: string,
+  attachmentId: string,
+  dataBase64: string,
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    await tx.execute(
+      `DELETE FROM announcement_attachment_blobs
+       WHERE attachment_id = ? AND workspace_id = ?`,
+      [attachmentId, workspaceId],
+    )
+    await tx.execute(
+      `INSERT INTO announcement_attachment_blobs (id, attachment_id, workspace_id, data_base64)
+       VALUES (?,?,?,?)`,
+      [crypto.randomUUID().replace(/-/g, ''), attachmentId, workspaceId, dataBase64],
+    )
+  })
+}
+
+/**
+ * Read the bytes plus the MIME type recorded on the attachment's metadata row.
+ *
+ * The join is what lets the store hand back a complete `{ bytes, mime }`
+ * without a second round trip, and it filters `deleted_at IS NULL` so a
+ * soft-deleted attachment - or one whose announcement was retracted, which
+ * cascades a soft delete onto it - is undownloadable even in the window before
+ * its bytes are cleared.
+ */
+export async function getAnnouncementAttachmentBlob(
+  workspaceId: string,
+  attachmentId: string,
+): Promise<AnnouncementAttachmentBlobRow | null> {
+  return db.queryOne<AnnouncementAttachmentBlobRow>(
+    `SELECT b.data_base64, a.mime_type
+     FROM announcement_attachment_blobs b
+     JOIN announcement_attachments a ON a.id = b.attachment_id
+     WHERE b.attachment_id = ? AND b.workspace_id = ? AND a.deleted_at IS NULL`,
+    [attachmentId, workspaceId],
+  )
+}
+
+export async function deleteAnnouncementAttachmentBlob(
+  workspaceId: string,
+  attachmentId: string,
+): Promise<void> {
+  await db.execute(
+    `DELETE FROM announcement_attachment_blobs
+     WHERE attachment_id = ? AND workspace_id = ?`,
+    [attachmentId, workspaceId],
   )
 }

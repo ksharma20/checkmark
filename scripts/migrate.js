@@ -544,20 +544,25 @@ const ADDITIVE_MIGRATIONS = [
   `CREATE INDEX IF NOT EXISTS idx_employment_details_type     ON employment_details(workspace_id, employment_type)`,
   `CREATE INDEX IF NOT EXISTS idx_employment_details_manager  ON employment_details(workspace_id, reporting_manager_id)`,
 
-  // employee_sensitive - financial + statutory IDs, all AES-256-GCM encrypted (1:1 with employees)
+  // employee_sensitive - financial + statutory IDs. The columns carrying a
+  // number that identifies an account are AES-256-GCM encrypted (the
+  // `_encrypted` suffix says which); the descriptive ones beside them - IFSC,
+  // bank name, account holder name - are plaintext, because they identify a
+  // branch or repeat a name the employees row already stores in the clear.
   `CREATE TABLE IF NOT EXISTS employee_sensitive (
-  id                     TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
-  employee_id            TEXT NOT NULL UNIQUE REFERENCES employees(id) ON DELETE CASCADE,
-  workspace_id           TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-  pan_encrypted          TEXT,
-  aadhaar_encrypted      TEXT,
-  uan                    TEXT,
-  passport_number        TEXT,
-  bank_account_encrypted TEXT,
-  bank_ifsc              TEXT,
-  bank_name              TEXT,
-  created_at             TEXT NOT NULL DEFAULT (datetime('now')),
-  updated_at             TEXT NOT NULL DEFAULT (datetime('now'))
+  id                       TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  employee_id              TEXT NOT NULL UNIQUE REFERENCES employees(id) ON DELETE CASCADE,
+  workspace_id             TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  pan_encrypted            TEXT,
+  aadhaar_encrypted        TEXT,
+  uan                      TEXT,
+  passport_number          TEXT,
+  bank_account_encrypted   TEXT,
+  bank_ifsc                TEXT,
+  bank_name                TEXT,
+  bank_account_holder_name TEXT,
+  created_at               TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at               TEXT NOT NULL DEFAULT (datetime('now'))
 )`,
   `CREATE INDEX IF NOT EXISTS idx_employee_sensitive_employee ON employee_sensitive(employee_id)`,
 
@@ -814,6 +819,131 @@ const ADDITIVE_MIGRATIONS = [
        WHERE wm.workspace_id = e.workspace_id
          AND (wm.user_id = e.user_id OR lower(wm.email) = lower(e.work_email))
      )`,
+
+  // employee_sensitive - the name the bank account is held in.
+  //
+  // Plaintext, like bank_ifsc and bank_name beside it and unlike
+  // bank_account_encrypted. It is a name, and the employees row already stores
+  // first_name / last_name in the clear, so encrypting this one would cost a
+  // decrypt on every read of the record to protect nothing new. It is likewise
+  // not masked on read-only screens - masking a name that is legible two fields
+  // above it is theatre.
+  `ALTER TABLE employee_sensitive ADD COLUMN bank_account_holder_name TEXT`,
+
+  // maternity_cases - the table now carries paternity too.
+  //
+  // Two statutory entitlements, one lifecycle: requested → approved → onleave →
+  // returned is the same walk whichever parent takes it, and splitting them into
+  // two tables would duplicate the stage machine, the reminder gate that reads
+  // start_date/end_date, and every query that joins the employee. A discriminator
+  // column is the smaller thing.
+  //
+  // NOT NULL DEFAULT 'maternity' so every existing row keeps its meaning with no
+  // backfill statement. SQLite cannot attach a CHECK to a column added by ALTER
+  // TABLE, so the allowed values are enforced in the query layer instead -
+  // isParentalCaseType() in src/lib/db/queries/maternity.ts. Keep the two in step.
+  `ALTER TABLE maternity_cases ADD COLUMN case_type TEXT NOT NULL DEFAULT 'maternity'`,
+
+  // The "one open case per employee" index has to become "one open case per
+  // employee PER TYPE", or someone who has ever taken maternity leave can never
+  // open a paternity case.
+  //
+  // THE RENAME IS LOAD-BEARING. Re-issuing
+  // `CREATE UNIQUE INDEX IF NOT EXISTS idx_maternity_cases_one_open` with a third
+  // column would be swallowed: the runner below tolerates "already exists", so
+  // the statement is counted as skipped and the OLD two-column index survives -
+  // silently, with no error and no failed run to notice. A DROP followed by a
+  // CREATE under a NEW name is the only spelling where the outcome is observable.
+  // The old name must never be reused for a different definition.
+  //
+  // Ordering matters: the original CREATE for idx_maternity_cases_one_open is
+  // still above (migration history is append-only), so on a fresh database the
+  // old index is created and then dropped here. Do not move these two entries
+  // earlier in the array.
+  `DROP INDEX IF EXISTS idx_maternity_cases_one_open`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_parental_cases_one_open
+   ON maternity_cases(workspace_id, employee_id, case_type)
+   WHERE deleted_at IS NULL AND status IN ('requested','approved','onleave')`,
+
+  // announcement_attachments - a file hung off a workspace announcement.
+  //
+  // Metadata only, mirroring employee_documents: the bytes live in
+  // announcement_attachment_blobs so listing an announcement feed never drags
+  // base64 through the query. Soft-deleted, because retracting an announcement
+  // must leave the record of what was posted.
+  //
+  // file_name / mime_type / size_bytes are NULLABLE ON PURPOSE. The row is
+  // created empty, the bytes are written second, and only then does the row
+  // claim the file - the same write order employee documents use, so a crash
+  // between the two leaves an honest empty slot rather than a metadata row
+  // naming bytes that were never stored.
+  `CREATE TABLE IF NOT EXISTS announcement_attachments (
+  id              TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id    TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  announcement_id TEXT NOT NULL REFERENCES workspace_announcements(id) ON DELETE CASCADE,
+  name            TEXT NOT NULL,
+  file_name       TEXT,
+  mime_type       TEXT,
+  size_bytes      INTEGER,
+  uploaded_by     TEXT,
+  deleted_at      TEXT,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_announcement_attachments_announcement
+   ON announcement_attachments(announcement_id, deleted_at)`,
+  `CREATE INDEX IF NOT EXISTS idx_announcement_attachments_ws
+   ON announcement_attachments(workspace_id, deleted_at)`,
+
+  // announcement_attachment_blobs - the bytes, base64-encoded, one row per
+  // attachment. Exactly the shape of employee_document_blobs and for the same
+  // reason: every list read touches the metadata table and never this one.
+  // UNIQUE on attachment_id is what makes replacing a file an upsert rather than
+  // an accumulation of orphaned bytes.
+  `CREATE TABLE IF NOT EXISTS announcement_attachment_blobs (
+  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  attachment_id TEXT NOT NULL UNIQUE REFERENCES announcement_attachments(id) ON DELETE CASCADE,
+  workspace_id  TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  data_base64   TEXT NOT NULL,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_announcement_attachment_blobs_ws
+   ON announcement_attachment_blobs(workspace_id)`,
+
+  // parental_leave_extensions - an employee asking to stay away longer than the
+  // statutory entitlement, as UNPAID days.
+  //
+  // A separate table rather than an editable end_date on the case, because the
+  // request and the case are different things: the case's dates are what the
+  // reminder gate reads, and an admin moving them is an administrative act,
+  // while this is a member-filed request that can be refused. Append-only in the
+  // same sense as leave_requests - the dates, the day count and the case are
+  // fixed at insert, and the ONLY mutation is the approve/reject transition out
+  // of 'pending' (status, rejection_reason, actioned_by_user_id). A correction is
+  // a reject plus a new request, never an edit.
+  //
+  // previous_end_date is stored rather than derived so the request still records
+  // what it was extending from after the case's end_date has moved on.
+  `CREATE TABLE IF NOT EXISTS parental_leave_extensions (
+  id                   TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  workspace_id         TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  case_id              TEXT NOT NULL REFERENCES maternity_cases(id) ON DELETE CASCADE,
+  user_id              TEXT NOT NULL REFERENCES users(id),
+  previous_end_date    TEXT NOT NULL,
+  requested_end_date   TEXT NOT NULL,
+  unpaid_days          INTEGER NOT NULL,
+  reason               TEXT,
+  status               TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','approved','rejected')),
+  rejection_reason     TEXT,
+  actioned_by_user_id  TEXT,
+  created_at           TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  // The approvals queue reads "every pending extension in this workspace"; the
+  // case screen reads "every extension on this case".
+  `CREATE INDEX IF NOT EXISTS idx_parental_extensions_ws_status
+   ON parental_leave_extensions(workspace_id, status)`,
+  `CREATE INDEX IF NOT EXISTS idx_parental_extensions_case
+   ON parental_leave_extensions(case_id)`,
 ];
 
 // ─── SQLite runner (local dev) ────────────────────────────────────────────────

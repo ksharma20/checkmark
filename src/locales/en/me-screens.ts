@@ -32,6 +32,7 @@ export const meScreens = {
     title: 'Leave',
     tabBalance: 'Balance',
     tabApply: 'Apply',
+    tabCorrection: 'Correction',
     tabHistory: 'History',
     tabHolidays: 'Holidays',
 
@@ -71,6 +72,17 @@ export const meScreens = {
     holidayWarning: (names: string) =>
       `These dates include a company holiday (${names}). Shorten the range before submitting.`,
 
+    // Correction
+    correctionHeading: 'Request a correction',
+    correctionIntro:
+      'Worked a day that is not showing correctly — forgot to check in, or checked in somewhere the signals could not confirm? Ask an admin to put it right.',
+    correctionFieldDay: 'Day',
+    correctionFieldDayPlaceholder: 'Select a day',
+    correctionNoDays: 'Nothing to correct',
+    correctionNoDaysHint:
+      'Every working day in the last three months is either already confirmed, covered by leave, or has a correction request open.',
+    correctionSubmitSuccess: 'Correction request submitted — awaiting admin review.',
+
     // History
     historyLeaveHeading: 'Your leave requests',
     historyCorrectionHeading: 'Your correction requests',
@@ -78,7 +90,7 @@ export const meScreens = {
     historyLeaveEmptyHint: 'Requests you submit show up here with their status.',
     historyCorrectionEmpty: 'No correction requests yet',
     historyCorrectionEmptyHint:
-      'Ask for a correction from a day on your timeline and it appears here.',
+      'Corrections you request from the Correction tab appear here with their status.',
     status: {
       approved: 'Approved',
       pending: 'Pending',
@@ -147,6 +159,7 @@ export const meScreens = {
       aadhaar: 'Aadhaar',
       uan: 'UAN',
       passport_number: 'Passport number',
+      bank_account_holder_name: 'Account holder name',
       bank_account: 'Bank account number',
       bank_ifsc: 'IFSC',
       bank_name: 'Bank name',
@@ -160,6 +173,7 @@ export const meScreens = {
       aadhaar: '12-digit number',
       uan: '12-digit number',
       passport_number: 'A1234567',
+      bank_account_holder_name: 'Name as it appears on the account',
       bank_account: 'Account number',
       bank_ifsc: 'e.g. HDFC0001234',
       bank_name: 'e.g. HDFC Bank',

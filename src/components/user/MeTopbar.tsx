@@ -8,6 +8,7 @@ import NotificationBell from '@/components/notifications/NotificationBell'
 import { useToast } from '@/components/shared/Toast'
 import { useWorkspaceScope } from '@/app/me/workspace-scope'
 import { me } from '@/locales/en/me'
+import { meAnnouncements } from '@/locales/en/me-announcements'
 
 export interface MeWorkspaceOption {
   id: string
@@ -198,6 +199,14 @@ export default function MeTopbar({ workspaces, userName, userEmail }: Props) {
         <Divider style={{ margin: 0 }} />
         <Link href="/me/documents" style={sheetRow} onClick={() => setProfileOpen(false)}>
           {me.profileSheet.documents}
+        </Link>
+        <Divider style={{ margin: 0 }} />
+        {/* The bottom nav is deliberately fixed at three tabs, so the
+            announcement archive lives here alongside Documents and
+            Notifications. No `?ws=` on this link: the screen falls back to the
+            pill's active workspace, which is what the sheet is sitting on. */}
+        <Link href="/me/announcements" style={sheetRow} onClick={() => setProfileOpen(false)}>
+          {meAnnouncements.title}
         </Link>
         <Divider style={{ margin: 0 }} />
         {/* Navigates rather than handing off to the switcher sheet: `/me/orgs`

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, Plus } from 'lucide-react'
 import {
-  Avatar, Button, Card, Chip, EmptyState, Field, Select, TabBar,
+  Avatar, Button, Card, Chip, ConfirmDialog, EmptyState, Field, Select, TabBar,
   type ChipTone, type Tab,
 } from '@/components/ui'
 import { useToast } from '@/components/shared/Toast'
@@ -377,6 +377,9 @@ function AccessPanel({
   const [savingRole, setSavingRole] = useState(false)
   const [roleError, setRoleError] = useState<string | null>(null)
   const [removing, setRemoving] = useState(false)
+  // A boolean rather than the usual `pendingX` target: this page has exactly
+  // one subject, so there is nothing for the dialog to remember.
+  const [removeOpen, setRemoveOpen] = useState(false)
   const [inviting, setInviting] = useState(false)
   const [transferOpen, setTransferOpen] = useState(false)
 
@@ -477,8 +480,7 @@ function AccessPanel({
     }
   }
 
-  async function remove() {
-    if (!confirm(en.wsPeople.removeConfirm)) return
+  async function confirmRemove() {
     setRemoving(true)
     try {
       const res = await fetch(`/api/ws/${slug}/members/${member.member_id}`, { method: 'DELETE' })
@@ -486,6 +488,7 @@ function AccessPanel({
       else toast(wsPeopleUi.accessRemoveFailed, 'error')
     } finally {
       setRemoving(false)
+      setRemoveOpen(false)
     }
   }
 
@@ -597,12 +600,25 @@ function AccessPanel({
             size="sm"
             className="mt-12"
             loading={removing}
-            onClick={() => void remove()}
+            onClick={() => setRemoveOpen(true)}
           >
             {wsPeopleUi.accessRemoveButton}
           </Button>
         </>
       )}
+
+      <ConfirmDialog
+        open={removeOpen}
+        onClose={() => setRemoveOpen(false)}
+        onConfirm={() => void confirmRemove()}
+        title={wsPeopleUi.removeConfirmTitle}
+        body={wsPeopleUi.removeConfirmBody(member.full_name ?? member.email)}
+        note={wsPeopleUi.removeConfirmNote}
+        confirmLabel={wsPeopleUi.removeConfirmAction}
+        busyLabel={wsPeopleUi.removeConfirmBusy}
+        cancelLabel={wsPeopleUi.removeConfirmCancel}
+        loading={removing}
+      />
     </Card>
   );
 }

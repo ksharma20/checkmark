@@ -13,7 +13,7 @@ const ALLOWED_SELF_EDIT = new Set([
   'current_address', 'permanent_address',
   'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone',
   'pan', 'aadhaar', 'uan', 'passport_number',
-  'bank_account', 'bank_ifsc', 'bank_name',
+  'bank_account', 'bank_ifsc', 'bank_name', 'bank_account_holder_name',
 ])
 
 export async function GET(req: NextRequest, { params }: Props) {

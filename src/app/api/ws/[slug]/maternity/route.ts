@@ -7,7 +7,9 @@ import {
   createMaternityCase,
   findOpenCaseForEmployee,
   isMaternityStatus,
+  isParentalCaseType,
   MaternityCaseOpenError,
+  type ParentalCaseType,
 } from '@/lib/db/queries/maternity'
 import { hrRecord, maternity as maternityCopy } from '@/locales/en/documents'
 
@@ -40,13 +42,22 @@ export async function GET(req: NextRequest, { params }: Props) {
   const statusParam = sp.get('status')
   const status = isMaternityStatus(statusParam) ? statusParam : undefined
   const employeeId = sp.get('employee_id') ?? undefined
+  // Omitted (or unrecognised) means BOTH types. An unknown value is dropped
+  // rather than 400'd, for the same reason the assets list drops an unknown
+  // status: a stale bookmark should not become an error page.
+  const caseTypeParam = sp.get('case_type')
+  const caseType = isParentalCaseType(caseTypeParam) ? caseTypeParam : undefined
 
-  const cases = await listMaternityCases(ctx.workspace.id, { status, employeeId })
+  const cases = await listMaternityCases(ctx.workspace.id, { status, employeeId, caseType })
   return NextResponse.json({ cases })
 }
 
 // ─── POST /api/ws/[slug]/maternity ────────────────────────────────────────────
-// Body: { user_id, due_date?, start_date?, end_date?, weeks?, notes? }
+// Body: { user_id, case_type?, due_date?, start_date?, end_date?, weeks?, notes? }
+//
+// `case_type` defaults to 'maternity' so every caller written before paternity
+// existed keeps its meaning, and is run through isParentalCaseType() because
+// the column has no CHECK constraint behind it - see the guard's doc comment.
 //
 // `user_id` is a workspace MEMBER. Most members have no HR record - `employees`
 // is written only when an admin fills in the directory form - so a body keyed
@@ -72,6 +83,13 @@ export async function POST(req: NextRequest, { params }: Props) {
   }
 
   const fields: Record<string, string> = {}
+
+  let caseType: ParentalCaseType = 'maternity'
+  if (body.case_type !== undefined && body.case_type !== null) {
+    if (!isParentalCaseType(body.case_type)) fields.case_type = 'INVALID'
+    else caseType = body.case_type
+  }
+
   const dueDate = parseDate(body.due_date)
   const startDate = parseDate(body.start_date)
   const endDate = parseDate(body.end_date)
@@ -95,12 +113,14 @@ export async function POST(req: NextRequest, { params }: Props) {
     )
   }
 
-  // One running case per employee. Closed ('returned') cases are history and
-  // do not block a later pregnancy.
+  // One running case per employee PER TYPE. Closed ('returned') cases are
+  // history and do not block a later one, and an open maternity case does not
+  // block a paternity case - the index covers case_type, and this read passes
+  // it so the two agree.
   //
   // This read is a courtesy - it turns the common case into a clean 409 with
   // no failed INSERT behind it. The GUARANTEE is the partial unique index
-  // idx_maternity_cases_one_open, because this check and the insert below are
+  // idx_parental_cases_one_open, because this check and the insert below are
   // two statements and two simultaneous requests can both pass it.
   //
   // Read with findEmployeeByUserId, not ensure: a member with no HR record
@@ -108,7 +128,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   // behind it.
   const existing = await findEmployeeByUserId(ctx.workspace.id, userId)
   if (existing) {
-    const open = await findOpenCaseForEmployee(ctx.workspace.id, existing.id)
+    const open = await findOpenCaseForEmployee(ctx.workspace.id, existing.id, caseType)
     if (open) {
       return NextResponse.json(
         { error: maternityCopy.errors.caseOpen, code: 'CASE_OPEN' },
@@ -131,6 +151,7 @@ export async function POST(req: NextRequest, { params }: Props) {
     maternityCase = await createMaternityCase({
       workspaceId: ctx.workspace.id,
       employeeId: resolved.employee.id,
+      case_type: caseType,
       due_date: dueDate ?? null,
       start_date: startDate ?? null,
       end_date: endDate ?? null,

@@ -172,7 +172,7 @@ predicates on that TEXT column are lexicographic, so a bound carrying `T` and
 | 2 | **non-working day** | `working_days` is a JSON array of weekday numbers, 0 = Sunday. A reminder on a Sunday is how a user disables push |
 | 3 | **workspace holiday** | `listHolidayDatesInRange(ws, localDate, localDate)`; skips the entire workspace, both kinds |
 | 5a | **approved leave** | `getLeaveRequestsInRange(ws, localDate, localDate)` where `status = 'approved'` |
-| 5b | **active maternity case** | `getActiveMaternityUserIds(ws, localDate)` — **maternity lives in its own table keyed by `employee_id`, so the leave gate cannot see it.** Missing this means reminding someone every working day of their maternity leave. It matches both `approved` and `onleave` because dates are the source of truth, not the status flag |
+| 5b | **active maternity case** | `getActiveParentalUserIds(ws, localDate)` — **parental leave (maternity AND paternity) lives in its own table keyed by `employee_id`, so the leave gate cannot see it.** Missing this means reminding someone every working day of their parental leave. The function is deliberately blind to `case_type`; filtering it by type would let one kind of leave through. It matches both `approved` and `onleave` because dates are the source of truth, not the status flag |
 
 Gates 5a and 5b are gathered **once per workspace** and unioned into a single
 `Set<user_id>` before the member loop.

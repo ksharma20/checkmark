@@ -90,9 +90,9 @@ export async function PATCH(req: NextRequest, { params }: Props) {
   if (start && end && end < start) fields.end_date = 'BEFORE_START'
 
   // An open case's DATES are the reminder gate, not its status:
-  // getActiveMaternityUserIds matches `start_date <= today <= end_date`, so a
+  // getActiveParentalUserIds matches `start_date <= today <= end_date`, so a
   // case that keeps its status but loses a date drops silently out of the gate
-  // and the daily check-in reminder starts nagging someone who is on maternity
+  // and the daily check-in reminder starts nagging someone who is on parental
   // leave. Dates may be moved while a case is open; they may not be cleared.
   // Only 'returned' - where the case is history and the gate no longer looks
   // at it - may hold nulls.

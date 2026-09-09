@@ -38,6 +38,7 @@ export default async function SettingsPage({ params }: Props) {
       canWriteSettings={can(role.permissions, Resource.Settings, Action.Write)}
       canReadLeaves={can(role.permissions, Resource.Leaves, Action.Read)}
       canWriteLeaves={can(role.permissions, Resource.Leaves, Action.Write)}
+      canDeleteLeaves={can(role.permissions, Resource.Leaves, Action.Delete)}
       canReadSignals={can(role.permissions, Resource.Signals, Action.Read)}
       canWriteSignals={can(role.permissions, Resource.Signals, Action.Write)}
       canDeleteSignals={can(role.permissions, Resource.Signals, Action.Delete)}

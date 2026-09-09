@@ -15,6 +15,12 @@ export interface DropdownMenuProps extends Omit<ComponentPropsWithoutRef<'div'>,
   onClose: () => void
   items: DropdownMenuItem[]
   placement?: 'above' | 'below'
+  /**
+   * Static label above the items - who this menu belongs to, typically. It is
+   * not a `menuitem`: it carries no `role`, is not focusable and does nothing on
+   * click, so arrow-key navigation and screen-reader item counts are unaffected.
+   */
+  header?: ReactNode
 }
 
 /**
@@ -30,6 +36,7 @@ export default function DropdownMenu({
   onClose,
   items,
   placement = 'above',
+  header,
   className,
   ...rest
 }: DropdownMenuProps) {
@@ -59,6 +66,7 @@ export default function DropdownMenu({
 
   return (
     <div {...rest} ref={ref} className={cls} role="menu">
+      {header != null && <div className="dropdown-menu-header">{header}</div>}
       {items.map((item) => (
         <button
           key={item.key}

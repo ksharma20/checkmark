@@ -213,6 +213,7 @@ function buildOptionalFields(body: Record<string, unknown>): Partial<CreateEmplo
     bank_account:                   pick(body, 'bank_account'),
     bank_ifsc:                      pick(body, 'bank_ifsc'),
     bank_name:                      pick(body, 'bank_name'),
+    bank_account_holder_name:       pick(body, 'bank_account_holder_name'),
     emergency_contact_name:         pick(body, 'emergency_contact_name'),
     emergency_contact_relationship: pick(body, 'emergency_contact_relationship'),
     emergency_contact_phone:        pick(body, 'emergency_contact_phone'),

@@ -11,6 +11,7 @@ import {
   hasPendingOrApprovedRegularization,
   type RegularizationType,
 } from '@/lib/db/queries/regularizations'
+import { getCorrectableDates } from '@/lib/regularization-dates'
 import { getUserById, getRateLimitCount, recordRateLimitHit } from '@/lib/db/queries/users'
 import { getActiveWorkspaceAdmins } from '@/lib/db/queries/workspaces'
 import { notify } from '@/lib/notify'
@@ -27,14 +28,34 @@ export async function GET(req: NextRequest, { params }: Props) {
   if (!ctx) {
     return NextResponse.json({ error: 'Unauthorized', code: 'UNAUTHORIZED' }, { status: 401 })
   }
-  const requests = await getUserRegularizationRequests(ctx.workspace.id, ctx.userId)
+  const [requests, correctable] = await Promise.all([
+    getUserRegularizationRequests(ctx.workspace.id, ctx.userId),
+    getCorrectableDates({
+      workspaceId: ctx.workspace.id,
+      userId: ctx.userId,
+      plan: ctx.workspace.plan,
+      timezone: ctx.workspace.display_timezone,
+      workingDaysJson: ctx.workspace.working_days,
+    }),
+  ])
 
   const gate = historyStartDate(ctx.workspace.plan)
   const minRequestDate = gate
     ? new Intl.DateTimeFormat('en-CA', { timeZone: ctx.workspace.display_timezone }).format(new Date(gate))
     : null
 
-  return NextResponse.json({ regularizationRequests: requests, minRequestDate })
+  // `getCorrectableDates()` answers "is this day correctable at all" and leaves
+  // DUPLICATE_REQUEST to the caller, so the days already spoken for are removed
+  // here - the form's picker must only offer what the POST will accept.
+  const spokenFor = new Set(
+    requests.filter((r) => r.status === 'pending' || r.status === 'approved').map((r) => r.target_date),
+  )
+
+  return NextResponse.json({
+    regularizationRequests: requests,
+    minRequestDate,
+    correctableDates: correctable.filter((date) => !spokenFor.has(date)),
+  })
 }
 
 export async function POST(req: NextRequest, { params }: Props) {

@@ -1,12 +1,16 @@
 /**
- * Copy for the workforce half of the `/ws` admin surface: Employees, Assets,
- * Leave (requests / applied / maternity) and the People membership screen.
+ * Copy for the workforce half of the `/ws` admin surface: Employees, the
+ * ordinary Leave screen (requests / applied), the People membership directory
+ * and the reporting tree.
  *
  * Kept out of `src/locales/en.ts` on purpose - that file is edited by every
- * other surface at once, and these four screens change together. Import the
- * export you need directly:
+ * other surface at once. Import the export you need directly:
  *
  *   import { wsEmployees } from '@/locales/en/ws-people'
+ *
+ * Two groups have MOVED OUT to modules of their own, because this file had
+ * become the same bottleneck `en.ts` is: `wsAssets` → ./ws-assets, and the
+ * parental-leave copy (`wsParental`) → ./ws-parental. Do not move them back.
  *
  * Anything a user can read belongs here rather than inline in a component.
  */
@@ -155,110 +159,13 @@ export const wsEmployees = {
   statusNoticePeriod: 'Notice period',
 } as const
 
-// ─── Assets ───────────────────────────────────────────────────────────────────
-
-export const wsAssets = {
-  title: 'Assets',
-  subtitle: 'Company equipment issued to employees — laptops, ID cards, peripherals.',
-  exportButton: 'Export CSV',
-  addButton: 'Add asset',
-  cancelButton: 'Cancel',
-
-  statTotal: 'Total assets',
-  statTotalHint: (value: string) => `${value} in service`,
-  statAssigned: 'Assigned',
-  statAssignedHint: 'held by employees',
-  statAvailable: 'Available',
-  statAvailableHint: 'ready to issue',
-  statRepair: 'In repair',
-  statRepairHint: 'out of circulation',
-
-  addFormTitle: 'Add an asset',
-  fieldName: 'Asset name',
-  fieldNamePlaceholder: 'e.g. MacBook Pro 14"',
-  fieldCategory: 'Category',
-  fieldCategoryPlaceholder: 'e.g. Laptop',
-  fieldSerial: 'Serial number',
-  fieldSerialPlaceholder: 'Serial number',
-  fieldCondition: 'Condition',
-  fieldValue: 'Purchase value',
-  fieldValuePlaceholder: 'Value',
-  fieldNotes: 'Notes',
-  addSubmit: 'Add',
-  addHint: 'New assets enter the register as Available. Assign them from the table below.',
-  addNameRequired: 'An asset name is required.',
-  added: 'Asset added to the register',
-
-  categoryAll: 'All',
-  registerTitle: 'Register',
-
-  colAsset: 'Asset',
-  colTagSerial: 'Serial',
-  colAssignedTo: 'Assigned to',
-  colIssued: 'Issued',
-  colCondition: 'Condition',
-  colStatus: 'Status',
-  colAction: 'Action',
-
-  statusAssigned: 'Assigned',
-  statusAvailable: 'Available',
-  statusRepair: 'In repair',
-  statusRetired: 'Retired',
-
-  conditionGood: 'good',
-  conditionFair: 'fair',
-  conditionPoor: 'poor',
-  conditionUnset: 'unset',
-
-  actionAssign: 'Assign',
-  actionReturn: 'Mark returned',
-  actionRepair: 'Send to repair',
-  actionBackInService: 'Back in service',
-  actionRetire: 'Retire',
-
-  assignTitle: 'Assign asset',
-  assignEmployeeLabel: 'Employee',
-  assignEmployeePlaceholder: 'Select employee',
-  assignSubmit: 'Assign',
-  assignCancel: 'Cancel',
-  assignEmployeeRequired: 'Pick an employee first.',
-  assigned: (name: string) => `Assigned to ${name}`,
-  returned: 'Asset returned to the pool',
-  sentToRepair: 'Asset sent for repair',
-  backInService: 'Asset is back in service',
-  retired: 'Asset retired',
-  conditionUpdated: 'Condition updated',
-  actionFailed: 'Could not update the asset.',
-
-  emptyTitle: 'No assets in this category',
-  emptyHint: 'Add one to start the register.',
-  loadFailed: 'Could not load assets.',
-  noEmployees: 'Add an employee record before assigning equipment.',
-} as const
-
 // ─── Leave (admin) ────────────────────────────────────────────────────────────
 
 export const wsLeaveScreen = {
   title: 'Leave',
-  tabRequests: 'Requests',
   tabApplied: 'Applied leaves',
-  tabMaternity: 'Maternity',
-
-  // Requests
-  pendingTitle: 'Pending requests',
-  pendingEmptyTitle: 'All caught up',
-  pendingEmptyHint: 'No leave requests waiting on you.',
-  approve: 'Approve',
-  approving: 'Approving…',
-  decline: 'Decline',
-  declineReasonLabel: 'Reason for declining',
-  declineReasonPlaceholder: 'Tell them why',
-  declineConfirm: 'Confirm decline',
-  declineCancel: 'Cancel',
-  declineReasonRequired: 'A reason is required to decline.',
-  approved: 'Leave request approved',
-  declined: 'Leave request declined',
-  requestActionFailed: 'Could not update the request.',
+  // The parental-leave tab's own label lives with the rest of its copy in
+  // ./ws-parental.ts, so the tab and its screen move together.
 
   // Applied
   filterAll: 'All',
@@ -276,51 +183,6 @@ export const wsLeaveScreen = {
   statusApproved: 'Approved',
   statusRejected: 'Declined',
   loadFailed: 'Could not load leave requests.',
-
-
-  // Maternity
-  maternityIntro:
-    '26-week paid entitlement (Maternity Benefit Act). Track each case from request through return to work.',
-  maternityStart: 'Start maternity leave',
-  maternityFormTitle: 'New maternity leave',
-  maternityEmployee: 'Employee',
-  maternityEmployeePlaceholder: 'Select employee',
-  maternityDue: 'Expected due date',
-  maternityWeeks: 'Weeks',
-  maternityAdd: 'Add',
-  maternityCancel: 'Cancel',
-  maternityFormHint:
-    'Leave starts ~4 weeks before the due date; expected return is calculated from the entitlement.',
-  maternityEmployeeRequired: 'Select an employee and a due date.',
-  maternityCreated: 'Maternity leave case created',
-  maternityCreateFailed: 'Could not create the case.',
-
-  maternityStatRequested: 'Awaiting approval',
-  maternityStatApproved: 'Approved · upcoming',
-  maternityStatOnLeave: 'Currently on leave',
-  maternityStatReturned: 'Returned',
-
-  maternityDueDate: 'Due date',
-  maternityLeaveStart: 'Leave start',
-  maternityExpectedReturn: 'Expected return',
-  maternityEntitlement: 'Entitlement',
-  maternityWeeksValue: (weeks: number) => `${weeks} weeks`,
-
-  stageRequested: 'Requested',
-  stageApproved: 'Approved',
-  stageOnLeave: 'On leave',
-  stageReturned: 'Returned',
-
-  maternityApprove: 'Approve leave',
-  maternityRevoke: 'Revoke approval',
-  maternityMarkOnLeave: 'Mark on leave',
-  maternityMarkReturned: 'Mark returned',
-  maternityReturnedOn: (date: string) => `Returned ${date}`,
-  maternityUpdated: 'Case updated',
-  maternityUpdateFailed: 'Could not move the case.',
-  maternityEmptyTitle: 'No maternity leave cases',
-  maternityEmptyHint: 'Start one when someone files for maternity leave.',
-  maternityLoadFailed: 'Could not load maternity cases.',
 } as const
 
 // ─── People (membership) ──────────────────────────────────────────────────────
@@ -405,6 +267,18 @@ export const wsPeopleUi = {
   accessRemoveHint: 'Their presence history stays; they lose access immediately.',
   accessRemoveButton: 'Remove member',
   accessRemoveFailed: 'Could not remove this member.',
+
+  /**
+   * Removing someone from the workspace. One wording for one consequence,
+   * shared by the directory row action and the Access tab - the two places
+   * that offer it - so they cannot drift apart.
+   */
+  removeConfirmTitle: 'Remove member',
+  removeConfirmBody: (name: string) => `${name} loses access to this workspace immediately.`,
+  removeConfirmNote: 'Their presence history stays. They can be invited again later.',
+  removeConfirmAction: 'Remove',
+  removeConfirmBusy: 'Removing…',
+  removeConfirmCancel: 'Cancel',
   noRecordTitle: 'No HR record yet',
   noRecordHint:
     'Add their details to open the record tabs - employment, bank, emergency contact and documents.',
@@ -439,8 +313,13 @@ export const wsOrg = {
   zoomIn: 'Zoom in',
   zoomOut: 'Zoom out',
   expandAll: 'Expand all',
-  collapse: 'Collapse',
-  expand: (n: number) => `${n} ${n === 1 ? 'report' : 'reports'}`,
+  // The outline's disclosure chevron is icon-only - the card's meta line already
+  // prints "3 direct reports", so repeating the count beside it was noise. These
+  // are its accessible name, and they carry the person so a screen reader is not
+  // read a page of identical "Expand" buttons.
+  collapseAria: (name: string) => `Hide ${name}'s reports`,
+  expandAria: (name: string, n: number) =>
+    `Show ${name}'s ${n} ${n === 1 ? 'report' : 'reports'}`,
   reportCount: (n: number) => `${n} direct ${n === 1 ? 'report' : 'reports'}`,
   youSuffix: '(you)',
   openPerson: (name: string) => `Find ${name} in the directory`,
