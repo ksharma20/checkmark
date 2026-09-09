@@ -579,7 +579,7 @@ export default function CheckinButtons({
         {allowRemote && (
           <div style={{ textAlign: "center" }}>
             <Button
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={handleRemoteCheckin}
               disabled={loading}
@@ -617,7 +617,7 @@ export default function CheckinButtons({
         </p>
         {allowRemote && (
           <Button
-            variant="ghost"
+            variant="secondary"
             size="sm"
             onClick={handleRemoteCheckin}
             disabled={loading}

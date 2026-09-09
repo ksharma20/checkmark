@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { MoreHorizontal } from 'lucide-react'
-import { Avatar, Button, DropdownMenu, Modal, type DropdownMenuItem } from '@/components/ui'
+import { Avatar, ConfirmDialog, DropdownMenu, type DropdownMenuItem } from '@/components/ui'
 import { en } from '@/locales/en'
 import { wsAdmin } from '@/locales/en/ws-overview'
 
@@ -105,23 +105,20 @@ export default function WsAccountMenu({ slug, userName, userRoleName, variant }:
           ) : undefined
         }
       />
-      <Modal
+      {/* `tone="primary"`: signing out is consequential enough to confirm, but
+          it destroys nothing - the red button was overstating it. */}
+      <ConfirmDialog
         open={confirmOpen}
-        onClose={() => { if (!loggingOut) setConfirmOpen(false) }}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => void signOut()}
+        tone="primary"
         title={en.wsSidebar.signOutTitle}
-        footer={
-          <>
-            <Button variant="secondary" disabled={loggingOut} onClick={() => setConfirmOpen(false)}>
-              {en.wsSidebar.cancelBtn}
-            </Button>
-            <Button variant="danger" loading={loggingOut} onClick={signOut}>
-              {loggingOut ? en.wsSidebar.signingOutBtn : en.wsSidebar.signOutConfirmBtn}
-            </Button>
-          </>
-        }
-      >
-        <p className="t-secondary">{en.wsSidebar.signOutBody}</p>
-      </Modal>
+        body={en.wsSidebar.signOutBody}
+        confirmLabel={en.wsSidebar.signOutConfirmBtn}
+        busyLabel={en.wsSidebar.signingOutBtn}
+        cancelLabel={en.wsSidebar.cancelBtn}
+        loading={loggingOut}
+      />
     </>
   )
 }

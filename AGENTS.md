@@ -37,6 +37,8 @@ AI agent coordination guide for working on this codebase.
 - A new decorative animation must be added to the `prefers-reduced-motion` guard in the same change
 - Update `docs/design/` in the same change
 
+> **Destructive actions:** there is one confirmation primitive, `src/components/ui/ConfirmDialog.tsx`. Never add a `window.confirm`, and never hand-roll another `Modal` confirm — the shape is fixed (title, one `.t-secondary` line, optional `.field-hint` caveat, optional `.field-error`, cancel-then-confirm). Anything needing more than that is not a confirmation; use `Modal` directly.
+
 ### Reviewer Agent
 **Use for:** Validating a completed change before merge.
 - Run `npm run build` - must pass
@@ -99,7 +101,9 @@ These are edited by *many* otherwise-independent tasks. Two agents appending to 
 
 English UI copy, emails, and stable technical identifiers are assembled into one `en` object by `src/locales/en.ts`. **New copy goes in a per-area module under `src/locales/en/`, not inline in `en.ts`.**
 
-Current modules: `me.ts`, `me-screens.ts`, `me-settings.ts`, `marketing.ts`, `documents.ts` (which also exports `assets` and `maternity`), `ws-overview.ts`, `ws-people.ts`, `ws-settings.ts`, `ws-reminders.ts`.
+Current modules: `me.ts`, `me-screens.ts`, `me-settings.ts`, `me-announcements.ts`, `marketing.ts`, `documents.ts` (which also exports `assets` and `maternity`), `ws-overview.ts`, `ws-people.ts`, `ws-assets.ts`, `ws-parental.ts`, `ws-approvals.ts`, `ws-announcements.ts`, `ws-leave-types.ts`, `ws-person.ts`, `ws-settings.ts`, `ws-reminders.ts`.
+
+`ws-people.ts` was itself a bottleneck and has been split: `wsAssets` now lives in `ws-assets.ts`, and the parental-leave copy (`wsParental`, including the tab label and the `stage*` keys) in `ws-parental.ts`. `wsApprovals` moved out of the inline groups in `en.ts` into `ws-approvals.ts`. All still resolve as `en.wsAssets.x` etc. — do not move them back.
 
 To add copy for a new area:
 1. Create `src/locales/en/<area>.ts` exporting one named const.
@@ -195,8 +199,10 @@ Query files and their domains:
 - `roles.ts` — workspace roles and permission grids; exports `seedSystemRoles`, `getMembershipWithRole`, `listWorkspaceRoles`
 - `assets.ts` — `workspace_assets`; soft-deleted so assignment history survives a retired laptop
 - `documents.ts` — `employee_documents` metadata **and** `employee_document_blobs`; the one file outside `lib/storage.ts` allowed to see base64. Metadata is soft-deleted, the blob is hard-deleted with it
-- `maternity.ts` — `maternity_cases` and the `requested → approved → onleave → returned` stage machine (`canTransition()`); the one backward edge is `approved → requested`
+- `maternity.ts` — `maternity_cases` and the `requested → approved → onleave → returned` stage machine (`canTransition()`); the one backward edge is `approved → requested`. Also owns `case_type` (`'maternity' | 'paternity'`) and its guard `isParentalCaseType()`, which is the ONLY validation on that column — SQLite cannot attach a CHECK to a column added by `ALTER TABLE`, so an unvalidated write is accepted by the database
 - `regularizations.ts` — `regularization_requests`; approving one writes an `admin_overrides` row and a *new* `presence_events` row, never an edit to an existing one
+- (`src/lib/parental.ts`, not a query file) — parental-leave constants + `isParentalCaseType()`. PURE, because client components import them; a runtime import from `lib/db/queries/*` into a `'use client'` file bundles the SQLite driver for the browser and fails the build
+- `parental-extensions.ts` — `parental_leave_extensions`; a member's request to extend an open parental case by UNPAID days. Append-only like `leave_requests`; `computeUnpaidExtensionDays()` lives here and is the ONLY place the day count is derived
 - `notifications.ts` — in-app notifications
 - `reminders.ts` — reads/writes for the wall-clock reminder pass (`reminder_log`)
 
@@ -317,6 +323,7 @@ Before editing any of these files, always read them first:
 - Delete user/workspace data (soft delete only)
 - Store raw WiFi SSIDs (always bcrypt hash)
 - Look for `lib/db/schema.ts` — it is deleted; read `scripts/migrate.js`
+- Import a RUNTIME value from `lib/db/queries/*` into a `'use client'` component — `import type` only. A value import drags better-sqlite3/libSQL into the browser bundle; put anything both sides need in a pure `src/lib/*.ts` module
 - Reintroduce `requireWsAdmin()`, or gate a `/api/ws/[slug]/*` route on membership alone
 - Put a shadow on an inline surface (card, input, chip, row, table) — shadows are for overlays only. Add gradients to app UI
 - Write a `<style>` block in a component, or an ad-hoc inline style object — add a class to `globals.css`

@@ -1,6 +1,11 @@
 import { getPendingLeaveRequests, type PendingLeaveSummary } from './db/queries/leaves'
 import { getPendingRegularizationRequests, type RegularizationRequestWithUser, type RegularizationType } from './db/queries/regularizations'
 import { getPendingDocuments, type PendingDocumentSummary } from './db/queries/documents'
+import {
+  getPendingParentalExtensions,
+  type ParentalExtensionWithUser,
+} from './db/queries/parental-extensions'
+import type { ParentalCaseType } from './db/queries/maternity'
 import { can } from './permissions/can'
 import { Action, Resource, type PermissionGrid } from './permissions/catalogue'
 
@@ -23,6 +28,26 @@ export type ApprovalItem =
       target_date: string
       requested_type: RegularizationType
       reason: string
+    }
+  | {
+      /**
+       * A member asking to stay on parental leave longer than their case
+       * allows, as UNPAID days. Approving it moves the case's `end_date`; it
+       * writes no `leave_requests` row and touches no balance.
+       *
+       * `unpaid_days` is the figure the server computed - working days only,
+       * weekends and company holidays already excluded - never anything the
+       * member typed.
+       */
+      kind: 'extension'
+      id: string
+      user_full_name: string | null
+      user_email: string
+      case_type: ParentalCaseType
+      previous_end_date: string
+      requested_end_date: string
+      unpaid_days: number
+      reason: string | null
     }
   | {
       /**
@@ -72,6 +97,7 @@ export async function getPendingApprovalItems(
 ): Promise<{
   leave: PendingLeaveSummary[]
   regularization: RegularizationRequestWithUser[]
+  extension: ParentalExtensionWithUser[]
   doc: PendingDocumentSummary[]
   items: ApprovalItem[]
 }> {
@@ -83,9 +109,15 @@ export async function getPendingApprovalItems(
   // allowed to see.
   const canReadDocs = can(opts?.viewer?.permissions, Resource.Documents, Action.Read)
 
-  const [leave, regularization, doc] = await Promise.all([
+  const [leave, regularization, extension, doc] = await Promise.all([
     opts?.leavesEnabled === false ? Promise.resolve([]) : getPendingLeaveRequests(workspaceId, opts?.limit ?? 100_000),
     getPendingRegularizationRequests(workspaceId, opts?.limit),
+    // Gated exactly as `leave` is, and for the same reason: a parental case
+    // lives under the Leaves screen, which redirects when the feature is off,
+    // so an extension filed against one has nowhere to be actioned from.
+    opts?.leavesEnabled === false
+      ? Promise.resolve([])
+      : getPendingParentalExtensions(workspaceId, opts?.limit ?? 100_000),
     canReadDocs ? getPendingDocuments(workspaceId, opts?.limit) : Promise.resolve([]),
   ])
 
@@ -109,6 +141,17 @@ export async function getPendingApprovalItems(
       requested_type: r.requested_type,
       reason: r.reason,
     })),
+    ...extension.map((x): ApprovalItem => ({
+      kind: 'extension',
+      id: x.id,
+      user_full_name: x.user_full_name,
+      user_email: x.user_email,
+      case_type: x.case_type,
+      previous_end_date: x.previous_end_date,
+      requested_end_date: x.requested_end_date,
+      unpaid_days: x.unpaid_days,
+      reason: x.reason,
+    })),
     ...doc.map((d): ApprovalItem => ({
       kind: 'doc',
       id: d.id,
@@ -122,5 +165,5 @@ export async function getPendingApprovalItems(
     })),
   ]
 
-  return { leave, regularization, doc, items }
+  return { leave, regularization, extension, doc, items }
 }

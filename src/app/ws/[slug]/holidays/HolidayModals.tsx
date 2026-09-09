@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, Modal } from '@/components/ui'
+import { ConfirmDialog } from '@/components/ui'
 import { wsAdmin } from '@/locales/en/ws-settings'
 import type { Holiday } from './types'
 
@@ -12,19 +12,15 @@ export function DeleteModal({ holiday, onConfirm, onCancel }: {
   onCancel: () => void
 }) {
   return (
-    <Modal
+    <ConfirmDialog
       open={holiday !== null}
       onClose={onCancel}
+      onConfirm={onConfirm}
       title={t.deleteTitle}
-      footer={
-        <>
-          <Button variant="secondary" size="sm" onClick={onCancel}>{t.cancelBtn}</Button>
-          <Button variant="danger" size="sm" onClick={onConfirm}>{t.deleteConfirm}</Button>
-        </>
-      }
-    >
-      {holiday && <p className="t-secondary">{t.deleteBody(holiday.name)}</p>}
-    </Modal>
+      body={holiday ? t.deleteBody(holiday.name) : ''}
+      confirmLabel={t.deleteConfirm}
+      cancelLabel={t.cancelBtn}
+    />
   )
 }
 
@@ -36,22 +32,16 @@ export function BulkDeleteModal({ open, count, onConfirm, onCancel, deleting }: 
   deleting: boolean
 }) {
   return (
-    <Modal
+    <ConfirmDialog
       open={open}
       onClose={onCancel}
+      onConfirm={onConfirm}
       title={t.bulkDeleteTitle(count)}
-      footer={
-        <>
-          <Button variant="secondary" size="sm" disabled={deleting} onClick={onCancel}>
-            {t.cancelBtn}
-          </Button>
-          <Button variant="danger" size="sm" loading={deleting} onClick={onConfirm}>
-            {deleting ? t.deletingConfirm : t.deleteConfirm}
-          </Button>
-        </>
-      }
-    >
-      <p className="t-secondary">{t.bulkDeleteBody(count)}</p>
-    </Modal>
+      body={t.bulkDeleteBody(count)}
+      confirmLabel={t.deleteConfirm}
+      busyLabel={t.deletingConfirm}
+      cancelLabel={t.cancelBtn}
+      loading={deleting}
+    />
   )
 }

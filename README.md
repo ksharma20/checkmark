@@ -162,7 +162,7 @@ src/
 │           ├── employees/        # HR directory + wizard + document folders
 │           ├── assets/           # Asset register
 │           ├── attendance/       # Day-level attendance table
-│           ├── leaves/           # Requests · Applied · Types · Balances · Maternity
+│           ├── leaves/           # Applied · Maternity · Paternity (types+balances in Settings)
 │           ├── holidays/         # Holiday calendar + CSV/XLSX import
 │           ├── approvals/        # Leave / regularization / document queue
 │           ├── people/           # Membership: invite, roles, consent
@@ -282,7 +282,9 @@ Verify with `sqlite3 venzio.db ".tables"`.
 | `employment_details`      | Designation, department, work mode, reporting manager, joining / exit dates |
 | `employee_documents`      | Document **metadata** only. One row per `(employee, doc_key)` slot. Soft-deleted |
 | `employee_document_blobs` | Document **bytes** as base64 TEXT, one row per document. Hard-deleted   |
-| `maternity_cases`         | Maternity leave cases - `requested` → `approved` → `onleave` → `returned` |
+| `announcement_attachments` | Policy-document **metadata** hung off an announcement. Soft-deleted     |
+| `announcement_attachment_blobs` | Those **bytes** as base64 TEXT. Hard-deleted with the metadata     |
+| `maternity_cases`         | Parental leave cases, maternity **and** paternity (`case_type`) - `requested` → `approved` → `onleave` → `returned` |
 
 **Leave**
 
@@ -291,6 +293,7 @@ Verify with `sqlite3 venzio.db ".tables"`.
 | `workspace_leave_types`   | Per-workspace leave types with accrual frequency + credits. Soft-deleted |
 | `leave_requests`          | Immutable once inserted                                                |
 | `leave_opening_balances`  | Migrated-in starting balance per (workspace, user, leave type)          |
+| `parental_leave_extensions` | Member requests for **unpaid** extra days on an open parental case. Append-only apart from approve/reject |
 
 ### Migration
 
@@ -664,27 +667,39 @@ with columns `email`, `leave_type`, `opening_balance`.
 The whole Leave and Holidays area is hidden when `workspaces.leaves_enabled` is off,
 regardless of permission.
 
-### Maternity
+### Parental leave (maternity + paternity)
 
-`maternity_cases`, surfaced as a tab under `/ws/:slug/leaves`. Filed under
-`Resource.Leaves` rather than getting its own catalogue resource. A case carries a due date,
-start/end dates and a `weeks` count (default 26), and moves through
-`requested → approved → onleave → returned`. Soft-deleted. An active case suppresses
-check-in reminders for that person.
+`maternity_cases`, surfaced as **two tabs** under `/ws/:slug/leaves` and discriminated by
+`case_type`. One table, one stage machine, one reminder gate — only the entitlement differs
+(`weeks` defaults to 26 for maternity, 2 for paternity). Filed under `Resource.Leaves`
+rather than getting its own catalogue resource. A case carries a due date, start/end dates
+and a `weeks` count, and moves through `requested → approved → onleave → returned`.
+Soft-deleted, and editable and deletable from the tab. An active case of either type
+suppresses check-in reminders for that person.
+
+`parental_leave_extensions` lets a member request **unpaid** extra days on an open case.
+The day count is computed server-side with `countWorkdays()` against the workspace's working
+days and holiday calendar — never sent by the client — and recomputed at approval. Approving
+moves the case's `end_date`; it writes no `leave_requests` row and consumes no balance.
 
 ### Approvals
 
 `/ws/:slug/approvals`, gated on `Resource.Approvals`. `src/lib/approvals.ts` is the single
-source for the pending feed, reused by the Overview widget, the Approvals page and the
-People page so all three always agree. Three kinds:
+source for the pending feed, reused by the Overview widget and the Approvals page so both
+always agree. Four kinds:
 
 - `leave` - pending leave requests
 - `regularization` - member-raised attendance corrections
 - `doc` - employee-uploaded documents awaiting verification
+- `extension` - a request for unpaid extra days on an open parental-leave case
 
-`PATCH /api/ws/:slug/approvals/:kind/:id` actions the first two (`kind` must be `leave` or
-`regularization`; anything else is a 404). Rejection requires a `rejection_reason`. Document
-verification is a `PATCH` on the document itself.
+**This is the only place a pending item is actioned.** The same rows used to be approvable
+from the Attendance screen, a Requests tab on the Leaves screen and an ungated section on the
+People page; those are gone. Read-only listings elsewhere (the Applied-leaves tab) stay.
+
+`PATCH /api/ws/:slug/approvals/:kind/:id` actions `leave`, `regularization` and `extension`
+(anything else is a 404). Rejection requires a `rejection_reason`. Document verification is a
+`PATCH` on the document itself.
 
 ### Billing
 

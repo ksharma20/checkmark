@@ -36,6 +36,7 @@ interface Props {
   canWriteSettings: boolean
   canReadLeaves: boolean
   canWriteLeaves: boolean
+  canDeleteLeaves: boolean
   canReadSignals: boolean
   canWriteSignals: boolean
   canDeleteSignals: boolean
@@ -92,7 +93,7 @@ export default function SettingsClient(props: Props) {
       {active === 'org' && <OrgTab slug={props.slug} canWrite={props.canWriteSettings} />}
 
       {active === 'leave' && (
-        <LeaveTypesSection slug={props.slug} canWrite={props.canWriteLeaves} />
+        <LeaveTypesSection slug={props.slug} canWrite={props.canWriteLeaves} canDelete={props.canDeleteLeaves} />
       )}
 
       {active === 'balances' && (

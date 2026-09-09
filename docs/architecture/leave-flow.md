@@ -289,14 +289,14 @@ they may not be nulled. Only `returned` — where the case is history and no gat
 looks at it any more — may hold nulls.
 
 This exists because the reminder gate reads **dates, not status**:
-`getActiveMaternityUserIds()` matches `start_date <= today <= end_date`. Nulling
+`getActiveParentalUserIds()` matches `start_date <= today <= end_date`. Nulling
 `end_date` on an `onleave` case therefore used to drop the person silently out of
 the gate while the case still read as open, and the daily check-in reminder
 resumed nagging someone who is on maternity leave. The check runs against the
 *resulting* status (`input.status ?? existing.status`), so it cannot be dodged by
 clearing a date in the same PATCH that moves the case forward.
 
-#### One open case per employee, enforced at the DB
+#### One open case per employee **per case type**, enforced at the DB
 
 `findOpenCaseForEmployee()` (status `!= 'returned'`) rejects a second concurrent
 case with `409 CASE_OPEN`; an employee may have a history of closed ones. That
@@ -304,10 +304,22 @@ read is a **courtesy**, not the guarantee — it and the insert are not one atom
 step. The real enforcement is a partial unique index:
 
 ```sql
-CREATE UNIQUE INDEX idx_maternity_cases_one_open
-  ON maternity_cases(workspace_id, employee_id)
+CREATE UNIQUE INDEX idx_parental_cases_one_open
+  ON maternity_cases(workspace_id, employee_id, case_type)
   WHERE deleted_at IS NULL AND status IN ('requested','approved','onleave');
 ```
+
+`case_type` (`'maternity' | 'paternity'`) is in the index, or somebody who has
+ever taken maternity leave could never open a paternity case. The index was
+**renamed** from `idx_maternity_cases_one_open` when that column landed, and the
+rename is load-bearing: `scripts/migrate.js` swallows `already exists`, so
+re-issuing the old name with a new definition would have been counted as a skip
+and left the two-column index quietly in place. `DROP INDEX IF EXISTS` + a
+`CREATE` under a new name is the only spelling whose outcome is observable.
+
+`case_type` itself has **no CHECK constraint** — SQLite cannot add one to a
+column introduced by `ALTER TABLE` — so `isParentalCaseType()` in
+`queries/maternity.ts` is the only validation on it.
 
 `createMaternityCase()` recognises that collision and throws
 `MaternityCaseOpenError`, which the route turns into **the same** `409 CASE_OPEN`
@@ -320,7 +332,7 @@ with it.
 ### Why maternity needs its own reminder gate
 
 ```ts
-getActiveMaternityUserIds(workspaceId, date)  // → Set<user_id>
+getActiveParentalUserIds(workspaceId, date)   // → Set<user_id>, both case types
 ```
 
 Maternity lives in its own table keyed by `employee_id`, so the

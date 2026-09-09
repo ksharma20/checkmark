@@ -55,9 +55,15 @@ const SCREEN_ICONS: Record<Screen, React.ReactNode> = {
 const SCREEN_LABELS: Record<Screen, string> = en.wsNav.screens
 const GROUP_LABELS: Record<ScreenGroup, string> = en.wsNav.groups
 
-/** Screens that carry a pending-count badge, and which count they read. */
-const SCREEN_BADGES: Partial<Record<Screen, 'leave' | 'approvals'>> = {
-  [Screen.Leave]: 'leave',
+/**
+ * Screens that carry a pending-count badge, and which count they read.
+ *
+ * Approvals is the only one, deliberately: it is the ONE screen from which a
+ * pending item can be actioned, and its count is leave + regularization. Leave
+ * used to carry its own badge pointing at a Requests tab that no longer exists
+ * - a badge whose destination cannot action anything is worse than no badge.
+ */
+const SCREEN_BADGES: Partial<Record<Screen, 'approvals'>> = {
   [Screen.Approvals]: 'approvals',
 }
 
@@ -74,7 +80,7 @@ interface Props {
    *  this repo forwards a ref (see docs/design/components.md). */
   navRef: RefObject<HTMLElement | null>
   leavesEnabled: boolean
-  pendingLeaveCount: number
+  /** Leave + regularization, both actioned on /ws/:slug/approvals. */
   pendingApprovalsCount: number
   userName: string
   /** Display name of the role, e.g. "Owner". Never the raw key. */
@@ -94,7 +100,7 @@ interface Props {
  */
 export default function WsSidebar({
   slug, collapsed, onToggleCollapsed, onNavigate, navRef, leavesEnabled,
-  pendingLeaveCount, pendingApprovalsCount, userName, userRoleName, readableResources,
+  pendingApprovalsCount, userName, userRoleName, readableResources,
 }: Props) {
   const pathname = usePathname()
 
@@ -159,12 +165,7 @@ export default function WsSidebar({
                 ? pathname === href
                 : pathname === href || pathname.startsWith(`${href}/`)
             const badge = SCREEN_BADGES[screen.key]
-            const badgeCount =
-              badge === 'leave'
-                ? pendingLeaveCount
-                : badge === 'approvals'
-                  ? pendingApprovalsCount
-                  : 0
+            const badgeCount = badge === 'approvals' ? pendingApprovalsCount : 0
             const label = SCREEN_LABELS[screen.key]
 
             return (

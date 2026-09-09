@@ -16,6 +16,23 @@ export const wsAnnouncements = {
   submit: 'Post announcement',
   submitting: 'Posting…',
 
+  // ── attachment ────────────────────────────────────────────────────────────
+  fieldAttachment: 'Attachment',
+  fieldAttachmentHint: 'Optional. One PDF, PNG or JPEG, up to 2 MB.',
+  attachmentDropzone: 'Drop a file here, or choose one',
+  attachmentRemove: 'Remove',
+  /** Filename plus size, under the dropzone once a file is chosen. */
+  attachmentChosen: (name: string, kb: number) => `${name} · ${kb} KB`,
+  attachmentLabel: 'Attachment',
+  attachmentDownload: 'Download',
+  /**
+   * The two rejections a person can actually cause. Both are decided by the
+   * SERVER - the size against `MAX_FILE_BYTES`, the type by sniffing magic
+   * bytes - so these strings describe the rule rather than re-implementing it.
+   */
+  attachmentTooLarge: 'That file is larger than 2 MB.',
+  attachmentUnsupported: 'Only PDF, PNG and JPEG files are accepted.',
+
   titleRequired: 'A title is required.',
   bodyRequired: 'A message is required.',
   postFailed: 'Could not post the announcement.',

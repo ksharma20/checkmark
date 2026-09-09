@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import type { WorkspaceMember, Workspace } from '@/lib/db/queries/workspaces'
 import { isWorkspaceAdmin } from '@/lib/permissions/ranks'
-import { Button, Card, EmptyState, WorkspaceAvatar } from '@/components/ui'
+import { Button, Card, ConfirmDialog, EmptyState, WorkspaceAvatar } from '@/components/ui'
 import { en } from '@/locales/en'
 import { meSettings } from '@/locales/en/me-settings'
 
@@ -24,6 +24,8 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
   const [pendingList, setPendingList] = useState(pendingMemberships)
   const [loadingId, setLoadingId] = useState<string | null>(null)
   const [counts, setCounts] = useState<Record<string, { present: number; visited: number; notIn: number }>>({})
+  const [pendingLeave, setPendingLeave] = useState<{ workspaceId: string; name: string } | null>(null)
+  const [leaveError, setLeaveError] = useState<string | null>(null)
 
   useEffect(() => {
     activeList.forEach((m) => {
@@ -40,18 +42,22 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
     })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function handleLeave(workspaceId: string, wsName: string) {
-    if (!confirm(en.meOrgs.leaveConfirm(wsName))) return
+  async function confirmLeave() {
+    if (!pendingLeave) return
+    const { workspaceId } = pendingLeave
     setLoadingId(workspaceId)
+    setLeaveError(null)
     try {
       const res = await fetch(`/api/me/workspaces/${workspaceId}`, { method: 'DELETE' })
       if (res.ok) {
         setActiveList((prev) => prev.filter((m) => m.workspace_id !== workspaceId))
+        setPendingLeave(null)
         router.refresh()
       } else {
-        // 409 SOLE_ADMIN lands here - the server explains why the leave was refused.
+        // 409 SOLE_ADMIN lands here - the server explains why the leave was
+        // refused, and the dialog stays open to carry that explanation.
         const data = await res.json()
-        alert(data.error || en.meOrgs.leaveError)
+        setLeaveError(data.error || en.meOrgs.leaveError)
       }
     } finally {
       setLoadingId(null)
@@ -193,7 +199,11 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                       disabled={loadingId === m.workspace_id}
                       onClick={(e) => {
                         e.stopPropagation()
-                        handleLeave(m.workspace_id, name || en.meOrgs.leaveFallbackName)
+                        setLeaveError(null)
+                        setPendingLeave({
+                          workspaceId: m.workspace_id,
+                          name: name || en.meOrgs.leaveFallbackName,
+                        })
                       }}
                     >
                       {loadingId === m.workspace_id ? en.meOrgs.leavingBtn : en.meOrgs.leaveBtn}
@@ -220,6 +230,19 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
           />
         )
       )}
+
+      <ConfirmDialog
+        open={pendingLeave !== null}
+        onClose={() => { setPendingLeave(null); setLeaveError(null) }}
+        onConfirm={() => void confirmLeave()}
+        title={meSettings.orgs.leaveTitle}
+        body={pendingLeave ? en.meOrgs.leaveConfirm(pendingLeave.name) : ''}
+        confirmLabel={meSettings.orgs.leaveConfirmAction}
+        busyLabel={meSettings.orgs.leaveBusy}
+        cancelLabel={meSettings.orgs.leaveCancel}
+        loading={loadingId !== null && loadingId === pendingLeave?.workspaceId}
+        error={leaveError}
+      />
     </div>
   )
 }

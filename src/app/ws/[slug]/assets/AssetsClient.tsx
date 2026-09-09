@@ -1,14 +1,14 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Plus } from 'lucide-react'
+import { Download, Pencil, Plus, Trash2 } from 'lucide-react'
 import {
-  Avatar, Button, Card, Chip, DataTable, EmptyState, Field, Input, Modal, Select,
-  SkeletonText, StatCard, Textarea,
+  Avatar, Button, Card, Chip, ConfirmDialog, DataTable, EmptyState, Field, IconButton,
+  Input, Modal, Select, SkeletonText, StatCard, Textarea,
   type ChipTone, type Column,
 } from '@/components/ui'
 import { useToast } from '@/components/shared/Toast'
-import { wsAssets } from '@/locales/en/ws-people'
+import { wsAssets } from '@/locales/en/ws-assets'
 import { hrRecord } from '@/locales/en/documents'
 import type { AssetStatus, AssetStatusCount, AssetWithAssignee } from '@/lib/db/queries/assets'
 import type { MemberWithUserFull } from '@/lib/db/queries/workspaces'
@@ -91,16 +91,21 @@ function memberLabel(m: PickableMember): string {
   return (m.full_name ?? '').trim() || m.email
 }
 
+/** Which row the add/edit modal is open for. `add` carries no asset. */
+type FormTarget = { mode: 'add' } | { mode: 'edit'; asset: AssetWithAssignee }
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 interface Props {
   slug: string
   canWrite: boolean
+  /** assets:delete - removing a row from the register. */
+  canDelete: boolean
   /** employees:read - without it the assign modal has nobody to offer. */
   canReadEmployees: boolean
 }
 
-export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props) {
+export default function AssetsClient({ slug, canWrite, canDelete, canReadEmployees }: Props) {
   // Destructured: `show` is a stable useCallback, the context object is not,
   // so this is what makes it safe in a useCallback/useEffect dep array.
   const { show: toast } = useToast()
@@ -112,9 +117,13 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
   const [category, setCategory] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
 
-  const [showAdd, setShowAdd] = useState(false)
+  const [formFor, setFormFor] = useState<FormTarget | null>(null)
   const [assigning, setAssigning] = useState<AssetWithAssignee | null>(null)
   const [members, setMembers] = useState<PickableMember[]>([])
+
+  const [deleteTarget, setDeleteTarget] = useState<AssetWithAssignee | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -220,6 +229,31 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
     }
   }
 
+  /**
+   * DELETE is a SOFT delete - the row keeps its assignment history, it just
+   * leaves the register. The error stays inside the dialog rather than
+   * becoming a toast, so the failed action and its explanation are in the
+   * same place.
+   */
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      const res = await fetch(`/api/ws/${slug}/assets/${deleteTarget.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({})) as { error?: string }
+      if (!res.ok) {
+        setDeleteError(data.error ?? wsAssets.deleteFailed)
+        return
+      }
+      setDeleteTarget(null)
+      toast(wsAssets.deleted, 'success')
+      await load()
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   // ── Table ──────────────────────────────────────────────────────────────────
 
   const columns: Column<AssetWithAssignee>[] = [
@@ -261,22 +295,14 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
       render: a => <span className="t-secondary" style={{ fontSize: '11.5px' }}>{fmtDate(a.assigned_at)}</span>,
     },
     {
+      // Read-only. Condition used to be an inline <Select> that PATCHed on
+      // change - a consequential write dressed up as sorting a column, and
+      // the one editable field with nowhere to state a consequence. It now
+      // lives in the edit form with the rest of the record, which is the same
+      // call the People directory made about its role dropdown.
       key: 'condition',
       header: wsAssets.colCondition,
-      render: (a) => (
-        canWrite ? (
-          <Select
-            value={a.condition ?? ''}
-            aria-label={wsAssets.fieldCondition}
-            disabled={busyId === a.id}
-            onChange={e => void patch(a, { condition: e.target.value || null }, wsAssets.conditionUpdated)}
-            style={{ height: '34px', width: '104px', fontSize: '12px' }}
-            options={[{ value: '', label: wsAssets.conditionUnset }, ...CONDITIONS]}
-          />
-        ) : (
-          <span className="t-secondary">{a.condition ?? wsAssets.conditionUnset}</span>
-        )
-      ),
+      render: a => <span className="t-secondary">{a.condition ?? wsAssets.conditionUnset}</span>,
     },
     {
       key: 'status',
@@ -288,7 +314,7 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
       header: wsAssets.colAction,
       align: 'right',
       render: (a) => {
-        if (!canWrite) return <span className="t-muted">—</span>
+        if (!canWrite && !canDelete) return <span className="t-muted">—</span>
         const busy = busyId === a.id
         // Every other action keys off the HOLDER, not off the status: an
         // asset with a holder can only leave via Return (DELETE /assign),
@@ -297,18 +323,18 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
         // offers the one button that can unstick it.
         const held = a.assigned_employee_id !== null
         return (
-          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-            {held && (
+          <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap' }}>
+            {canWrite && held && (
               <Button variant="secondary" size="sm" loading={busy} onClick={() => void returnAsset(a)}>
                 {wsAssets.actionReturn}
               </Button>
             )}
-            {a.status === 'available' && !held && (
+            {canWrite && a.status === 'available' && !held && (
               <Button size="sm" disabled={busy} onClick={() => setAssigning(a)}>
                 {wsAssets.actionAssign}
               </Button>
             )}
-            {a.status === 'repair' && !held && (
+            {canWrite && a.status === 'repair' && !held && (
               <Button
                 variant="secondary" size="sm" loading={busy}
                 onClick={() => void patch(a, { status: 'available' }, wsAssets.backInService)}
@@ -318,7 +344,7 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
             )}
             {/* An assigned asset has to come back before it can go to a
                 workshop, so repair is offered only once it is in the pool. */}
-            {a.status === 'available' && !held && (
+            {canWrite && a.status === 'available' && !held && (
               <Button
                 variant="ghost" size="sm" loading={busy}
                 onClick={() => void patch(a, { status: 'repair' }, wsAssets.sentToRepair)}
@@ -326,13 +352,31 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
                 {wsAssets.actionRepair}
               </Button>
             )}
-            {a.status !== 'retired' && !held && (
+            {canWrite && a.status !== 'retired' && !held && (
               <Button
                 variant="ghost" size="sm" loading={busy}
                 onClick={() => void patch(a, { status: 'retired' }, wsAssets.retired)}
               >
                 {wsAssets.actionRetire}
               </Button>
+            )}
+            {canWrite && (
+              <IconButton
+                variant="plain"
+                label={wsAssets.editAction}
+                icon={<Pencil size={14} />}
+                disabled={busy}
+                onClick={() => setFormFor({ mode: 'edit', asset: a })}
+              />
+            )}
+            {canDelete && (
+              <IconButton
+                variant="decline"
+                label={wsAssets.deleteAction}
+                icon={<Trash2 size={14} />}
+                disabled={busy}
+                onClick={() => { setDeleteError(null); setDeleteTarget(a) }}
+              />
             )}
           </div>
         )
@@ -358,8 +402,8 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
             <Download size={14} aria-hidden /> {wsAssets.exportButton}
           </a>
           {canWrite && (
-            <Button size="sm" icon={<Plus size={14} />} onClick={() => setShowAdd(v => !v)}>
-              {showAdd ? wsAssets.cancelButton : wsAssets.addButton}
+            <Button size="sm" icon={<Plus size={14} />} onClick={() => setFormFor({ mode: 'add' })}>
+              {wsAssets.addButton}
             </Button>
           )}
         </div>
@@ -371,15 +415,6 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
         <StatCard label={wsAssets.statAvailable} value={countFor(counts, 'available')} hint={wsAssets.statAvailableHint} />
         <StatCard label={wsAssets.statRepair} value={countFor(counts, 'repair')} hint={wsAssets.statRepairHint} accent="amber" />
       </div>
-
-      {canWrite && showAdd && (
-        <AddAssetForm
-          slug={slug}
-          categories={categories}
-          onCancel={() => setShowAdd(false)}
-          onAdded={async () => { setShowAdd(false); await load() }}
-        />
-      )}
 
       <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
         {chips.map(c => (
@@ -406,6 +441,20 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
         )}
       </Card>
 
+      {canWrite && formFor && (
+        <AssetForm
+          // Remounts between add and edit so the fields seed from the right
+          // row - the state is initialised from `initial`, not synced to it.
+          key={formFor.mode === 'edit' ? formFor.asset.id : 'add'}
+          slug={slug}
+          open
+          initial={formFor.mode === 'edit' ? formFor.asset : undefined}
+          categories={categories}
+          onSave={async () => { setFormFor(null); await load() }}
+          onClose={() => setFormFor(null)}
+        />
+      )}
+
       {/* Keyed by asset: remounting is what resets the picked employee, so
           there is no effect syncing state that a fresh mount already gives. */}
       {assigning && (
@@ -418,37 +467,80 @@ export default function AssetsClient({ slug, canWrite, canReadEmployees }: Props
           onAssign={userId => void assign(assigning, userId)}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        onClose={() => { setDeleteTarget(null); setDeleteError(null) }}
+        onConfirm={() => void confirmDelete()}
+        title={wsAssets.deleteTitle}
+        body={deleteTarget ? wsAssets.deleteBody(deleteTarget.name) : ''}
+        note={wsAssets.deleteNote}
+        confirmLabel={wsAssets.deleteConfirm}
+        busyLabel={wsAssets.deletingConfirm}
+        cancelLabel={wsAssets.deleteCancel}
+        loading={deleting}
+        error={deleteError}
+      />
     </div>
   )
 }
 
-// ─── Add form ─────────────────────────────────────────────────────────────────
+// ─── Add / edit form ──────────────────────────────────────────────────────────
 
-function AddAssetForm({
-  slug, categories, onCancel, onAdded,
-}: {
+interface AssetFormProps {
   slug: string
+  open: boolean
+  /** Present when editing an existing row; absent when adding a new one. */
+  initial?: AssetWithAssignee
+  /** Free-text suggestions - whatever categories the workspace already uses. */
   categories: string[]
-  onCancel: () => void
-  onAdded: () => void | Promise<void>
-}) {
-  // Destructured: `show` is a stable useCallback, the context object is not,
-  // so this is what makes it safe in a useCallback/useEffect dep array.
-  const { show: toast } = useToast()
-  const [name, setName] = useState('')
-  const [category, setCategory] = useState('')
-  const [serial, setSerial] = useState('')
-  const [condition, setCondition] = useState('good')
-  const [value, setValue] = useState('')
-  const [notes, setNotes] = useState('')
-  const [saving, setSaving] = useState(false)
+  onSave: () => void | Promise<void>
+  onClose: () => void
+}
 
-  async function submit() {
-    if (!name.trim()) { toast(wsAssets.addNameRequired, 'error'); return }
+/**
+ * Add / edit an asset.
+ *
+ * One component for both, flipped by `initial`: POST creates, PATCH updates.
+ *
+ * It NEVER sends `status`, in either mode. The PATCH route owns the assignment
+ * boundary - `status: 'assigned'` on an unheld asset is `ASSIGN_VIA_ENDPOINT`,
+ * and any other status on a held one is `RETURN_FIRST` - so a form that round
+ * -tripped the current status would 409 every time an assigned asset was
+ * edited. Status moves through the row actions (assign / return / repair /
+ * retire), which is the only place it can move correctly. On create the server
+ * seeds `available`.
+ *
+ * Errors are local state rather than toasts: a validation failure belongs
+ * beside the field that caused it, and the 422 `fields` map is what paints the
+ * `invalid` borders.
+ */
+function AssetForm({ slug, open, initial, categories, onSave, onClose }: AssetFormProps) {
+  const [name, setName] = useState(initial?.name ?? '')
+  const [category, setCategory] = useState(initial?.category ?? '')
+  const [serial, setSerial] = useState(initial?.serial_number ?? '')
+  const [condition, setCondition] = useState(initial?.condition ?? (initial ? '' : 'good'))
+  const [value, setValue] = useState(initial?.purchase_value != null ? String(initial.purchase_value) : '')
+  const [notes, setNotes] = useState(initial?.notes ?? '')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+
+  async function save() {
+    if (!name.trim()) {
+      setFieldErrors({ name: 'REQUIRED' })
+      setError(wsAssets.addNameRequired)
+      return
+    }
     setSaving(true)
+    setError(null)
+    setFieldErrors({})
     try {
-      const res = await fetch(`/api/ws/${slug}/assets`, {
-        method: 'POST',
+      const url = initial
+        ? `/api/ws/${slug}/assets/${initial.id}`
+        : `/api/ws/${slug}/assets`
+      const res = await fetch(url, {
+        method: initial ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: name.trim(),
@@ -459,58 +551,117 @@ function AddAssetForm({
           notes: notes.trim() || null,
         }),
       })
-      const data = await res.json().catch(() => ({})) as { error?: string }
-      if (res.ok) {
-        toast(wsAssets.added, 'success')
-        await onAdded()
-      } else {
-        toast(data.error ?? wsAssets.actionFailed, 'error')
+      const data = await res.json().catch(() => ({})) as {
+        error?: string
+        code?: string
+        fields?: Record<string, string>
       }
+      if (!res.ok) {
+        if (data.code === 'VALIDATION_ERROR' && data.fields) {
+          setFieldErrors(data.fields)
+          setError(
+            data.fields.name === 'REQUIRED' ? wsAssets.addNameRequired
+              : data.fields.purchase_value ? wsAssets.valueInvalid
+                : wsAssets.validationFailed,
+          )
+          return
+        }
+        setError(data.error ?? wsAssets.saveFailed)
+        return
+      }
+      await onSave()
     } finally {
       setSaving(false)
     }
   }
 
+  const categoryListId = 'asset-category-options'
+
   return (
-    <Card style={{ marginTop: '14px' }}>
-      <p className="t-eyebrow" style={{ marginBottom: '10px' }}>{wsAssets.addFormTitle}</p>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
-        <Field label={wsAssets.fieldName} htmlFor="asset-name" required full>
-          <Input id="asset-name" value={name} onChange={e => setName(e.target.value)} placeholder={wsAssets.fieldNamePlaceholder} />
+    <Modal
+      open={open}
+      onClose={onClose}
+      maxWidth={520}
+      title={initial ? wsAssets.editTitle : wsAssets.addTitle}
+      footer={
+        <>
+          <Button variant="secondary" size="sm" onClick={onClose}>{wsAssets.cancelButton}</Button>
+          <Button size="sm" loading={saving} onClick={() => void save()}>
+            {initial ? wsAssets.saveSubmit : wsAssets.addSubmit}
+          </Button>
+        </>
+      }
+    >
+      <div className="stack">
+        <Field label={wsAssets.fieldName} htmlFor="asset-name" required>
+          <Input
+            id="asset-name"
+            autoFocus
+            value={name}
+            placeholder={wsAssets.fieldNamePlaceholder}
+            invalid={!!fieldErrors.name}
+            onChange={e => setName(e.target.value)}
+          />
         </Field>
         <Field label={wsAssets.fieldCategory} htmlFor="asset-category">
           <Input
             id="asset-category"
-            list="asset-category-options"
+            list={categoryListId}
             value={category}
-            onChange={e => setCategory(e.target.value)}
             placeholder={wsAssets.fieldCategoryPlaceholder}
+            invalid={!!fieldErrors.category}
+            onChange={e => setCategory(e.target.value)}
           />
           {/* Free text with suggestions: categories are whatever this
               workspace already uses, not a fixed enum. */}
-          <datalist id="asset-category-options">
+          <datalist id={categoryListId}>
             {categories.map(c => <option key={c} value={c} />)}
           </datalist>
         </Field>
         <Field label={wsAssets.fieldSerial} htmlFor="asset-serial">
-          <Input id="asset-serial" value={serial} onChange={e => setSerial(e.target.value)} placeholder={wsAssets.fieldSerialPlaceholder} />
+          <Input
+            id="asset-serial"
+            value={serial}
+            placeholder={wsAssets.fieldSerialPlaceholder}
+            invalid={!!fieldErrors.serial_number}
+            onChange={e => setSerial(e.target.value)}
+          />
         </Field>
         <Field label={wsAssets.fieldCondition} htmlFor="asset-condition">
-          <Select id="asset-condition" value={condition} onChange={e => setCondition(e.target.value)} options={CONDITIONS} />
+          <Select
+            id="asset-condition"
+            value={condition}
+            invalid={!!fieldErrors.condition}
+            onChange={e => setCondition(e.target.value)}
+            options={[{ value: '', label: wsAssets.conditionUnset }, ...CONDITIONS]}
+          />
         </Field>
         <Field label={wsAssets.fieldValue} htmlFor="asset-value">
-          <Input id="asset-value" type="number" min={0} value={value} onChange={e => setValue(e.target.value)} placeholder={wsAssets.fieldValuePlaceholder} />
+          <Input
+            id="asset-value"
+            type="number"
+            min={0}
+            value={value}
+            placeholder={wsAssets.fieldValuePlaceholder}
+            invalid={!!fieldErrors.purchase_value}
+            onChange={e => setValue(e.target.value)}
+          />
         </Field>
-        <Field label={wsAssets.fieldNotes} htmlFor="asset-notes" full>
-          <Textarea id="asset-notes" value={notes} onChange={e => setNotes(e.target.value)} rows={2} />
+        <Field label={wsAssets.fieldNotes} htmlFor="asset-notes">
+          <Textarea
+            id="asset-notes"
+            value={notes}
+            rows={2}
+            invalid={!!fieldErrors.notes}
+            onChange={e => setNotes(e.target.value)}
+          />
         </Field>
+
+        <p className="field-hint">{initial ? wsAssets.editHint : wsAssets.addHint}</p>
+
+        {error && <p className="field-error" role="alert">{error}</p>}
       </div>
-      <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-        <Button loading={saving} onClick={() => void submit()}>{wsAssets.addSubmit}</Button>
-        <Button variant="secondary" onClick={onCancel}>{wsAssets.cancelButton}</Button>
-      </div>
-      <p className="t-muted" style={{ marginTop: '10px' }}>{wsAssets.addHint}</p>
-    </Card>
+    </Modal>
   )
 }
 

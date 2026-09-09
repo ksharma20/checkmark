@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import { Button, Card, Chip, EmptyState, Field, Input, Modal, Skeleton } from '@/components/ui'
+import { Button, Card, Chip, ConfirmDialog, EmptyState, Field, Input, Skeleton } from '@/components/ui'
 import { en } from '@/locales/en'
 import { wsAdmin } from '@/locales/en/ws-settings'
 
@@ -328,31 +328,22 @@ export default function SignalsTab({ slug, canWrite, canDelete }: Props) {
 
       <p className="t-muted" style={{ marginTop: '14px' }}>{s.signalsAndTitle}</p>
 
-      <Modal
+      {/* The body is the signal itself, so it keeps `.mono`. `.t-prewrap` carries
+          the `overflow-wrap: anywhere` the old inline style asked for - a
+          location name is user-supplied and can be one long token. */}
+      <ConfirmDialog
         open={pendingDelete !== null}
         onClose={() => setPendingDelete(null)}
+        onConfirm={() => { if (pendingDelete) deleteSignal(pendingDelete.id) }}
         title={t.signalRemoveConfirm}
-        footer={
-          <>
-            <Button variant="secondary" size="sm" onClick={() => setPendingDelete(null)}>
-              {t.cancelBtn}
-            </Button>
-            <Button
-              variant="danger"
-              size="sm"
-              onClick={() => pendingDelete && deleteSignal(pendingDelete.id)}
-            >
-              {t.signalRemove}
-            </Button>
-          </>
+        body={
+          pendingDelete
+            ? <span className="mono t-prewrap">{signalLabel(pendingDelete)}</span>
+            : ''
         }
-      >
-        {pendingDelete && (
-          <p className="t-secondary mono" style={{ wordBreak: 'break-word' }}>
-            {signalLabel(pendingDelete)}
-          </p>
-        )}
-      </Modal>
+        confirmLabel={t.signalRemove}
+        cancelLabel={t.cancelBtn}
+      />
     </Card>
   )
 }

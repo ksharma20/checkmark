@@ -16,7 +16,12 @@ export async function GET(request: NextRequest, { params }: Props) {
   if (!ctx) return NextResponse.json({ error: 'Forbidden', code: 'FORBIDDEN' }, { status: 403 })
 
   const url = new URL(request.url)
-  const type = (url.searchParams.get('type') ?? 'all') as 'all' | 'leave' | 'regularization'
+  const type = (url.searchParams.get('type') ?? 'all') as
+    | 'all'
+    | 'leave'
+    | 'regularization'
+    | 'extension'
+    | 'doc'
   const search = (url.searchParams.get('search') ?? '').trim().toLowerCase()
 
   const { items } = await getPendingApprovalItems(ctx.workspace.id, {

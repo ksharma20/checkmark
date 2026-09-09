@@ -81,6 +81,49 @@ export async function createLeaveType(params: {
   return row
 }
 
+/**
+ * Partial update of a leave type.
+ *
+ * The `'key' in input` idiom (as `updateAsset` / `updateMaternityCase` use)
+ * distinguishes "set this column" from "leave it alone", so a caller sending
+ * only `name` cannot silently reset the accrual settings to defaults.
+ *
+ * NOTE FOR CALLERS: no balance is materialised anywhere. `getLeaveTypesWithBalance`
+ * recomputes `opening_balance + total_accrued - used_days` on every read from
+ * `accrual_frequency`, `accrual_credits` and `credit_timing`, so editing any of
+ * those three retroactively changes the available balance of EVERY member in
+ * the workspace. Renaming is inert; the other three are not.
+ */
+export async function updateLeaveType(
+  id: string,
+  workspaceId: string,
+  input: {
+    name?: string
+    accrual_frequency?: AccrualFrequency
+    accrual_credits?: number
+    credit_timing?: CreditTiming
+  },
+): Promise<LeaveType | null> {
+  const sets: string[] = []
+  const values: unknown[] = []
+
+  if ('name' in input) { sets.push('name = ?'); values.push(input.name) }
+  if ('accrual_frequency' in input) { sets.push('accrual_frequency = ?'); values.push(input.accrual_frequency) }
+  if ('accrual_credits' in input) { sets.push('accrual_credits = ?'); values.push(input.accrual_credits) }
+  if ('credit_timing' in input) { sets.push('credit_timing = ?'); values.push(input.credit_timing) }
+
+  if (sets.length === 0) return getLeaveTypeById(id, workspaceId)
+
+  values.push(id, workspaceId)
+  const result = await db.execute(
+    `UPDATE workspace_leave_types SET ${sets.join(', ')}
+     WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL`,
+    values,
+  )
+  if (result.changes === 0) return null
+  return getLeaveTypeById(id, workspaceId)
+}
+
 export async function softDeleteLeaveType(id: string, workspaceId: string): Promise<boolean> {
   const row = await db.queryOne<{ id: string }>(
     'SELECT id FROM workspace_leave_types WHERE id = ? AND workspace_id = ? AND deleted_at IS NULL',

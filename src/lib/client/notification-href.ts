@@ -57,6 +57,14 @@ export function notificationHref(n: NotificationTarget, surface: NotificationSur
     return surface === 'ws' ? wsApprovals : '/me/leave'
   }
 
+  if (type.startsWith('extension_')) {
+    // A request to extend a parental leave case by unpaid days. It is filed
+    // against a case, not a balance, but it is still an approval: the admin
+    // actions it from the same queue, and the employee sees the outcome beside
+    // their own leave.
+    return surface === 'ws' ? wsApprovals : '/me/leave'
+  }
+
   if (type.startsWith('regularization_')) {
     // A correction is *about* a past day, so on `/me` the timeline - which is
     // already scoped to the active workspace - is where the outcome is visible.
@@ -82,9 +90,11 @@ export function notificationHref(n: NotificationTarget, surface: NotificationSur
   }
 
   if (type === 'announcement') {
-    // An announcement has no screen of its own - the notification body *is* the
-    // content - so it reopens the scoped notification list it came from.
-    return slug ? `/me/notifications?ws=${encodeURIComponent(slug)}` : '/me/notifications'
+    // The member-facing archive at /me/announcements. It used to reopen the
+    // scoped notification list, because an announcement had no screen of its
+    // own; it has one now, and that screen is the only place the attachments are
+    // reachable - a notification row carries the body and nothing else.
+    return slug ? `/me/announcements?ws=${encodeURIComponent(slug)}` : '/me/announcements'
   }
 
   return fallback

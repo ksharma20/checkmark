@@ -41,6 +41,9 @@ export default async function WsSlugLayout({ children, params }: Props) {
     redirect("/me");
   }
 
+  // Both halves of the Approvals badge. Leave no longer has a badge of its own
+  // - its pending requests are actioned on /ws/:slug/approvals like every other
+  // kind - but the count is still needed, as one addend of that badge.
   const [dbUser, pendingLeaveCount, pendingRegularizationCount, cookieStore] = await Promise.all([
     getUserById(user.userId),
     workspace.leaves_enabled ? getPendingLeaveCount(workspace.id) : Promise.resolve(0),
@@ -68,7 +71,6 @@ export default async function WsSlugLayout({ children, params }: Props) {
         workspaceName={workspace.name}
         logoUpdatedAt={workspace.logo_updated_at}
         plan={workspace.plan}
-        pendingLeaveCount={pendingLeaveCount}
         pendingApprovalsCount={pendingLeaveCount + pendingRegularizationCount}
         userName={dbUser?.full_name?.trim() || user.email}
         userRoleName={role.name}

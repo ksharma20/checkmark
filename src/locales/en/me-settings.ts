@@ -53,6 +53,17 @@ export const meSettings = {
     countsInOffice: (n: number) => `${n} in office`,
     countsVisited: (n: number) => `${n} visited`,
     countsNotIn: (n: number) => `${n} not in`,
+
+    /**
+     * Leaving a workspace. The body keeps `en.meOrgs.leaveConfirm`, which names
+     * the workspace - one of the documented places on `/me` where the name is
+     * the information rather than decoration, because the reader is choosing
+     * between workspaces rather than working inside one.
+     */
+    leaveTitle: 'Leave workspace',
+    leaveConfirmAction: 'Leave',
+    leaveBusy: 'Leaving…',
+    leaveCancel: 'Cancel',
   },
 
   // ── /me/settings ──────────────────────────────────────────────────────────
@@ -115,6 +126,11 @@ export const meSettings = {
       lastUsed: (date: string) => `Last used ${date}`,
       revoke: 'Revoke',
       revokeConfirm: 'Revoke this token? Any apps using it will stop working.',
+      revokeTitle: 'Revoke token',
+      revokeConfirmAction: 'Revoke',
+      revokeBusy: 'Revoking…',
+      revokeCancel: 'Cancel',
+      revokeError: 'Could not revoke this token.',
     },
 
     notifications: {

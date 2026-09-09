@@ -27,7 +27,7 @@ interface Props {
   logoUpdatedAt?: string | null
   /** Plan key as stored on the workspace row - rendered as a chip. */
   plan: string
-  pendingLeaveCount: number
+  /** Leave + regularization, badged on the Approvals nav entry. */
   pendingApprovalsCount: number
   userName: string
   userRoleName: string
@@ -64,7 +64,7 @@ const DESKTOP_QUERY = '(min-width: 861px)'
  * of the flow entirely as a fixed overlay.
  */
 export default function WsLayoutClient({
-  slug, workspaceId, logoUpdatedAt, leavesEnabled, workspaceName, plan, pendingLeaveCount, pendingApprovalsCount,
+  slug, workspaceId, logoUpdatedAt, leavesEnabled, workspaceName, plan, pendingApprovalsCount,
   userName, userRoleName, readableResources, initialNavCollapsed, children,
 }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
@@ -137,7 +137,6 @@ export default function WsLayoutClient({
           onToggleCollapsed={toggleNav}
           onNavigate={closeDrawer}
           leavesEnabled={leavesEnabled}
-          pendingLeaveCount={pendingLeaveCount}
           pendingApprovalsCount={pendingApprovalsCount}
           userName={userName}
           userRoleName={userRoleName}
