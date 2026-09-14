@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react'
 import { Avatar, Button, Card, EmptyState, Input, SkeletonText } from '@/components/ui'
 import { buildReportingTree, ancestorsOf, type ReportingTree } from '@/lib/hierarchy'
@@ -42,8 +41,6 @@ const ZOOM_STEP = 0.1
  * whom - including the roll-up that puts everyone unassigned under the owner.
  */
 export default function OrgTreeClient({ slug, viewerUserId }: { slug: string; viewerUserId: string }) {
-  const router = useRouter()
-
   const [members, setMembers] = useState<HierarchyMember[]>([])
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -54,7 +51,7 @@ export default function OrgTreeClient({ slug, viewerUserId }: { slug: string; vi
   const [query, setQuery] = useState('')
 
   const viewportRef = useRef<HTMLDivElement>(null)
-  const matchRef = useRef<HTMLButtonElement>(null)
+  const matchRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -142,6 +139,59 @@ export default function OrgTreeClient({ slug, viewerUserId }: { slug: string; vi
     })
   }, [])
 
+  function cardBody(args: {
+    isMatch: boolean
+    depth: number
+    hasChildren: boolean
+    isCollapsed: boolean
+    member: HierarchyMember
+    label: string
+    meta: string
+  }) {
+    const { isMatch, depth, hasChildren, isCollapsed, member, label, meta } = args
+    const className = [
+      'org-card',
+      depth === 0 && 'is-root',
+      isMatch && 'is-match',
+      !hasChildren && 'is-leaf',
+    ].filter(Boolean).join(' ')
+
+    /* The card is a fixed height and each line is clipped, so `title` is what
+       keeps a long name or address readable at all. */
+    const inner = (
+      <>
+        <Avatar name={member.name} color={personColor(member.userId)} />
+        <span className="org-card-body">
+          <span className="org-card-name" title={label}>{label}</span>
+          <span className="org-card-meta" title={meta}>{meta}</span>
+        </span>
+      </>
+    )
+
+    if (!hasChildren) {
+      return (
+        <div ref={isMatch ? (el) => { matchRef.current = el } : undefined} className={className}>
+          {inner}
+        </div>
+      )
+    }
+
+    return (
+      <button
+        type="button"
+        ref={isMatch ? (el) => { matchRef.current = el } : undefined}
+        className={className}
+        onClick={() => toggle(member.userId)}
+        aria-expanded={!isCollapsed}
+        aria-label={isCollapsed
+          ? wsOrg.expandAria(member.name, tree.childrenOf.get(member.userId)?.length ?? 0)
+          : wsOrg.collapseAria(member.name)}
+      >
+        {inner}
+      </button>
+    )
+  }
+
   function renderNode(userId: string, depth: number) {
     const member = byId.get(userId)
     if (!member) return null
@@ -176,25 +226,16 @@ export default function OrgTreeClient({ slug, viewerUserId }: { slug: string; vi
             <span className="org-toggle-spacer" aria-hidden />
           )}
 
-          <button
-            type="button"
-            ref={isMatch ? matchRef : undefined}
-            className={[
-              'org-card',
-              depth === 0 && 'is-root',
-              isMatch && 'is-match',
-            ].filter(Boolean).join(' ')}
-            onClick={() => router.push(`/ws/${slug}/people?search=${encodeURIComponent(member.email)}`)}
-            aria-label={wsOrg.openPerson(member.name)}
-          >
-            <Avatar name={member.name} color={personColor(member.userId)} />
-            {/* The card is a fixed height and each line is clipped, so `title`
-                is what keeps a long name or address readable at all. */}
-            <span className="org-card-body">
-              <span className="org-card-name" title={label}>{label}</span>
-              <span className="org-card-meta" title={meta}>{meta}</span>
-            </span>
-          </button>
+          {/* The card toggles its own subtree - it does NOT navigate. It used
+              to push to `/ws/:slug/people?search=<email>`, and PeopleClient
+              never reads that param, so the click left the chart and landed on
+              an unfiltered directory. A whole-card hit area for expand/collapse
+              is what the chevron alone was asking the user to aim at.
+
+              A leaf is a plain <div>: giving a control button semantics, a
+              focus stop and a pointer cursor when it does nothing is a lie the
+              keyboard user pays for. */}
+          {cardBody({ isMatch, depth, hasChildren: children.length > 0, isCollapsed, member, label, meta })}
         </div>
 
         {children.length > 0 && !isCollapsed && (

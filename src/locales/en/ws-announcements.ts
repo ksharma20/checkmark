@@ -36,8 +36,17 @@ export const wsAnnouncements = {
   titleRequired: 'A title is required.',
   bodyRequired: 'A message is required.',
   postFailed: 'Could not post the announcement.',
+  /**
+   * Zero is not an error and not a failure to post - it is what a workspace
+   * that has switched the `announcements` category off in Notification settings
+   * gets. The notice IS posted and IS readable in every member's announcements
+   * list; nothing was sent to anybody's bell or phone. Saying "sent to 0 people"
+   * would read as a bug, so the zero case says what actually happened instead.
+   */
   posted: (count: number) =>
-    `Announcement sent to ${count} ${count === 1 ? 'person' : 'people'}`,
+    count === 0
+      ? 'Announcement posted silently — notifications for this workspace are switched off, so nobody was alerted. It is still in everyone’s announcements list.'
+      : `Announcement sent to ${count} ${count === 1 ? 'person' : 'people'}`,
 
   listTitle: 'Posted',
   listEmpty: 'No announcements yet',

@@ -743,23 +743,62 @@ const ADDITIVE_MIGRATIONS = [
   // is silently off for every workspace that predates it.
   `ALTER TABLE workspaces ADD COLUMN notification_categories_off TEXT NOT NULL DEFAULT '[]'`,
 
-  // notification_prefs - per-member category mutes.
+  // notification_prefs - per-member category push preferences.
   //
-  // A ROW MEANS MUTED. Un-muting deletes the row; there is no boolean column.
-  // Absence is the default and the default is "on", so 47 users across 6
-  // workspaces need no seeding and a member who has never opened the settings
-  // screen has no rows at all.
+  // RETAINED, AND CURRENTLY UNREAD. The catalogue is now exactly two categories,
+  // `approvals` and `announcements`, and both are memberMutable: false - so no
+  // category is member-mutable today and this table has no live reader or
+  // writer. That is deliberate, and the same statement is made from the query
+  // side in the header of src/lib/db/queries/notification-prefs.ts. It is a
+  // retained mechanism, not dead code awaiting deletion; read on for why it
+  // cannot be dropped and re-added later.
   //
-  // workspace_id NULL means an account-level preference. Only the `presence`
-  // category uses it, because presence_events carries no workspace_id and a
-  // check-in session therefore belongs to no workspace.
+  // A ROW IS AN EXPLICIT CHOICE, and `muted` is what it chose. Absence means
+  // "never touched it" and falls back to `CATEGORY_DEFS[category].defaultOn` in
+  // the catalogue, so nothing is ever seeded and a member who has never opened
+  // the settings screen still has no rows at all. That shape is correct
+  // independently of which categories happen to exist.
+  //
+  // It did NOT always carry the boolean: a row used to MEAN muted and un-muting
+  // was a DELETE. THAT SHAPE CAN EXPRESS ONE DEFAULT ONLY. Under it, "off by
+  // default" and "never chose" are spelled identically - both are absence - and
+  // no query can tell them apart. So the column is the precondition for ever
+  // adding a default-OFF member-mutable category: adding it after such a
+  // category shipped would mean reinterpreting every row already stored, and
+  // there is no rule that reinterprets them correctly, because the two meanings
+  // were never distinguishable in the first place. Keeping an unread column is
+  // cheap; recovering a distinction that was never recorded is not.
+  //
+  // The two categories that originally motivated the column, `reminders` and
+  // `presence`, have since left the catalogue entirely - they became SCHEDULES
+  // (member_reminder_prefs and member_presence_prefs, added below), where the
+  // configured time or rung hour IS the opt-in and there is no boolean to
+  // store. They are not examples of this column any more; the argument above
+  // is, and it survives them.
+  //
+  // workspace_id NULL means an account-level preference rather than a
+  // per-workspace one - the shape `presence` needed while it was a category,
+  // because presence_events carries no workspace_id and a check-in session
+  // therefore belongs to no workspace. Nothing writes a NULL today; the column
+  // and its partial indexes stay for the same reason the boolean does.
   `CREATE TABLE IF NOT EXISTS notification_prefs (
   id           TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   workspace_id TEXT REFERENCES workspaces(id) ON DELETE CASCADE,
   category     TEXT NOT NULL,
+  muted        INTEGER NOT NULL DEFAULT 1,
   created_at   TEXT NOT NULL DEFAULT (datetime('now'))
 )`,
+  // The additive half, for a database that predates the column. DEFAULT 1 is
+  // not a neutral choice of filler - it is exactly what every pre-existing row
+  // already meant, back when a row's existence WAS the mute. So the backfill
+  // reinterprets nothing: a member who had muted a category before this runs is
+  // still muted after it. That remains exactly right even though the rows it
+  // would have converted are now deleted further down (the `reminders` /
+  // `presence` retirement) - the ALTER has to be correct for any database that
+  // runs it before reaching that statement, and for any row a future
+  // member-mutable category writes.
+  `ALTER TABLE notification_prefs ADD COLUMN muted INTEGER NOT NULL DEFAULT 1`,
   // TWO partial unique indexes, not one. SQLite treats NULLs as DISTINCT in a
   // unique index, so a single UNIQUE(user_id, workspace_id, category) would not
   // constrain the account-level rows at all - the same NULL = NULL trap that
@@ -774,6 +813,147 @@ const ADDITIVE_MIGRATIONS = [
   // per workspace per reminder pass rather than once per member.
   `CREATE INDEX IF NOT EXISTS idx_notif_prefs_lookup
    ON notification_prefs(workspace_id, category, user_id)`,
+
+  // member_reminder_prefs - one member's check-in / check-out reminder times in
+  // one workspace. This is the MEMBER half of the notification split: the
+  // organisation broadcasts categories, the member sets schedules.
+  //
+  // Both times are 'HH:MM' wall-clock in the WORKSPACE's display_timezone. NULL
+  // means that kind is off; no row at all means both are off. There is
+  // deliberately NO `enabled` or `muted` column anywhere in this table - THE
+  // TIME IS THE SWITCH. Two representations of "is this on" drift the moment
+  // one write path updates one of them, and then no code can say which is true:
+  // a row with checkin_at = '09:30' and enabled = 0 is a question, not an
+  // answer. One column, one meaning.
+  //
+  // Scoped per-workspace, and that is not a convenience. Everything the
+  // reminder pass gates on is the workspace's: the timezone the time is read
+  // in, working_days, the holiday calendar, and whether this member is on
+  // approved leave there. A member of two workspaces genuinely wants two
+  // schedules - one office starts at 09:00 in Asia/Kolkata, the other at 10:00
+  // in Europe/London - and collapsing them to one account-level time would make
+  // the second one wrong every single day. (Contrast member_presence_prefs
+  // below, which is account-scoped for the exactly opposite structural reason.)
+  //
+  // checkin_at / checkout_at are NULL-able on purpose and workspaces.checkin_
+  // reminder_at / checkout_reminder_at are deliberately NOT backfilled into
+  // this table. Reminders are opt-in now, so silence until a member asks for
+  // them is the intended default, not a gap - backfilling would start pushing
+  // to every member of every workspace that ever set an admin-side time, which
+  // is the nag that makes people revoke push permission and lose their approval
+  // notifications with it. The old workspace value survives only as a
+  // pre-filled SUGGESTION on the settings screen, never as a delivery fallback.
+  `CREATE TABLE IF NOT EXISTS member_reminder_prefs (
+  id           TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  workspace_id TEXT NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+  checkin_at   TEXT,
+  checkout_at  TEXT,
+  created_at   TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at   TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  // ONE plain UNIQUE index here, where notification_prefs above needs two
+  // PARTIAL ones - and the difference is entirely that workspace_id is NOT NULL
+  // in this table. SQLite treats NULLs as DISTINCT in a unique index, so a
+  // nullable column in the key constrains nothing: the rows you most need to
+  // deduplicate are the ones it silently lets through. Forbidding the NULL is
+  // what makes the simple spelling correct; it is not that this table is
+  // simpler, it is that it removed the trap rather than working around it.
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_member_reminder_prefs_one
+   ON member_reminder_prefs(user_id, workspace_id)`,
+  // The reminder pass iterates WORKSPACES, not members: once per tick it asks
+  // "who in this workspace has a time set for now?". Without this index that is
+  // a full scan of every member's schedule in the product, every 30 minutes.
+  `CREATE INDEX IF NOT EXISTS idx_member_reminder_prefs_ws
+   ON member_reminder_prefs(workspace_id)`,
+
+  // member_presence_prefs - the member-configured session ladder: how long an
+  // open check-in runs before it nudges, and when it is closed for them.
+  //
+  // ACCOUNT-scoped, keyed on user_id alone, and the reason is structural rather
+  // than a preference. presence_events carries no workspace_id and deliberately
+  // never will, so a member of two workspaces has ONE check-in session, not
+  // two. There is no workspace to key this on: asking "which workspace's ladder
+  // applies to this open session" has no answer, and inventing one would mean
+  // two ladders racing to push about the same session.
+  //
+  // user_id is the PRIMARY KEY rather than a surrogate id plus a unique index,
+  // because there is exactly one row per member BY DEFINITION - the id would be
+  // a second key to the same fact and a second thing to get wrong.
+  //
+  // The three rung columns are nullable: NULL means that rung is off, and no
+  // row at all means no ladder pushes whatsoever. That absence IS the opt-in
+  // default, the same argument as member_reminder_prefs above.
+  //
+  // auto_checkout_after_h is NOT NULL DEFAULT 12 while every rung beside it is
+  // nullable, and THE ASYMMETRY IS THE POINT. The three rungs are NUDGES; a
+  // member may switch all of them off and lose nothing but a buzz. Auto-
+  // checkout is a MECHANIC: a session that never closes leaves an open
+  // presence_events row that corrupts that day's attendance - no checkout
+  // signals, no hours, and invariant 4 means the row can never be repaired by
+  // editing it. So it has no off value, and the column refuses to express one.
+  // 12 is exactly what src/app/api/checkin/route.ts hardcoded before this
+  // table existed, so the default reinterprets nobody's existing session.
+  //
+  // REAL, not INTEGER, throughout: a 4.5h rung has to be expressible, and an
+  // integer column would round it to a different nudge without saying so.
+  //
+  // repeat_every_h repeats AFTER full_day_after_h and is meaningless without
+  // it - there is no anchor to repeat from. The API route refuses that
+  // combination, and the route is the ONLY guard: the constraint is conditional
+  // on another nullable column, and SQLite cannot attach a CHECK to a column
+  // added by ALTER TABLE in any case. Exactly like case_type in
+  // maternity_cases, every write path must run its input through the check in
+  // code, because the database will not.
+  `CREATE TABLE IF NOT EXISTS member_presence_prefs (
+  user_id               TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  half_day_after_h      REAL,
+  full_day_after_h      REAL,
+  repeat_every_h        REAL,
+  auto_checkout_after_h REAL NOT NULL DEFAULT 12,
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+
+  // approvals_inbox + approvals_outcome were merged into one `approvals`
+  // category. Two data migrations, and the first one is load-bearing.
+  //
+  // parseCategoriesOff() filters the stored array through the catalogue, so a
+  // key it no longer recognises is silently DROPPED - which for this column
+  // means "not disabled", i.e. switched back ON. Without this rewrite, every
+  // workspace that had deliberately switched approval notifications off would
+  // start sending them again at deploy, with nothing to show it happened.
+  //
+  // REPLACE rather than JSON surgery because the outcome is the same and this
+  // is legible: a workspace that had BOTH keys off ends up with the array
+  // ["approvals","approvals"], which is harmless - parseCategoriesOff returns a
+  // Set, and serialiseCategoriesOff rewrites the column clean on the next save.
+  // Idempotent: a second run finds no old keys and changes nothing.
+  `UPDATE workspaces SET notification_categories_off =
+     REPLACE(REPLACE(notification_categories_off, 'approvals_inbox', 'approvals'),
+             'approvals_outcome', 'approvals')
+   WHERE notification_categories_off LIKE '%approvals_inbox%'
+      OR notification_categories_off LIKE '%approvals_outcome%'`,
+
+  // The merged category is not member-mutable, and invariant 25 says a
+  // preference row may not exist for one that is not. getMutedCategories()
+  // already filters unknown keys so these rows are inert either way - but a row
+  // whose category no longer exists is dead weight that contradicts the
+  // invariant on its face, and the mute it once expressed has no meaning now
+  // that the category cannot be muted at all.
+  `DELETE FROM notification_prefs WHERE category IN ('approvals_inbox', 'approvals_outcome')`,
+
+  // Same reasoning, one category split further on. `reminders` and `presence`
+  // left the catalogue entirely when notification control was split by WHO the
+  // message is for: the organisation broadcasts categories, the member sets
+  // SCHEDULES, and those two now live in member_reminder_prefs and
+  // member_presence_prefs above. getMutedCategories() filters every row through
+  // isNotificationCategory, so these rows are already inert - but a preference
+  // row naming a category that no longer exists contradicts invariant 25 on its
+  // face, and the mute it once expressed has no meaning now that HAVING A
+  // SCHEDULE is the switch: there is nothing left to mute, only a time to clear.
+  // Idempotent: a second run finds nothing.
+  `DELETE FROM notification_prefs WHERE category IN ('reminders', 'presence')`,
 
   // workspace_logos - a workspace's own mark, shown in both app shells.
   //

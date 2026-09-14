@@ -363,11 +363,54 @@ export async function updatePushRemindersSent(eventId: string, reminders: string
   )
 }
 
-export async function autoCheckoutEvent(eventId: string, checkoutAt: string): Promise<void> {
-  await db.execute(
+/**
+ * Is this event still open, right now?
+ *
+ * A single-row re-read, and it exists for one specific window. The cron fetches
+ * its entire batch in one query and then LOOPS, awaiting a push per rung per
+ * event - so the snapshot it is working from grows staler with every iteration.
+ * A member who checks out from the app during that loop is still, as far as the
+ * in-memory batch is concerned, checked in, and would be pushed "still working?"
+ * minutes after closing their day. That is the complaint the ladder exists to
+ * avoid, delivered by the ladder itself.
+ *
+ * So this is called immediately before each ladder push, not once per event: the
+ * gap it closes is the gap between rungs as much as the gap since the batch
+ * read. It is deliberately NOT a guard on auto-checkout, which needs no
+ * pre-read - that UPDATE carries its own `AND checkout_at IS NULL` and reports
+ * back whether it changed anything (see below), which is one statement where
+ * this would be two and a race between them.
+ */
+export async function isEventOpen(eventId: string): Promise<boolean> {
+  const row = await db.queryOne<{ one: number }>(
+    `SELECT 1 AS one FROM presence_events
+     WHERE id = ? AND checkout_at IS NULL AND deleted_at IS NULL
+     LIMIT 1`,
+    [eventId]
+  )
+  return row !== null
+}
+
+/**
+ * Force-close an open session. Returns whether it actually closed one.
+ *
+ * The UPDATE has always carried `AND checkout_at IS NULL`, which makes it safe
+ * against a manual checkout that landed first - that row simply does not match
+ * and nothing is overwritten. What was missing is the caller being TOLD. The
+ * cron follows this with a push saying "we closed your session for you", and
+ * sending that after a no-op UPDATE announces something that did not happen, to
+ * somebody who checked out by hand and knows perfectly well that they did.
+ *
+ * `changes > 0` is the only honest signal available here: the condition is
+ * evaluated inside the statement, so a pre-read would answer a different
+ * question at a slightly earlier instant. Let the write decide, then report it.
+ */
+export async function autoCheckoutEvent(eventId: string, checkoutAt: string): Promise<boolean> {
+  const result = await db.execute(
     `UPDATE presence_events
      SET checkout_at = ?, checkout_reason = 'auto_checkout'
      WHERE id = ? AND checkout_at IS NULL`,
     [checkoutAt, eventId]
   )
+  return result.changes > 0
 }

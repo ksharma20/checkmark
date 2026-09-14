@@ -322,7 +322,6 @@ export const wsOrg = {
     `Show ${name}'s ${n} ${n === 1 ? 'report' : 'reports'}`,
   reportCount: (n: number) => `${n} direct ${n === 1 ? 'report' : 'reports'}`,
   youSuffix: '(you)',
-  openPerson: (name: string) => `Find ${name} in the directory`,
   emptyTitle: 'Nobody to chart yet',
   emptyHint: 'Once people accept their invitations they appear here, under the owner.',
   loadFailed: 'Could not load the reporting structure',

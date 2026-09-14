@@ -748,69 +748,24 @@ export interface UpcomingCelebration {
   yearsCount?: number // anniversary only: years since date_of_joining
 }
 
-function stripTime(d: Date): Date {
-  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
-}
-
-function nextOccurrence(originalIso: string, today: Date): { iso: string; daysUntil: number } {
-  const month = Number(originalIso.slice(5, 7))
-  const day = Number(originalIso.slice(8, 10))
-  const todayMidnight = stripTime(today)
-  let candidate = new Date(Date.UTC(today.getUTCFullYear(), month - 1, day))
-  if (candidate < todayMidnight) candidate = new Date(Date.UTC(today.getUTCFullYear() + 1, month - 1, day))
-  const daysUntil = Math.round((candidate.getTime() - todayMidnight.getTime()) / 86400000)
-  return { iso: candidate.toISOString().slice(0, 10), daysUntil }
+interface CelebrationRow {
+  id: string
+  first_name: string
+  last_name: string
+  date_of_birth: string | null
+  date_of_joining: string | null
 }
 
 /**
- * How far ahead the next occurrence is computed before selection happens.
- *
- * This is NOT the widget's window - the window is a calendar month plus a
- * minimum count (see below). It is only wide enough that every person on file
- * has exactly one occurrence in it, so the "keep taking the next ones" step
- * never runs out of candidates it should have had. A birthday is at most 366
- * days away once `nextOccurrence` has rolled it into the future, so ~400 days
- * covers everyone with room to spare.
- */
-const CELEBRATION_HORIZON_DAYS = 400
-
-/**
- * The celebrations the overview widget shows.
- *
- * The rule is "the rest of this month, but never a nearly-empty card":
- * every occurrence falling in the same calendar month as `todayIso`, and if
- * that is fewer than `minCount`, keep taking the next ones in date order until
- * there are `minCount` (or the workspace runs out of people).
- *
- * Who is eligible:
- * - not soft-deleted, not `terminated`, and not past their `exit_date` - a
- *   departed colleague's birthday must not be announced to the workspace;
- * - an ACTIVE `workspace_members` row, so an ex-member whose membership was
- *   revoked, or an HR record for somebody who never joined, drops out.
- *
- * An employee record with a NULL `user_id` is DELIBERATELY excluded. That is
- * the open-invitation window (invariant 19): the record exists, the person does
- * not have an account and has not accepted, so they are not yet a colleague to
- * congratulate. Requiring `e.user_id` to match a member's is what encodes that
- * - unlike the directory join in `workspaces.ts`, this one has no work-email
- * fallback, and that omission is the decision, not an oversight.
+ * Everyone in the workspace whose birthday or joining date could be
+ * celebrated, with eligibility decided as of `todayIso`.
  *
  * EXISTS rather than a plain JOIN: nothing at the DB level stops two membership
  * rows (different emails) pointing at one user, and a JOIN would then emit the
  * same birthday twice - which the widget keys as one row.
  */
-export async function getUpcomingCelebrations(
-  workspaceId: string,
-  todayIso: string,
-  minCount = 5,
-): Promise<UpcomingCelebration[]> {
-  const rows = await db.query<{
-    id: string
-    first_name: string
-    last_name: string
-    date_of_birth: string | null
-    date_of_joining: string | null
-  }>(
+async function fetchCelebrationRows(workspaceId: string, todayIso: string): Promise<CelebrationRow[]> {
+  return db.query<CelebrationRow>(
     `SELECT e.id, e.first_name, e.last_name, e.date_of_birth, ed.date_of_joining
      FROM employees e
      LEFT JOIN employment_details ed ON ed.employee_id = e.id
@@ -827,39 +782,99 @@ export async function getUpcomingCelebrations(
        AND (e.date_of_birth IS NOT NULL OR ed.date_of_joining IS NOT NULL)`,
     [workspaceId, todayIso],
   )
+}
 
-  const today = new Date(`${todayIso}T00:00:00Z`)
+/**
+ * Every celebration falling in ONE calendar month.
+ *
+ * This replaced `getUpcomingCelebrations`, which showed "the rest of this
+ * month, topped up to five" - a window that silently changed shape depending
+ * on how many people happened to have a birthday. The widget now names the
+ * month it is showing and can step to any other, so a quiet month is an honest
+ * answer rather than a card padded with next month's people.
+ *
+ * Who is eligible:
+ * - not soft-deleted, not `terminated`, and not past their `exit_date` - a
+ *   departed colleague's birthday must not be announced to the workspace;
+ * - an ACTIVE `workspace_members` row, so an ex-member whose membership was
+ *   revoked, or an HR record for somebody who never joined, drops out.
+ *
+ * An employee record with a NULL `user_id` is DELIBERATELY excluded. That is
+ * the open-invitation window (invariant 19): the record exists, the person does
+ * not have an account and has not accepted, so they are not yet a colleague to
+ * congratulate.
+ *
+ * `todayIso` is still taken, and is still what the `exit_date` filter compares
+ * against: eligibility is asked about NOW, not about the month being viewed.
+ * Paging back to March must not resurrect somebody who has since left.
+ *
+ * @param monthIso `YYYY-MM`
+ */
+export async function getCelebrationsInMonth(
+  workspaceId: string,
+  monthIso: string,
+  todayIso: string,
+): Promise<UpcomingCelebration[]> {
+  const rows = await fetchCelebrationRows(workspaceId, todayIso)
+
+  const year = Number(monthIso.slice(0, 4))
+  const month = Number(monthIso.slice(5, 7))
+
+  /** Days in the viewed month - day 0 of the next month is the last of this one. */
+  const daysInViewedMonth = new Date(Date.UTC(year, month, 0)).getUTCDate()
+
+  /**
+   * The occurrence of a month/day anniversary inside the viewed month.
+   *
+   * The day is CLAMPED to the length of the viewed month, so a 29 February date
+   * is observed on **28 February** in a common year - never 1 March, and never
+   * both.
+   *
+   * Why 28 February and not 1 March:
+   * - the outer guard is `month-of-birth === viewed month`, so February is the
+   *   only month this date is ever considered in. Landing it on 1 March would
+   *   mean widening that guard to admit March as well, and then narrowing it
+   *   again in leap years so the person is not listed twice - two coupled
+   *   conditions where a clamp is one, and the kind of pair that drifts apart;
+   * - the card names the month it is showing, and "February" is the honest
+   *   heading for a February birthday. Announcing it under March reads as the
+   *   wrong person's month;
+   * - it matches the common HR convention of observing a leap-day anniversary
+   *   on the last day of February in a common year.
+   *
+   * This shifts NO other date: the outer guard means `day` is only ever a day
+   * number that occurs in this very month (a 31st only reaches here for a
+   * 31-day month), so the clamp bites for 29 February in a common year and
+   * nothing else. Built by string rather than through `Date.UTC` so the result
+   * structurally cannot roll into the next month.
+   */
+  function occurrenceIn(originalIso: string): string {
+    const day = Math.min(Number(originalIso.slice(8, 10)), daysInViewedMonth)
+    return `${monthIso}-${String(day).padStart(2, '0')}`
+  }
+
   const out: UpcomingCelebration[] = []
 
   for (const r of rows) {
     const name = `${r.first_name} ${r.last_name}`.trim()
 
-    if (r.date_of_birth) {
-      const occurs = nextOccurrence(r.date_of_birth, today)
-      if (occurs.daysUntil >= 0 && occurs.daysUntil <= CELEBRATION_HORIZON_DAYS) {
-        out.push({ employeeId: r.id, name, kind: 'birthday', occursOn: occurs.iso })
-      }
+    if (r.date_of_birth && Number(r.date_of_birth.slice(5, 7)) === month) {
+      out.push({ employeeId: r.id, name, kind: 'birthday', occursOn: occurrenceIn(r.date_of_birth) })
     }
 
-    if (r.date_of_joining) {
-      const occurs = nextOccurrence(r.date_of_joining, today)
-      if (occurs.daysUntil >= 0 && occurs.daysUntil <= CELEBRATION_HORIZON_DAYS) {
-        const joinYear = Number(r.date_of_joining.slice(0, 4))
-        const occurYear = Number(occurs.iso.slice(0, 4))
-        if (occurYear > joinYear) {
-          out.push({ employeeId: r.id, name, kind: 'anniversary', occursOn: occurs.iso, yearsCount: occurYear - joinYear })
-        }
+    if (r.date_of_joining && Number(r.date_of_joining.slice(5, 7)) === month) {
+      // The joining date itself is not an anniversary - only the years after it.
+      if (year > Number(r.date_of_joining.slice(0, 4))) {
+        out.push({
+          employeeId: r.id,
+          name,
+          kind: 'anniversary',
+          occursOn: occurrenceIn(r.date_of_joining),
+          yearsCount: year - Number(r.date_of_joining.slice(0, 4)),
+        })
       }
     }
   }
 
-  const sorted = out.sort((a, b) => a.occursOn.localeCompare(b.occursOn))
-
-  // Every occurrence is on or after today, so the ones inside today's calendar
-  // month are a PREFIX of the sorted list. "Extend forward until minCount" is
-  // therefore just a longer prefix - no second pass, no risk of the two
-  // branches disagreeing about order.
-  const thisMonth = todayIso.slice(0, 7)
-  const inMonth = sorted.filter((c) => c.occursOn.slice(0, 7) === thisMonth)
-  return inMonth.length >= minCount ? inMonth : sorted.slice(0, minCount)
+  return out.sort((a, b) => a.occursOn.localeCompare(b.occursOn))
 }

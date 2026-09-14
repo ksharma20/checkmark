@@ -59,7 +59,17 @@ export const wsAdmin = {
     membersColumn: 'Members',
     noActivity: 'No activity yet today.',
 
-    viewAll: (count: number) => `View all ${count} ›`,
+    openApprovals: 'Open queue ›',
+
+    /* The Recent-activity and Celebrations cards are addressed by date now,
+       not fixed to "today" and "this month", so each needs a stepper and each
+       needs to say which period it is showing. */
+    prevDay: 'Previous day',
+    nextDay: 'Next day',
+    today: 'Today',
+    prevMonth: 'Previous month',
+    nextMonth: 'Next month',
+    recentActivityEmptyDay: 'No check-ins recorded on this day.',
 
     planLimitReached: (used: number, max: number, plan: string) =>
       `Member limit reached - ${used}/${max} on the ${plan} plan. Upgrade to add more members.`,
@@ -79,6 +89,17 @@ export const wsAdmin = {
      * fortnight and "nobody has HR details" look identical. Say which.
      */
     celebrationsEmptyHint: 'Birthdays and work anniversaries come from HR details.',
+    celebrationsEmptyMonth: 'Nothing to celebrate this month',
+
+    /**
+     * The card clears its rows while a month is in flight, so a failed fetch
+     * leaves nothing on screen to contradict it. Without this the empty card
+     * reads as "nobody has a birthday this month", which is a different and
+     * wrong answer. Stepping the month re-runs the fetch, so that is the
+     * recovery offered rather than a retry button.
+     */
+    celebrationsErrorTitle: 'Could not load celebrations',
+    celebrationsErrorHint: 'Something went wrong loading this month. Step to another month and back to try again.',
   },
 
   /** /ws/:slug/attendance - today's roster and the regularization queue. */
@@ -98,6 +119,12 @@ export const wsAdmin = {
     rosterEmptyTitle: 'Nobody on the roster yet',
     rosterEmptyHint: 'Members appear here as soon as they join the workspace.',
 
+    /* The page is two unbounded lists - the roster grows with headcount, the
+       declared office days grow with time. Stacked, reaching the second meant
+       scrolling the whole first, so they are tabs. */
+    tabRoster: 'Roster',
+    tabOfficeDays: 'Office days',
+
     /** Drill-down slide-over. */
     statusEyebrow: "Today's status",
     signalsEyebrow: 'Signals matched',
@@ -107,6 +134,10 @@ export const wsAdmin = {
     signalIp: 'IP',
     signalMatched: 'matched',
     signalUnmatched: 'not matched',
+    /* Config-light: a workspace that configured nothing has nothing to fail
+       against, so the slide-over says so rather than drawing three crosses. */
+    signalsNoneConfigured: 'No signals configured, so every check-in from an active member counts as verified.',
+    signalsOverridden: 'An admin override applies to this check-in, so signal matching was bypassed entirely.',
     checkedInAt: 'Checked in',
     checkedOutAt: 'Checked out',
     stillIn: 'Still checked in',

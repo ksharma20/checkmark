@@ -59,7 +59,7 @@ interface Holiday {
   description: string | null
 }
 
-type TabKey = 'balance' | 'apply' | 'correction' | 'extension' | 'history' | 'holidays'
+type TabKey = 'balance' | 'apply' | 'correction' | 'extension' | 'holidays'
 
 const BASE_TABS: Tab[] = [
   { key: 'balance', label: meScreens.leave.tabBalance },
@@ -67,8 +67,17 @@ const BASE_TABS: Tab[] = [
   { key: 'correction', label: meScreens.leave.tabCorrection },
 ]
 
+/**
+ * There is no History tab.
+ *
+ * It held two unbounded lists stacked in one scroll - every leave request, then
+ * every correction - so reaching the newest correction meant scrolling past
+ * fifteen leaves that had nothing to do with it. Each list now sits under the
+ * form that creates it: a form's height never changes, a list's always does, so
+ * the fixed thing goes on top and the growing thing below it. `ExtensionTab`
+ * already worked this way and is the shape the other two now follow.
+ */
 const TAIL_TABS: Tab[] = [
-  { key: 'history', label: meScreens.leave.tabHistory },
   { key: 'holidays', label: meScreens.leave.tabHolidays },
 ]
 
@@ -221,12 +230,14 @@ function ApplyTab({
   slug,
   types,
   holidays,
+  requests,
   loading,
   onSubmitted,
 }: {
   slug: string
   types: LeaveTypeWithBalance[]
   holidays: Holiday[]
+  requests: LeaveRequestWithType[]
   loading: boolean
   onSubmitted: () => void
 }) {
@@ -358,6 +369,12 @@ function ApplyTab({
           {submitting ? meScreens.leave.submitting : meScreens.leave.submit}
         </Button>
       </Card>
+
+      {/* The form above never changes height; this list grows with every
+          request. Fixed on top, growing below - which is also why a submit no
+          longer jumps the member to another tab: the new row appears right
+          here, under the form they just used. */}
+      <LeaveHistoryList requests={requests} />
     </>
   )
 }
@@ -382,11 +399,13 @@ function ApplyTab({
 function CorrectionTab({
   slug,
   correctableDates,
+  regularizations,
   loading,
   onSubmitted,
 }: {
   slug: string
   correctableDates: string[]
+  regularizations: RegularizationRequest[]
   loading: boolean
   onSubmitted: () => void
 }) {
@@ -399,11 +418,16 @@ function CorrectionTab({
 
   if (loading) return <ListSkeleton rows={1} />
   if (correctableDates.length === 0) {
+    // No day is correctable - often BECAUSE a request is already open on it.
+    // The list is the answer to "why can I not pick that day", so it stays.
     return (
-      <EmptyState
-        title={meScreens.leave.correctionNoDays}
-        hint={meScreens.leave.correctionNoDaysHint}
-      />
+      <>
+        <EmptyState
+          title={meScreens.leave.correctionNoDays}
+          hint={meScreens.leave.correctionNoDaysHint}
+        />
+        <CorrectionHistoryList regularizations={regularizations} />
+      </>
     )
   }
 
@@ -439,6 +463,7 @@ function CorrectionTab({
   }
 
   return (
+    <>
     <Card>
       <p className="t-eyebrow" style={{ marginBottom: '8px' }}>
         {meScreens.leave.correctionHeading}
@@ -512,6 +537,9 @@ function CorrectionTab({
         {submitting ? en.meWsRegularization.submitting : en.meWsRegularization.submit}
       </Button>
     </Card>
+
+    <CorrectionHistoryList regularizations={regularizations} />
+    </>
   )
 }
 
@@ -718,22 +746,17 @@ function ExtensionTab({
   )
 }
 
-// ─── History ──────────────────────────────────────────────────────────────────
+// ─── History lists ────────────────────────────────────────────────────────────
+//
+// Rendered UNDER the form that produces them, not in a tab of their own. They
+// are separate components rather than one merged feed because a leave request
+// and a correction answer different questions and carry different shapes - a
+// date RANGE against a balance versus a single day against an event.
 
-function HistoryTab({
-  requests,
-  regularizations,
-  loading,
-}: {
-  requests: LeaveRequestWithType[]
-  regularizations: RegularizationRequest[]
-  loading: boolean
-}) {
-  if (loading) return <ListSkeleton rows={4} />
-
+function LeaveHistoryList({ requests }: { requests: LeaveRequestWithType[] }) {
   return (
     <>
-      <p className="t-eyebrow" style={{ marginBottom: '4px' }}>
+      <p className="t-eyebrow" style={{ margin: '24px 0 4px' }}>
         {meScreens.leave.historyLeaveHeading}
       </p>
       {requests.length === 0 ? (
@@ -764,7 +787,13 @@ function HistoryTab({
           </Card>
         ))
       )}
+    </>
+  )
+}
 
+function CorrectionHistoryList({ regularizations }: { regularizations: RegularizationRequest[] }) {
+  return (
+    <>
       <p className="t-eyebrow" style={{ margin: '24px 0 4px' }}>
         {meScreens.leave.historyCorrectionHeading}
       </p>
@@ -1000,10 +1029,10 @@ export default function LeaveScreen() {
           slug={slug}
           types={fresh?.types ?? []}
           holidays={fresh?.holidays ?? []}
+          requests={fresh?.requests ?? []}
           loading={loading}
           onSubmitted={() => {
             setRefreshKey((n) => n + 1)
-            setTab('history')
           }}
         />
       )}
@@ -1013,10 +1042,10 @@ export default function LeaveScreen() {
           key={slug}
           slug={slug}
           correctableDates={fresh?.correctableDates ?? []}
+          regularizations={fresh?.regularizations ?? []}
           loading={loading}
           onSubmitted={() => {
             setRefreshKey((n) => n + 1)
-            setTab('history')
           }}
         />
       )}
@@ -1034,14 +1063,6 @@ export default function LeaveScreen() {
           onSubmitted={() => {
             setRefreshKey((n) => n + 1)
           }}
-        />
-      )}
-
-      {tab === 'history' && (
-        <HistoryTab
-          requests={fresh?.requests ?? []}
-          regularizations={fresh?.regularizations ?? []}
-          loading={loading}
         />
       )}
 

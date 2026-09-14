@@ -3,9 +3,13 @@ import { db } from '../index'
 export type NotificationType =
   | 'leave_submitted' | 'leave_approved' | 'leave_rejected'
   | 'regularization_submitted' | 'regularization_approved' | 'regularization_rejected'
-  // Scheduled wall-clock reminders (see lib/reminders.ts). ref_id is the
-  // workspace-local 'YYYY-MM-DD', ref_type is 'reminder'.
-  | 'checkin_reminder' | 'checkout_reminder'
+  // No reminder types here, and that is structural rather than an omission. The
+  // wall-clock check-in / check-out reminders (see `src/lib/reminders.ts`) are
+  // PUSH-ONLY: they write no `notifications` row, so they have no
+  // `NotificationType` and no category. Same shape the presence ladder has
+  // always had. A nudge to check in is worthless an hour later, and a member's
+  // reminder is now a schedule they set rather than a message class the
+  // organisation broadcasts.
   // An employee document was verified or rejected. ref_id is the document id,
   // ref_type 'employee_document'. Until this existed, an admin could reject
   // somebody's ID proof and the employee was never told.

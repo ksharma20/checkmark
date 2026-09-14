@@ -15,12 +15,12 @@
 | [permissions.md](./permissions.md) | The resource × action catalogue, `Scope`, the seeded owner/admin/member grids, `requireWsAccess`, the screen registry, the three escalation guards, and why rank alone is not a ceiling |
 | [auth-flow.md](./auth-flow.md) | Login/register state machine, OTP flow (and its plaintext storage), forgot password, session lifecycle, API token auth |
 | [signal-matching.md](./signal-matching.md) | AND semantics for **gps + ip** (WiFi removed), `MatchedBy`, `queryWorkspaceEvents()` internals, config-light mode, admin overrides, day-level attendance |
-| [checkin-flow.md](./checkin-flow.md) | Check-in/checkout sequences, what is actually stored, cron-driven milestones and auto-checkout, extend, V1 API |
+| [checkin-flow.md](./checkin-flow.md) | Check-in/checkout sequences, what is actually stored, the member-configured session ladder and auto-checkout, extend, V1 API |
 | [leave-flow.md](./leave-flow.md) | Leave types, pro-rata accrual and opening balances, the cutover date, request → approval, holidays, the maternity lifecycle |
 | [employee-records.md](./employee-records.md) | The `employees` / `employment_details` / `employee_sensitive` split, AES-256-GCM field encryption, and the `employees:read` design gap |
 | [assets-and-documents.md](./assets-and-documents.md) | Asset lifecycle and the document store, plus the base64-in-DB storage decision and its exit criteria |
-| [reminders.md](./reminders.md) | Why approvals notify reliably, why scheduled reminders previously could not exist, the workspace pass, its four skip gates, and the known remaining gaps |
-| [notification-flow.md](./notification-flow.md) | The in-app `notifications` feed, bell/panel, Web Push subscription, SW push handler, tags, cleanup |
+| [reminders.md](./reminders.md) | Why approvals notify reliably, why scheduled reminders previously could not exist, the workspace pass over its members' own times, its five skip gates, and the known remaining gaps |
+| [notification-flow.md](./notification-flow.md) | The two-category model, the `notify()` seam and the two push-only paths that bypass it, where member schedules live, the in-app feed, bell/panel, Web Push subscription, SW push handler, tags, cleanup |
 | [workspace-flow.md](./workspace-flow.md) | Workspace creation (roles seeded in the same transaction), invites + consent, domain verification, signal config, dashboard/analytics queries, archive, ownership transfer |
 
 ---
@@ -50,13 +50,27 @@
 - API tokens: O(1) prefix lookup (`token_prefix` + `idx_api_tokens_prefix`).
 
 ### Notifications
+- **Control is partitioned by who the message is for.** The organisation
+  broadcasts **two categories**, `approvals` and `announcements` — both
+  workspace-switchable on `/ws/:slug/settings`, neither member-mutable. The
+  member sets **schedules**: reminder times per workspace
+  (`member_reminder_prefs`) and the session ladder per account
+  (`member_presence_prefs`). A category is a class of message and a schedule is a
+  time; **having a value set is the opt-in**, so there is no boolean beside it.
 - In-app feed in the `notifications` table; `NotificationBell` polls an
   unread-count endpoint every 30 s, `NotificationPanel` renders the last 20.
-- Approvals and submissions notify **inline in the handler** — reliable.
-- Scheduled reminders run from `POST /api/push/cron`, triggered by GitHub
-  Actions at `0,30 * * * *`, deduped by `reminder_log`.
-- The client no longer schedules milestone or auto-checkout timers; the cron
-  does.
+  Only the two categories write to it.
+- Approvals, submissions and announcements notify **inline in the handler**
+  through `notify()` — reliable, two channels.
+- The reminder pass and the session ladder are **push-only** and bypass
+  `notify()` — invariant 24's two sanctioned exceptions, because there is no feed
+  row to write and no category to resolve.
+- Both cron passes run from `POST /api/push/cron`, triggered by GitHub Actions at
+  `0,30 * * * *`; reminders dedupe on `reminder_log`, ladder rungs on
+  `presence_events.push_reminders_sent`.
+- The client no longer schedules ladder or auto-checkout timers; the cron does.
+  `scheduled_checkout_at` is the member's own `auto_checkout_after_h`, clamped to
+  `[1, 24]` — never a fixed 12h, though 12 is still the default.
 
 ### Workforce modules
 - Employees: three-table split; PAN / Aadhaar / bank account AES-256-GCM
@@ -81,7 +95,8 @@ Each is documented in full where it belongs; this is the index.
 | Area | Gap | Where |
 |------|-----|-------|
 | Employee data | Any holder of `employees:read` gets decrypted PAN / Aadhaar / bank account — there is no separate sensitive-data permission | [employee-records.md](./employee-records.md#3-known-design-gap--employeesread-decrypts) |
-| Reminders | No per-member opt-out; muting push also loses approval notifications | [reminders.md](./reminders.md#41-no-per-member-opt-out--the-biggest-risk) |
+| Reminders | ~~No per-member opt-out~~ — closed by per-member schedules, not by a mute | [reminders.md](./reminders.md#41-no-per-member-opt-out--closed-and-then-closed-differently) |
+| Reminders | Push-only: a failed or denied push leaves no feed row and still burns the day's `reminder_log` slot | [reminders.md](./reminders.md#44-push-failures-are-swallowed-after-the-log-row-is-claimed) |
 | Reminders | Timezone and working days are workspace-wide | [reminders.md](./reminders.md#42-workspace-wide-timezone-and-working-days) |
 | Reminders | Overnight shifts are invisible to the check-out pass | [reminders.md](./reminders.md#43-overnight-shifts-are-uncovered-by-the-checkout-pass) |
 | Reminders | Push failures are swallowed after the `reminder_log` row is claimed | [reminders.md](./reminders.md#44-push-failures-are-swallowed-after-the-log-row-is-claimed) |

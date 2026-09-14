@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getOpenEvent, setScheduledCheckout } from '@/lib/db/queries/events'
 import { extendSession } from '@/locales/en/notifications'
+import { MAX_AUTO_CHECKOUT_H } from '@/lib/presence-ladder'
 
 /**
  * How long a member may push their auto-checkout back, in one go.
@@ -43,7 +44,18 @@ export async function POST(request: NextRequest) {
       ? openEvent.checkin_at
       : openEvent.checkin_at.replace(' ', 'T') + 'Z'
   ).getTime()
-  const hardLimitMs = checkinMs + 24 * 60 * 60 * 1000
+  /**
+   * The hard ceiling on an open session, from the one place that defines it.
+   *
+   * This was the literal `24 * 60 * 60 * 1000`, and the same 24 appeared as a
+   * hardcoded auto-checkout bound in the check-in route and again in the
+   * settings form. Three literals in three files is the arrangement where one of
+   * them gets raised and the other two silently disagree with it - a member
+   * would set a 30h close time the form accepted, and this route would quietly
+   * refuse to extend them past 24. One definition, in `presence-ladder.ts`,
+   * which the form can import because that module is pure.
+   */
+  const hardLimitMs = checkinMs + MAX_AUTO_CHECKOUT_H * 60 * 60 * 1000
 
   const currentScheduledMs = openEvent.scheduled_checkout_at
     ? new Date(openEvent.scheduled_checkout_at).getTime()
@@ -51,7 +63,7 @@ export async function POST(request: NextRequest) {
 
   if (currentScheduledMs >= hardLimitMs) {
     return NextResponse.json(
-      { error: 'Cannot extend past 24 hours', code: 'MAX_DURATION_REACHED' },
+      { error: extendSession.errorMaxDuration(MAX_AUTO_CHECKOUT_H), code: 'MAX_DURATION_REACHED' },
       { status: 409 }
     )
   }

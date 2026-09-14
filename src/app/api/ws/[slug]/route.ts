@@ -50,14 +50,30 @@ function readReminderTime(value: unknown): string | null | undefined | typeof IN
  * sends the whole array (an empty one means "everything on"), so a null here is
  * a client bug, and guessing at it would be a silent mass re-enable.
  *
- * `serialiseCategoriesOff` drops anything not `workspaceSwitchable`, so even a
- * caller past the validation below cannot store "announcements are off".
+ * **Unknown and non-switchable keys are DROPPED, not rejected**, so this agrees
+ * with `parseCategoriesOff()` on the read side. The column is historical data:
+ * a workspace that switched `reminders` or `presence` off while those were still
+ * categories still has those words stored, and a tab opened before a deploy
+ * posts them straight back. Answering that with a 400 would fail a save whose
+ * real switches are perfectly legal, and name categories the admin cannot even
+ * see. Reading through the catalogue in both directions is what made retiring
+ * two categories a one-file change - rejecting on the way in would put a
+ * migration back into that job.
+ *
+ * Only genuinely malformed input is a 400: not an array, or an array holding
+ * something that is not a string. Those are client bugs with no honest reading,
+ * where a retired key has one.
+ *
+ * The two filters are the catalogue's own: `isNotificationCategory` drops
+ * anything that has left `CATEGORY_DEFS` (and narrows the type), and
+ * `serialiseCategoriesOff` then drops anything not `workspaceSwitchable`. No
+ * second copy of either rule lives here.
  */
 function readCategoriesOff(value: unknown): string | undefined | typeof INVALID {
   if (value === undefined) return undefined
   if (!Array.isArray(value)) return INVALID
-  if (!value.every(isNotificationCategory)) return INVALID
-  return serialiseCategoriesOff(value)
+  if (!value.every((c) => typeof c === 'string')) return INVALID
+  return serialiseCategoriesOff(value.filter(isNotificationCategory))
 }
 
 interface Props { params: Promise<{ slug: string }> }
@@ -178,7 +194,9 @@ export async function PATCH(request: NextRequest, { params }: Props) {
   }
   if (checkoutReminder !== undefined) updates.checkout_reminder_at = checkoutReminder
 
-  // The notification switchboard. Absent key = leave the stored list alone.
+  // The notification switchboard. Absent key = leave the stored list alone;
+  // retired or locked keys are dropped rather than refused, so a stale tab
+  // still saves its real switches.
   const categoriesOff = readCategoriesOff(body.notificationCategoriesOff)
   if (categoriesOff === INVALID) {
     return NextResponse.json(

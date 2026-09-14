@@ -14,7 +14,7 @@ import type {
 import PresenceChip from '@/components/ws/PresenceChip'
 import {
   Avatar, Button, Card, Chip, ConfirmDialog, DataTable, Divider, EmptyState, Field, IconButton,
-  Input, SlideOver, Skeleton, StatCard, type Column,
+  Input, SlideOver, Skeleton, StatCard, TabBar, type Column,
 } from '@/components/ui'
 import { useToast } from '@/components/shared/Toast'
 import { wsAdmin } from '@/locales/en/ws-overview'
@@ -28,9 +28,12 @@ interface Props {
 /** Derived from the route's own response type so the two cannot drift. */
 type DeclaredOfficeDay = OfficeDaysListResponse['officeDays'][number]
 
+/* Keyed by the values `deriveConfiguredTypes()` can return - 'gps' and 'ip'.
+   There is deliberately no 'wifi' entry: the SSID is collected and hashed as a
+   trust signal but `workspace_signals.signal_type` cannot hold it, so it can
+   never be matched against and must never be drawn as a failed check. */
 const SIGNAL_LABELS: Record<string, string> = {
   gps: wsAdmin.attendance.signalGps,
-  wifi: wsAdmin.attendance.signalWifi,
   ip: wsAdmin.attendance.signalIp,
 }
 
@@ -57,6 +60,7 @@ export default function AttendanceClient({ slug, canAction }: Props) {
   const { show: showToast } = useToast()
 
   const [dash, setDash] = useState<DashboardResponse | null>(null)
+  const [tab, setTab] = useState<'roster' | 'officeDays'>('roster')
   const [loading, setLoading] = useState(true)
   const [overview, setOverview] = useState<OverviewWidgetsResponse | null>(null)
 
@@ -122,6 +126,7 @@ export default function AttendanceClient({ slug, canAction }: Props) {
 
   const members = useMemo(() => dash?.all_members ?? [], [dash])
   const openMember = members.find((m) => m.member_id === openMemberId) ?? null
+  const configuredSignalTypes = dash?.configured_signal_types ?? []
 
   /**
    * Step 1 of declaring an office day: a dry run.
@@ -314,7 +319,25 @@ export default function AttendanceClient({ slug, canAction }: Props) {
         />
       </div>
 
+      {/* Two unbounded lists, so two tabs rather than one scroll. The roster
+          grows with headcount and the declared office days grow with time;
+          stacked, the second was only reachable by scrolling past the whole of
+          the first. The declare form stays a fixed card ABOVE its list - a
+          form's height never changes, a list's always does. */}
+      {canAction && (
+        <TabBar
+          style={{ marginTop: '16px' }}
+          tabs={[
+            { key: 'roster', label: wsAdmin.attendance.tabRoster },
+            { key: 'officeDays', label: wsAdmin.attendance.tabOfficeDays, badge: officeDays.length },
+          ]}
+          active={tab}
+          onChange={(key) => setTab(key as 'roster' | 'officeDays')}
+        />
+      )}
+
       {/* ── Roster ── */}
+      {(!canAction || tab === 'roster') && (
       <Card className="fx-spring" padded={false} style={{ marginTop: '14px', overflow: 'hidden' }}>
         {loading ? (
           <div className="stack" style={{ padding: '20px' }}>
@@ -336,6 +359,7 @@ export default function AttendanceClient({ slug, canAction }: Props) {
           />
         )}
       </Card>
+      )}
 
       {/* ── Bulk office day ──
           It generalises a regularization: a regularization corrects one
@@ -344,8 +368,9 @@ export default function AttendanceClient({ slug, canAction }: Props) {
           monthly grid, analytics, the export and /me all pick it up with no
           read-path change. Actioning an individual regularization lives on
           /ws/:slug/approvals, not here. */}
-      {canAction && (
-        <Card className="fx-spring overflow-hidden" padded={false}>
+      {canAction && tab === 'officeDays' && (
+        <>
+        <Card className="fx-spring overflow-hidden" padded={false} style={{ marginTop: '14px' }}>
           <div className="table-head">
             <p className="t-h2">{wsAdmin.officeDay.cardTitle}</p>
             <p className="t-muted">{wsAdmin.officeDay.cardHint}</p>
@@ -381,9 +406,9 @@ export default function AttendanceClient({ slug, canAction }: Props) {
               </Button>
             </div>
           </div>
+        </Card>
 
-          <Divider />
-
+        <Card className="fx-spring overflow-hidden" padded={false}>
           <div className="table-head row-between">
             <p className="t-h2">{wsAdmin.officeDay.declaredTitle}</p>
             {officeDays.length > 0 && <Chip tone="override">{officeDays.length}</Chip>}
@@ -402,6 +427,7 @@ export default function AttendanceClient({ slug, canAction }: Props) {
             )}
           />
         </Card>
+        </>
       )}
 
       {/* Confirm names the count BEFORE anything is written - the number comes
@@ -471,20 +497,31 @@ export default function AttendanceClient({ slug, canAction }: Props) {
                 <p className="t-eyebrow" style={{ marginTop: '16px' }}>
                   {wsAdmin.attendance.signalsEyebrow}
                 </p>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                  {['gps', 'wifi', 'ip'].map((type) => {
-                    const matched = openMember.latest_event!.matched_signals.includes(type)
-                    return (
-                      <Chip
-                        key={type}
-                        tone={matched ? 'verified' : 'none'}
-                        title={matched ? wsAdmin.attendance.signalMatched : wsAdmin.attendance.signalUnmatched}
-                      >
-                        {SIGNAL_LABELS[type]} {matched ? '✓' : '✗'}
-                      </Chip>
-                    )
-                  })}
-                </div>
+                {/* Only the types this workspace actually matches against get a
+                    tick or a cross. An override bypasses matching altogether
+                    and a config-light workspace has nothing to match, so both
+                    say so in words - a row of crosses beside a "verified" chip
+                    reads as a failure that never happened. */}
+                {openMember.latest_event.matched_by === 'override' ? (
+                  <p className="t-muted" style={{ marginTop: '8px' }}>{wsAdmin.attendance.signalsOverridden}</p>
+                ) : configuredSignalTypes.length === 0 ? (
+                  <p className="t-muted" style={{ marginTop: '8px' }}>{wsAdmin.attendance.signalsNoneConfigured}</p>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                    {configuredSignalTypes.map((type) => {
+                      const matched = openMember.latest_event!.matched_signals.includes(type)
+                      return (
+                        <Chip
+                          key={type}
+                          tone={matched ? 'verified' : 'none'}
+                          title={matched ? wsAdmin.attendance.signalMatched : wsAdmin.attendance.signalUnmatched}
+                        >
+                          {SIGNAL_LABELS[type] ?? type} {matched ? '✓' : '✗'}
+                        </Chip>
+                      )
+                    })}
+                  </div>
+                )}
 
                 <p className="t-eyebrow" style={{ marginTop: '16px' }}>
                   {wsAdmin.attendance.detailsEyebrow}

@@ -52,13 +52,27 @@ try {
 
 const APPLY = process.argv.includes('--apply')
 
-// Must stay in step with LADDER in src/app/api/push/cron/route.ts - and with
-// every ladder that came before it. The point of this list is that a drained row
-// can never produce a push, so it is a UNION, not a copy: the old seven-rung
-// milestones (4/8/12/16/18/20/22h) and the auto-checkout warning are dead code in
-// the route now, but a row this script wrote is immutable, and a future reader
-// that resurrects an old key must still find it claimed.
+// Every dedupe key any ladder could ever claim for a row, as a UNION across all
+// of them rather than a copy of the current one. The point of this list is that a
+// drained row can never produce a push: a row this script wrote is immutable, so
+// a reader that resurrects a retired key must still find it claimed.
+//
+// The ladder is no longer a fixed list. `resolveLadder()` in
+// src/lib/presence-ladder.ts builds it per member from their own hours, so the
+// keys are now `half`, `full` and `ot-<n>` rather than `<hours>h`. The numeric
+// keys below are retired but stay here for exactly the reason above - and note
+// that `normaliseLadderKey()` maps only '5h' and '10h' onto the modern names, so
+// the rest would otherwise be unclaimed by anything.
+//
+// `OT_MAX` is derived, not guessed: overtime rungs run while
+// `full + n * repeat < autoCheckout`, so the worst case is the smallest legal
+// `full` and `repeat` (MIN_RUNG_H / MIN_REPEAT_H, both 0.5) against the largest
+// legal close (MAX_AUTO_CHECKOUT_H, 24) - i.e. 0.5 + 0.5n < 24, giving n <= 46.
+// Those constants live in src/lib/presence-ladder.ts; this file is plain JS and
+// cannot import the TypeScript module, so changing any of the three means
+// changing this number too.
 const MILESTONES_H = [4, 5, 8, 10, 12, 16, 18, 20, 22]
+const OT_MAX = 46
 
 const SELECT_OPEN = `
   SELECT id, user_id, checkin_at, scheduled_checkout_at
@@ -79,6 +93,13 @@ const CLOSE_ONE = `
 function remindersFor(scheduledCheckoutAt) {
   return JSON.stringify([
     ...MILESTONES_H.map((h) => `${h}h`),
+    // The member-configured ladder: two named rungs plus every reachable
+    // overtime rung. Cheap to over-claim - this array is only ever read as a
+    // membership test - and the cost of under-claiming is a push to somebody
+    // whose session was closed by a backlog drain months ago.
+    'half',
+    'full',
+    ...Array.from({ length: OT_MAX }, (_, i) => `ot-${i + 1}`),
     // Same shape the cron builds: `warn_${scheduled_checkout_at.slice(0, 16)}`.
     `warn_${String(scheduledCheckoutAt).slice(0, 16)}`,
     'autocheckedout',

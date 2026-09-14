@@ -11,10 +11,20 @@ on:
     #
     # GitHub Actions cron is BEST-EFFORT: runs are queued, not guaranteed, and
     # regularly start several minutes - occasionally much longer - after the
-    # scheduled minute. Reminder times are therefore approximate. The route
-    # absorbs this with a grace window (REMINDER_GRACE_MIN in
-    # src/lib/reminders.ts) and dedupes on the reminder_log table, so a late or
-    # doubled run still sends each person at most one reminder per day.
+    # scheduled minute. Reminder times are therefore approximate.
+    #
+    # REMINDER_GRACE_MIN in src/lib/reminders.ts is 30 - exactly one tick wide,
+    # so every minute-of-day is covered by exactly one tick and the worst-case
+    # lateness is 29 minutes. It used to be 90, wide enough to catch up a
+    # skipped tick, and that is deliberately no longer the behaviour: a run that
+    # is skipped or badly delayed now DROPS that person's reminder for the day
+    # rather than delivering it stale. A nudge to check in that arrives an hour
+    # and a half late is a nag, and a nag is what makes somebody revoke push
+    # permission outright - which also costs them the approval notifications
+    # they want. A missed nudge costs nothing anybody notices.
+    #
+    # Dedupe is `reminder_log`, not the window: a doubled run still sends each
+    # person at most one reminder per kind per local day.
     - cron: '0,30 * * * *'
   workflow_dispatch:
 

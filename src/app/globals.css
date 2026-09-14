@@ -561,6 +561,26 @@ a[href] {
 .me-navitem .ic { width: 20px; height: 20px; }
 .me-navitem.active { color: var(--brand); }
 
+/* The raised Home tab.
+   The disc is lifted by a negative margin so it breaks the bar's top border,
+   and the `--surface-0` ring is what punches a clean hole in that border - NOT
+   a shadow. Elevation in this system means "floating above the page" (toasts,
+   modals, sheets); the nav is chrome, and a shadow on it would read as the
+   card-shadow bug the rest of the stylesheet exists to prevent.
+   The item is already >= 44px, so the global touch-target rule still holds. */
+.me-navitem.is-primary { gap: 5px; }
+.me-navdisc {
+  display: flex; align-items: center; justify-content: center;
+  width: 56px; height: 56px; border-radius: 999px;
+  margin-top: -26px; margin-bottom: 1px;
+  background: var(--brand); color: var(--surface-0);
+  border: 4px solid var(--surface-0);
+  transition: background 200ms var(--ease-out), transform 200ms var(--ease-spring);
+}
+.me-navitem.is-primary .ic { width: 24px; height: 24px; }
+.me-navitem.is-primary:active .me-navdisc { transform: scale(0.94); }
+.me-navitem.is-primary.active .me-navdisc { background: var(--brand-hover); }
+
 /* ── typography scale ──────────────────────────────────────────────────────── */
 .t-display { font-size: clamp(1.9rem, 4vw, 2.6rem); line-height: 1.05; letter-spacing: -0.025em; font-weight: 700; }
 .t-h1 { font-size: 21px; font-weight: 700; }
@@ -582,6 +602,9 @@ a[href] {
 .rowlink { cursor: pointer; border-radius: var(--radius-md); }
 .card-fixed-h { display: flex; flex-direction: column; min-height: 340px; max-height: 420px; }
 .card-fixed-h .scroll-body { flex: 1; overflow-y: auto; }
+/* Inset for a skeleton standing in for rows that carry their own padding,
+   so the loading state occupies the same box as the content it replaces. */
+.scroll-body-pad { padding: 16px 20px; }
 .divider { height: 1px; background: var(--border); margin: 16px 0; }
 .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
 
@@ -998,6 +1021,9 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   .me-sheet .scrim, .me-sheet .panel,
   .toast, .dropdown-menu, .ws-scrim,
   .page-enter, .reveal,
+  /* Safe to blanket-reset: the Home disc's lift is a negative MARGIN, not a
+     transform, so killing transform only drops its press-scale. */
+  .me-navdisc,
   .hero-anim, .hero-underline, .cs-ping {
     animation: none !important;
     transition: none !important;
@@ -1337,6 +1363,79 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 .org-toggle:hover { color: var(--brand); background: var(--surface-2); }
 .org-toggle-spacer { flex: 0 0 44px; }
 
+/* ── Monthly attendance grid ────────────────────────────────────────────────
+   These were inline style objects returned by `dayColor()`/`dayBorder()` in
+   MonthlyClient. Inline styles sit outside every selector list in this file -
+   the reduced-motion guard, the touch-target rule, the elevation rule - so
+   they were silently exempt from all three. They are classes now (invariant
+   15), and the legend renders the SAME classes as the grid, so a swatch can no
+   longer drift from the cell it claims to describe.
+
+   `remote` collapses onto the office fill when no signals are configured:
+   with nothing to match against, "remote" is not a distinction the data can
+   actually make. That is what `.is-unconfigured` expresses. */
+.mcal-cell {
+  width: 100%; height: 28px; border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 10px;
+  border: 1px solid transparent; background: transparent;
+}
+.mcal-cell.is-prejoin {
+  background: var(--surface-1); border-style: dashed; border-color: var(--border);
+  opacity: 0.45; color: var(--text-muted);
+}
+.mcal-cell.is-weekend {
+  background: var(--surface-2); border-color: var(--border);
+  opacity: 0.45; color: var(--text-muted);
+}
+/* Holiday is HATCHED, not just tinted. It used to be plain `--surface-2` -
+   pixel-identical to the weekend swatch and only a shade off the brand-tinted
+   office cell, so the one day that most changes what a row means was the
+   hardest day to spot. Pattern rather than a new hue keeps the palette blue. */
+.mcal-cell.is-holiday {
+  background-color: var(--surface-2);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--text-muted) 38%, transparent) 4px 7px
+  );
+  border-color: color-mix(in srgb, var(--text-muted) 45%, transparent);
+  color: var(--text-secondary);
+}
+.mcal-cell.is-office {
+  background: color-mix(in srgb, var(--brand) 26%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  font-weight: 600;
+}
+.mcal-cell.is-remote {
+  background: color-mix(in srgb, var(--amber) 22%, transparent);
+  border-color: color-mix(in srgb, var(--amber) 45%, transparent);
+}
+.mcal-cell.is-remote.is-unconfigured {
+  background: color-mix(in srgb, var(--brand) 26%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+  font-weight: 600;
+}
+.mcal-cell.is-absent {
+  background: color-mix(in srgb, var(--danger) 15%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+}
+.mcal-cell.is-leave {
+  background: color-mix(in srgb, var(--info) 15%, transparent);
+  border-color: color-mix(in srgb, var(--info) 35%, transparent);
+}
+/* Legend swatch: the same paint, shrunk. `aspect-ratio` rather than a height
+   override so a future cell-height change carries through. */
+.mcal-swatch { width: 14px; height: 14px; font-size: 0; }
+
+/* The name column stays put while the day columns scroll. Without it, scrolling
+   right to the end of a 31-day month detaches every row from whose row it is. */
+.mcal-name {
+  width: 170px; flex-shrink: 0; position: sticky; left: 0; z-index: 1;
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface-0); padding-right: 8px;
+}
+
 /* Fixed height, single line, ellipsis. Two reasons, and neither is taste: a
    card of unpredictable height has no knowable centre, so the elbow above could
    not anchor to one; and uniform rows are what make an outline scan as a list.
@@ -1350,6 +1449,10 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   transition: border-color 200ms var(--ease-out), background 200ms var(--ease-out);
 }
 .org-card:hover { border-color: var(--brand); }
+/* A leaf card is a <div>, not a button - it has no subtree to toggle and must
+   not advertise a click it will not honour. */
+.org-card.is-leaf { cursor: default; }
+.org-card.is-leaf:hover { border-color: var(--border); }
 .org-card.is-root { border-color: var(--brand); }
 .org-card.is-match { border-color: var(--brand); box-shadow: 0 0 0 4px var(--ring); }
 .org-card-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 1px; }
@@ -1461,6 +1564,17 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 /* The reminder-time pair, and the notification group headings. */
 .switch-group + .switch-group { margin-top: 18px; }
 .field-row { display: flex; gap: 16px; flex-wrap: wrap; }
+/* A field sharing a `.field-row` with its siblings: an equal share of the line,
+   dropping to a line of its own rather than squeezing below 200px. A class
+   rather than the `flex: 1 1 200px` the old reminder pair wrote inline - an
+   inline style sits outside this file's reduced-motion, touch-target and
+   elevation selector lists and is silently exempt from all three (invariant 15). */
+.field-row-item { flex: 1 1 200px; min-width: 200px; }
+/* The state line under a schedule input: the on/off chip, and the control that
+   turns it off. A row of its own because "empty means off" has to be STATED -
+   every one of these fields opens empty, and an empty box with nothing beside
+   it reads as broken rather than as off. */
+.field-state-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
 .mb-8  { margin-bottom: 8px; }
 .mb-16 { margin-bottom: 16px; }
 

@@ -67,11 +67,12 @@ export const wsAdmin = {
 
     // Shown instead of the org form when GET /api/ws/[slug] fails. The form is
     // withheld on purpose: its initial state is a set of defaults, and saving
-    // those would overwrite the workspace's real timezone, working days and
-    // reminders with values nobody chose.
+    // those would overwrite the workspace's real timezone and working days with
+    // values nobody chose. The reminder times it also used to guard are no
+    // longer edited anywhere on /ws - they are each member's own now.
     orgLoadFailedTitle: 'Settings could not be loaded',
     orgLoadFailedBody:
-      'Nothing has been changed. This form stays hidden until the saved configuration is on screen — editing it now would overwrite your timezone, working days and reminders with defaults.',
+      'Nothing has been changed. This form stays hidden until the saved configuration is on screen — editing it now would overwrite your timezone and working days with defaults.',
     orgLoadFailedRetry: 'Try again',
     signalsAndTitle: 'Verification uses AND logic — every configured signal must match for a check-in to count as verified.',
 
@@ -82,8 +83,19 @@ export const wsAdmin = {
 
     // ── Settings › Notifications ─────────────────────────────────────────────
     notifPageTitle: 'What this workspace sends',
+    /**
+     * This screen is now one half of a split, and the hint's main job is to
+     * name the OTHER half. An admin who remembers four switches and a pair of
+     * reminder times needs to be told those moved rather than broke, and told
+     * exactly where - otherwise the first assumption is that reminders were
+     * removed from the product, and the second is to file a bug.
+     *
+     * "Cannot be switched off from here" is stated rather than implied. An
+     * admin who believes they still hold the reminder schedule will promise a
+     * member they can stop a nudge, and then cannot.
+     */
     notifPageHint:
-      'Switching a category off stops it for everybody in this workspace — the in-app notification and the push both. Members can additionally mute the switchable ones for themselves.',
+      'This screen covers what the ORGANISATION sends. Switching one off stops it for everybody here — the in-app notification and the push both, so nothing is recorded either, and members cannot mute what is left on. A member’s own check-in reminders and check-in session nudges are not here at all: each person sets those in their own notification settings, and they cannot be switched on or off from this screen.',
 
     // The same tri-state withholding as the org form, and for the same reason:
     // the switchboard's initial state is "everything on", so saving it after a
@@ -97,44 +109,78 @@ export const wsAdmin = {
      * One entry per category in `CATEGORY_DEFS`. `satisfies Record<...>` makes a
      * category added to that catalogue without copy here a compile error, which
      * is the point: an unlabelled switch is worse than no switch.
+     *
+     * Two entries left, and that is now the whole catalogue this screen is
+     * responsible for. `reminders` and `presence` were here as unrendered copy
+     * for switches the workspace no longer owns; they are gone rather than kept
+     * disabled, because a string nothing renders is a string nobody updates, and
+     * both of those had already drifted into describing a vote no admin can cast.
+     * The member's half of the split has its own copy under
+     * `meSettings.settings.notifications`, written for the person being nudged.
      */
     notifCategories: {
-      reminders: {
-        label: 'Daily check-in reminders',
-        hint: 'The scheduled nudges configured above, to anyone who has not checked in or out yet.',
-      },
-      approvals_inbox: {
-        label: 'Requests to action',
-        hint: 'Tells approvers that a leave request or a regularization is waiting for them.',
-      },
-      approvals_outcome: {
-        label: 'Outcomes of requests',
-        hint: 'Tells a person their leave, regularization or document was approved, rejected or verified.',
+      /**
+       * One switch over both halves of an approval - the request reaching an
+       * approver and the answer reaching whoever filed it. These were two
+       * categories and two near-identical rows.
+       *
+       * The hint has to carry BOTH consequences, because one switch now has two
+       * audiences and an admin will almost certainly only be thinking about the
+       * first. Switching it off silences the inbox side AND the outcome side at
+       * once: approvers stop being told a request is waiting, and every employee
+       * stops being told what was decided about a request they filed. The second
+       * is the severe one and is spelled out rather than summarised - it is not
+       * "fewer pushes", it is no notification and no in-app record at all, so
+       * somebody whose leave was rejected finds out only by going to look.
+       */
+      approvals: {
+        label: 'Approvals',
+        hint: 'Covers both halves of an approval, and switching it off silences both audiences at once. Approvers stop being told that a leave request, regularization or document is waiting for them — they must watch the queue themselves. And every employee stops being told the outcome of their own request: no notification, no in-app record, so someone whose leave was approved or rejected only finds out by going to look. Members can never mute this one.',
       },
       announcements: {
         label: 'Announcements',
-        hint: 'Workspace-wide notices posted from this Settings screen.',
-      },
-      presence: {
-        label: 'Check-in session updates',
-        hint: 'The hourly milestones and the auto-checkout warning during someone’s own working session.',
+        /**
+         * Off means silent, NOT unposted. The `workspace_announcements` row is
+         * written before the fan-out, so the notice still reaches the member
+         * archive at /me/announcements with its attachments - it just arrives
+         * without a bell or a push. Saying so here is the only way an admin
+         * learns it before relying on it.
+         */
+        hint: 'Workspace-wide notices posted from this Settings screen. Switched off, a notice is still posted and still readable in each member’s announcements list — it just arrives silently, with no notification and no push. Members can never mute this one.',
       },
     } as const satisfies Record<NotificationCategory, { label: string; hint: string }>,
 
-    /** Keyed on `CategoryDef.lockedReason`, so the refusal is stated, not implied. */
+    /**
+     * Keyed on `CategoryDef.lockedReason`, so the refusal is stated, not implied.
+     *
+     * **No longer read by this screen.** The switchboard used to render a
+     * locked category as a disabled row captioned from here; it now filters
+     * those rows out entirely, so there is no lock left to caption and
+     * `lockedReasonFor()` has gone with it. Kept against the flag being
+     * flipped back, and because a lock reintroduced with no reason beside it is
+     * worse than no lock.
+     *
+     * `satisfies Record<string, string>` cannot check these keys against the
+     * catalogue the way `notifCategories` is checked against
+     * `NotificationCategory` — the index type is `string`. So a renamed
+     * `lockedReason` goes stale here silently and typechecks: `always_on_outcome`
+     * survived the approvals merge by exactly that route and had to be caught by
+     * grep. If you rename one in `CATEGORY_DEFS`, rename it in both locale
+     * modules by hand.
+     */
     notifLockedReasons: {
-      always_on_outcome:
-        'Always on. Someone who filed a request is entitled to be told what happened to it.',
+      always_on_approvals:
+        'Always on for members. Someone who filed a request is entitled to be told what happened to it, and an approver needs to know one is waiting.',
       always_on_announcement:
         'Always on. An announcement is the one notice that cannot afford to be missed — a closure, an office day, a policy change.',
     } as const satisfies Record<string, string>,
 
-    /** `presence` is account-scoped: there is no workspace switch to offer. */
-    notifLockedAccountScope:
-      'A personal setting. A check-in session belongs to no workspace, so each member controls this from their own settings.',
-
+    // Only malformed shapes reach this: the route DROPS keys it does not
+    // recognise rather than refusing them, so the message must not promise a
+    // rejection for an unknown category - it would be describing behaviour the
+    // route no longer has, on the one screen an admin reads it from.
     notifInvalidCategories:
-      'notificationCategoriesOff must be an array of switchable notification category keys',
+      'notificationCategoriesOff must be an array of notification category keys',
 
     // ── Workspace logo ───────────────────────────────────────────────────────
     logoTitle: 'Workspace logo',

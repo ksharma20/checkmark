@@ -19,6 +19,13 @@ interface NavItem {
   label: string
   /** True when the tab owns every route beneath its href, not just the href. */
   prefix: boolean
+  /**
+   * The one raised tab. Home is where a member checks in - the single action
+   * this surface exists for - and as a third identical 10.5px label it read as
+   * a peer of Timeline and Leave. It is a disc that breaks the bar's top edge
+   * instead, so the thumb has an unmissable target it does not have to aim at.
+   */
+  primary?: boolean
   icon: React.ReactNode
 }
 
@@ -42,6 +49,7 @@ const NAV_ITEMS: NavItem[] = [
     href: '/me',
     label: me.nav.home,
     prefix: false,
+    primary: true,
     icon: (
       <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
@@ -78,10 +86,10 @@ export default function BottomNav() {
           <Link
             key={item.href}
             href={item.href}
-            className={`me-navitem pressable${active ? ' active' : ''}`}
+            className={`me-navitem pressable${item.primary ? ' is-primary' : ''}${active ? ' active' : ''}`}
             aria-current={active ? 'page' : undefined}
           >
-            {item.icon}
+            {item.primary ? <span className="me-navdisc">{item.icon}</span> : item.icon}
             {item.label}
           </Link>
         )

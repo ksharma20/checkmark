@@ -1,6 +1,6 @@
 # Check-in & Checkout Flows
 
-> Last updated: 2026-08-31
+> Last updated: 2026-09-12
 >
 > **WiFi is gone.** No SSID is collected on check-in or checkout, and no signal
 > config can be WiFi any more. The `wifi_ssid` / `checkout_wifi_ssid` columns
@@ -41,7 +41,8 @@ sequenceDiagram
   API->>API: event_type = body.event_type ?? (body.is_remote ? 'remote_checkin' : 'office_checkin')
   API->>DB: createEvent(userId, eventType, gps, ip + ipGeo, device_info, deviceTimezone, source='user_app')
 
-  API->>DB: setScheduledCheckout(eventId, now + 12h)
+  API->>DB: getPresencePrefsForUser(userId) - auto_checkout_after_h, default 12
+  API->>DB: setScheduledCheckout(eventId, now + clamp(auto_checkout_after_h, 1, 24))
   API->>DB: updateUserStats(userId) - fire-and-forget
 
   alt gps_lat not null
@@ -59,7 +60,7 @@ sequenceDiagram
   Note over U,SW: Push subscription happens on SW registration<br/>(SwRegister.tsx → subscribeToPush()), not here.
   U->>U: 60s interval re-renders the "auto-checkout in Xh Ym" label
   U->>U: showToast("Checked in!")
-  Note over API: Milestones, the auto-checkout warning and the<br/>auto-checkout itself are all driven by /api/push/cron —<br/>the client no longer schedules them.
+  Note over API: The member's own ladder rungs and the<br/>auto-checkout itself are driven by /api/push/cron —<br/>the client no longer schedules them.
 ```
 
 ---
@@ -99,7 +100,12 @@ sequenceDiagram
 
 ---
 
-## 3. The reminder schedule from T=0
+## 3. The schedule from T=0 — the member's, not a constant
+
+`scheduled_checkout_at` is **member-set**. `POST /api/checkin` reads
+`auto_checkout_after_h` from that member's `member_presence_prefs` row and
+schedules the close that many hours out; the rungs in between come from the same
+row and are expanded by the cron, not stored on the event.
 
 ```mermaid
 gantt
@@ -107,27 +113,57 @@ gantt
   dateFormat HH:mm
   axisFormat %Hh
 
-  section Milestone pushes
-  4h     :milestone, 04:00, 0m
-  8h     :milestone, 08:00, 0m
-  12h    :milestone, 12:00, 0m
-  16h    :milestone, 16:00, 0m
-  18h    :milestone, 18:00, 0m
-  20h    :milestone, 20:00, 0m
-  22h    :milestone, 22:00, 0m
+  section A member who has configured nothing
+  no pushes at all            :milestone, 00:00, 0m
+  auto-checkout (default 12h) :milestone, 12:00, 0m
 
-  section Auto-checkout
-  warning window opens (T−60m) :milestone, 11:00, 0m
-  auto-checkout                :milestone, 12:00, 0m
+  section An example configured ladder
+  half_day_after_h = 5    :milestone, 05:00, 0m
+  full_day_after_h = 9    :milestone, 09:00, 0m
+  repeat_every_h = 1      :milestone, 10:00, 0m
+  repeat                  :milestone, 11:00, 0m
+  auto_checkout_after_h = 12 :milestone, 12:00, 0m
 ```
+
+**A member who has never opened the settings screen is silent and still closed on
+time.** The three rung columns are nullable and default to NULL, so
+`resolveLadder()` returns an empty list; `auto_checkout_after_h` is
+`NOT NULL DEFAULT 12`, which is exactly what this route hardcoded before the
+table existed, so the deploy changed nobody's close time — only their ability to
+change it themselves.
+
+That asymmetry is the design. The rungs are NUDGES and a member may switch them
+all off; **auto-checkout is a MECHANIC.** An open `presence_events` row is what
+the day's attendance is computed from, and invariant 4 means it can never be
+repaired by editing it, so a session that never closes leaves that day wrong for
+the member and for every workspace they belong to until somebody fixes it by
+hand. The column refuses to express an off value.
+
+Three guards around that hour, in the order they apply:
+
+| Guard | Where | Why |
+|---|---|---|
+| Validation of the whole ladder object | `/api/me/presence-prefs` | The rungs constrain each other — a repeat is meaningless without a full-day mark, and no rung may sit at or past auto-checkout — so the write takes the complete object, never a patch |
+| `clamp(h, MIN_AUTO_CHECKOUT_H, MAX_AUTO_CHECKOUT_H)` = `[1, 24]` | `POST /api/checkin` | The route is not the only thing that could ever write the column — a migration, a support fix, an importer all reach it directly. A stored `0` closes the session the instant it opens; a stored `10000` leaves it open past `CRON_MAX_EVENT_AGE_H`, which means never closed at all |
+| A failed preference read falls back to the default | `POST /api/checkin` | Recording presence is the product. A member standing in the office must not be unable to say so because of a preferences table they may have no row in |
+
+`MAX_AUTO_CHECKOUT_H = 24` is the **same** ceiling `POST /api/checkin/extend`
+enforces when it clamps an extension to `checkin_at + 24h`. It lives in the pure
+`src/lib/presence-ladder.ts` so the check-in route, the extend route and the
+`/me/settings` form read one definition — before that it was three literals in
+three files, which is the arrangement where one gets raised and the other two
+silently disagree.
 
 These are evaluated by the cron every 30 minutes, not by browser timers, so they
 fire with the app closed. Dedupe is the `presence_events.push_reminders_sent`
-JSON array. `scheduled_checkout_at` is set to `now + 12h` at check-in and can be
-pushed out by `POST /api/checkin/extend`.
+JSON array, read through `normaliseLadderKey()` so a session opened under the old
+`'5h'` / `'10h'` names is not re-nudged under the new ones. A rung more than
+`LADDER_WINDOW_H` (1.5h) past its hour is **claimed without being sent** — see
+[`notification-flow.md`](./notification-flow.md#5-the-session-ladder-cron-pass-1).
 
 The **wall-clock** "time to check in / check out" reminders are a completely
-separate mechanism — see [`reminders.md`](./reminders.md).
+separate mechanism, configured per member per workspace — see
+[`reminders.md`](./reminders.md).
 
 ---
 
@@ -140,11 +176,26 @@ sequenceDiagram
   participant SW as Service Worker
 
   C->>DB: getOpenEventsForCron()
-  Note over C: for each event where now >= scheduled_checkout_at<br/>and 'autocheckedout' not yet in push_reminders_sent
-  C->>DB: autoCheckoutEvent(event.id, now)
-  C->>SW: sendPushToUser("Auto-checked out", tag='auto-checked-out')
+  Note over C: for each event where now >= scheduled_checkout_at<br/>and 'autocheckedout' not yet claimed
+  C->>DB: autoCheckoutEvent(event.id, now) - UPDATE ... AND checkout_at IS NULL
+  DB-->>C: closed: boolean
+  alt closed
+    C->>SW: sendPushToUser("Auto-checked out", tag='presence-autocheckedout')
+  end
   C->>DB: updatePushRemindersSent(event.id, [...,'autocheckedout'])
 ```
+
+**The mechanic runs first and unconditionally**, and obeys no notification
+preference: a session must close whether or not anybody is told. It is not one of
+the member's configurable rungs and it is not subject to the ladder's staleness
+ceiling — unlike a nudge, what it reports is still true whenever it arrives.
+
+**The push is conditional on the write having done something.** The UPDATE
+carries `AND checkout_at IS NULL` and `autoCheckoutEvent()` returns whether it
+changed a row, because announcing "we closed your session" to somebody who closed
+it themselves seconds earlier is announcing a thing that did not happen. The
+dedupe key is claimed either way — the event is resolved, and leaving it
+unclaimed would re-run this branch on every future tick.
 
 A user can also check out from a notification action, which posts
 `{ reason: 'push_action_checkout' }`. `checkout_reason` is stored on the event,
@@ -220,7 +271,8 @@ presence_events row (columns verified against sqlite3 .schema):
   event_type               'office_checkin' | 'remote_checkin'
   checkin_at               TEXT, SQLite datetime ('YYYY-MM-DD HH:MM:SS')
   checkout_at              TEXT, null until checkout
-  scheduled_checkout_at    TEXT, T+12h from check-in (extendable)
+  scheduled_checkout_at    TEXT, T + the member's auto_checkout_after_h
+                                 (default 12h, clamped to [1,24]; extendable)
   checkout_reason          null | 'push_action_checkout' | 'midnight_auto_checkout' | ...
 
   # Check-in signals
