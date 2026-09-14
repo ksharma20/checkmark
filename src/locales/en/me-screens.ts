@@ -33,7 +33,6 @@ export const meScreens = {
     tabBalance: 'Balance',
     tabApply: 'Apply',
     tabCorrection: 'Correction',
-    tabHistory: 'History',
     tabHolidays: 'Holidays',
 
     // Balance

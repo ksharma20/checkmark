@@ -9,6 +9,7 @@ import {
 } from '@/lib/db/queries/announcements'
 import { getActiveMemberIds } from '@/lib/db/queries/workspaces'
 import { notify } from '@/lib/notify'
+import { parseCategoriesOff } from '@/lib/notifications/categories'
 import { announcementStore, MAX_FILE_BYTES, sniffMimeType } from '@/lib/storage'
 import { wsAnnouncements as t } from '@/locales/en/ws-announcements'
 
@@ -230,13 +231,24 @@ export async function POST(req: NextRequest, { params }: Props) {
   const created = listed ?? { ...announcement, author_name: null, attachments: [] }
 
   // `delivered` is the size of the fan-out, not a count of confirmed writes -
-  // `notify()` deliberately does not report per-recipient outcomes. It stays
-  // exact for this type: `announcements` is locked on in `CATEGORY_DEFS`, so
-  // neither the workspace switchboard nor a member mute can drop a row, and the
-  // in-app write is unconditional. Only a database failure would make the two
-  // disagree, and that is already invisible to the admin.
+  // `notify()` deliberately does not report per-recipient outcomes.
+  //
+  // It used to be exact because `announcements` was locked on in
+  // `CATEGORY_DEFS`, so nothing could drop a row. It is switchable now, and a
+  // workspace that has switched it off gets NO rows at all - `notify()` returns
+  // at step 2 - so reporting the roster size would be a flat lie on the one
+  // screen an admin uses to check a notice went out. Zero is the honest answer,
+  // and the composer says "posted silently" rather than "delivered to 34".
+  //
+  // A member mute still cannot lower this: the mute is push-only, so the in-app
+  // row is written regardless (invariant 24). Only a database failure makes the
+  // two disagree, and that is already invisible to the admin.
+  const announcementsOff = parseCategoriesOff(
+    ctx.workspace.notification_categories_off,
+  ).has('announcements')
+
   return NextResponse.json(
-    { announcement: created, delivered: recipients.length },
+    { announcement: created, delivered: announcementsOff ? 0 : recipients.length },
     { status: 201 },
   )
 }

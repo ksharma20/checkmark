@@ -6,6 +6,12 @@ import { extractIp, getIpGeo } from '@/lib/geo'
 import { updateUserStats } from '@/lib/stats'
 import { reverseGeocodeLabel } from '@/lib/geo-label'
 import { evaluateTrust } from '@/lib/trust'
+import { getPresencePrefsForUser } from '@/lib/db/queries/presence-prefs'
+import {
+  DEFAULT_PRESENCE_PREFS,
+  MAX_AUTO_CHECKOUT_H,
+  MIN_AUTO_CHECKOUT_H,
+} from '@/lib/presence-ladder'
 
 export async function POST(request: NextRequest) {
   const userId = request.headers.get('x-user-id')
@@ -73,8 +79,43 @@ export async function POST(request: NextRequest) {
   if (!event)
     return NextResponse.json({ error: 'Check-in failed', code: 'DB_ERROR' }, { status: 500 })
 
-  // Schedule auto-checkout 12 hours after check-in
-  const autoCheckoutAt = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString()
+  /**
+   * Schedule the auto-checkout, at the member's own hour count.
+   *
+   * This was a hardcoded 12 hours. `DEFAULT_PRESENCE_PREFS.autoCheckoutAfterH`
+   * is 12 for exactly that reason, so a member who has never opened the session
+   * settings gets the identical time they got before this table existed - the
+   * deploy changes nobody's behaviour, only their ability to change it
+   * themselves.
+   *
+   * A FAILED PREFERENCE READ MUST NOT FAIL THE CHECK-IN. Recording presence is
+   * the product; a scheduling preference is a detail of what happens twelve
+   * hours later, and letting it block the write would mean a member standing in
+   * the office unable to say so because of a table they may not even have a row
+   * in. The fallback is the same default as having no row, which is the outcome
+   * they would almost certainly have got anyway.
+   */
+  let autoCheckoutAfterH = DEFAULT_PRESENCE_PREFS.autoCheckoutAfterH
+  try {
+    autoCheckoutAfterH = (await getPresencePrefsForUser(userId)).autoCheckoutAfterH
+  } catch (err) {
+    console.error('[checkin] presence prefs lookup failed; using the default close time:', err)
+  }
+
+  /**
+   * Clamped here as well as validated in `/api/me/presence-prefs`, because this
+   * is the value that decides when somebody's day is closed and the route is not
+   * the only thing that could ever have written the row - a migration, a support
+   * fix or a future importer all reach the column directly. A stored 0 would
+   * close the session in the same instant it opened; a stored 10000 would leave
+   * it open past the point the cron will even look at it (CRON_MAX_EVENT_AGE_H),
+   * which means never closed at all.
+   */
+  const clampedH = Math.min(
+    MAX_AUTO_CHECKOUT_H,
+    Math.max(MIN_AUTO_CHECKOUT_H, autoCheckoutAfterH),
+  )
+  const autoCheckoutAt = new Date(Date.now() + clampedH * 60 * 60 * 1000).toISOString()
   await setScheduledCheckout(event.id, autoCheckoutAt)
 
   updateUserStats(userId).catch(console.error)

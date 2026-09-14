@@ -9,6 +9,28 @@ export { haversineMetres }
 
 export type MatchedBy = 'verified' | 'partial' | 'none' | 'override'
 
+/**
+ * Which signal types this workspace actually matches against.
+ *
+ * A type counts as configured only when a row of that type carries usable
+ * coordinates - a half-filled row can never match, so listing it would promise
+ * a check that never runs.
+ *
+ * This is exported because the ATTENDANCE UI needs the same answer. It used to
+ * hardcode `['gps','wifi','ip']` and draw a cross beside every type it did not
+ * find in `matched_signals`, which meant Wi-Fi - a type this function has never
+ * been able to return, because `workspace_signals.signal_type` is only ever
+ * 'gps' or 'ip' - showed a permanent failure for every member in every
+ * workspace. Deriving both the matcher's set and the UI's list here is what
+ * stops the screen and the rule disagreeing again.
+ */
+export function deriveConfiguredTypes(signals: WorkspaceSignalConfig[]): string[] {
+  const types: string[] = []
+  if (signals.some(s => s.signal_type === 'gps' && s.gps_lat !== null && s.gps_lng !== null)) types.push('gps')
+  if (signals.some(s => s.signal_type === 'ip' && s.ip_geo_lat !== null && s.ip_geo_lng !== null)) types.push('ip')
+  return types
+}
+
 export interface PresenceEventWithMatch extends PresenceEvent {
   matched_by: MatchedBy
   matched_signals: string[]  // which signal types actually matched: e.g. ['gps', 'wifi']
@@ -92,9 +114,7 @@ export async function queryWorkspaceEvents(
   )
 
   // Determine which signal types are configured for this workspace
-  const configuredTypes = new Set<string>()
-  if (gpsSignals.length > 0) configuredTypes.add('gps')
-  if (ipSignals.length > 0) configuredTypes.add('ip')
+  const configuredTypes = new Set<string>(deriveConfiguredTypes(signals))
 
   const result: PresenceEventWithMatch[] = []
 

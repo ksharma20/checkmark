@@ -46,37 +46,77 @@ export const documentNotifications = {
 }
 
 /**
- * The presence ladder - the only three pushes anchored on an open check-in.
+ * Render an hour count for a push body or a settings summary.
  *
- * Three steps, not seven. The old ladder fired at 4/8/12/16/18/20/22h and every
- * rung said the same thing, so it read as nagging rather than as a signal; worse,
- * auto-checkout lands at 12h, so the 16h and later rungs could never fire at all.
- * Each step now has a distinct job and its own destination:
+ * The values are REAL numbers now - `half_day_after_h` and friends are stored as
+ * REAL so a member can ask for four and a half hours - and `String(5)` gives
+ * "5" while `(5).toFixed(1)` gives "5.0". A push that says "5.0 hours since you
+ * checked in" reads like a machine reporting a float, so whole numbers print
+ * whole and fractional ones keep one decimal.
  *
- *   5h   a nudge with no urgency  - you may be on a half day
- *   10h  the last chance to act   - links to the extension picker, because from
- *                                   here the only two honest answers are "check
- *                                   out" and "tell us you are still working"
- *   12h  a statement of fact      - the session is already closed; asking for an
- *                                   action would be asking for one that no longer
- *                                   exists
+ * Lives here, beside the bodies that consume it, rather than in
+ * `src/lib/presence-ladder.ts`: it is a decision about how copy reads, not about
+ * how the ladder works.
+ */
+export function formatHours(hours: number): string {
+  return Number.isInteger(hours) ? String(hours) : String(Math.round(hours * 10) / 10)
+}
+
+/**
+ * The presence ladder - the pushes anchored on an open check-in session.
  *
- * These are push-only (see `notifyPresence` in `src/lib/notify.ts`), so the body
- * has to carry the whole message - there is no feed row to open for the detail.
+ * No longer three fixed steps. The hours were hardcoded at 5h / 10h / 12h and
+ * every member in the product got the same three, which is wrong in both
+ * directions at once: a warehouse shift and a consultant's day are not the same
+ * day, and a member who wanted none of it had only the blunt instrument of
+ * revoking push permission entirely. The schedule is now four numbers the member
+ * sets in `/me/settings`, stored in `member_presence_prefs` and expanded by
+ * `resolveLadder()` in `src/lib/presence-ladder.ts`.
+ *
+ * So the TIMINGS are the member's and the COPY stays ours: these bodies take the
+ * hour as an argument and must never restate a number as a word. The old copy
+ * read "Five hours since you checked in" and "Ten hours in", which would now be
+ * a straightforward lie to anybody who moved the rung.
+ *
+ * Four rungs, each with a distinct job - which is the whole reason they are
+ * separate rungs rather than one message repeated:
+ *
+ *   halfDay       a nudge, no urgency. Opens the check-in screen. Nothing is
+ *                 being asked of the member; they are being told where they are.
+ *   fullDay       the last chance to act, so it names the choice and opens the
+ *                 extension picker, because from here the only two honest
+ *                 answers are "check out" and "I am still working".
+ *   overtime      past the day they themselves defined, still checked in.
+ *                 Repeats, so it has to stay short and stay free of alarm.
+ *   autoCheckout  fires AFTER the fact, so it reports rather than asks. There is
+ *                 no action left to offer - the session is already closed - and
+ *                 it takes no hour count because the hour is not the point.
+ *
+ * These are push-only (see `notifyPresence` in `src/lib/notify.ts`): no feed row
+ * is written for any of them, so the body carries the entire message and there
+ * is nothing to open later for the detail.
  */
 export const presenceLadder = {
-  fiveHour: {
+  halfDay: {
     title: "That's half a day",
-    body: "Five hours since you checked in. Heading off?",
+    body: (hours: number) =>
+      `${formatHours(hours)} hours since you checked in. Check out whenever you are done.`,
   },
-  tenHour: {
+  fullDay: {
     title: 'Your day is complete',
-    body: 'Ten hours in. Check out and go home, or extend if you are still working.',
+    body: (hours: number) =>
+      `${formatHours(hours)} hours in. Check out to close the day, or extend if you are still working.`,
+  },
+  /** Repeats until auto-checkout, so it stays short and states the fact. */
+  overtime: {
+    title: 'Still checked in',
+    body: (hours: number) =>
+      `${formatHours(hours)} hours in, past the day you set. Check out, or extend to keep the session open.`,
   },
   /** Fires after the fact, so it reports rather than asks. */
   autoCheckout: {
     title: "You've been checked out",
-    body: 'Your session reached its scheduled end, so we closed it for you.',
+    body: 'Your session reached the time you set for it, so we closed it for you.',
   },
 }
 
@@ -84,10 +124,10 @@ export const presenceLadder = {
  * The extension picker, and the one error its endpoint can return.
  *
  * Lives beside the ladder rather than in `me.ts` because it is the same feature:
- * the 10h push is the only reason a member ever lands on `/me?extend=1`, and the
- * offer it makes ("extend if you are still working") is only true because this
- * dialog exists. Splitting the two across modules is how the promise and the
- * screen drift apart.
+ * the full-day and overtime rungs are the only reason a member ever lands on
+ * `/me?extend=1`, and the offer they make ("extend if you are still working") is
+ * only true because this dialog exists. Splitting the two across modules is how
+ * the promise and the screen drift apart.
  */
 export const extendSession = {
   trigger: 'Extend session',
@@ -103,4 +143,14 @@ export const extendSession = {
   toastNetworkError: 'Network error. Please try again.',
   /** Server-side. The allow-list is closed, so naming it is the useful half. */
   errorInvalidExtension: 'Extension must be 2, 4, 6, 8 or 12 hours',
+  /**
+   * Server-side, and deliberately a function of the ceiling rather than a
+   * sentence with `24` written into it. The number is `MAX_AUTO_CHECKOUT_H` in
+   * `src/lib/presence-ladder.ts`, which the check-in route, the extend route and
+   * the member's own settings form all now read from one definition; a literal
+   * here would be a fourth copy, and the one most likely to be missed when the
+   * ceiling moves, because it is the only one a compiler cannot find.
+   */
+  errorMaxDuration: (maxHours: number) =>
+    `A session cannot be extended past ${maxHours} hours from check-in`,
 }

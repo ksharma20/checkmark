@@ -6,9 +6,7 @@ import { getMembersOnLeaveToday } from '@/lib/db/queries/leaves'
 import { getPendingApprovalItems, type ApprovalItem } from '@/lib/approvals'
 import {
   getDepartmentBreakdown,
-  getUpcomingCelebrations,
   type DepartmentHeadcount,
-  type UpcomingCelebration,
 } from '@/lib/db/queries/employees'
 import { Action, Resource } from '@/lib/permissions/catalogue'
 
@@ -25,16 +23,11 @@ export interface OverviewWidgetsResponse {
   pendingApprovals: ApprovalItem[]
   pendingApprovalsTotal: number
   departmentBreakdown: DepartmentHeadcount
-  /**
-   * The rest of the current calendar month, topped up to at least five.
-   *
-   * Not a fixed day window: a 14-day one emptied the card for most of the
-   * month and then cut the list off mid-month for no reason a reader could
-   * see. The count, not the horizon, is what the widget is sized for - see
-   * getUpcomingCelebrations.
-   */
-  celebrations: UpcomingCelebration[]
 }
+
+// Celebrations left this payload when the widget gained a month stepper: it is
+// addressed by month now, so it owns its own fetch against
+// GET /api/ws/[slug]/celebrations rather than riding on a route with no params.
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -47,7 +40,7 @@ export async function GET(req: NextRequest, { params }: Props) {
 
   const today = todayInTz(ctx.workspace.display_timezone)
 
-  const [memberIds, onLeaveMembers, approvals, departmentBreakdown, celebrations] = await Promise.all([
+  const [memberIds, onLeaveMembers, approvals, departmentBreakdown] = await Promise.all([
     getActiveMemberIds(ctx.workspace.id),
     getMembersOnLeaveToday(ctx.workspace.id, today),
     // ctx.role decides whether the document items are in this feed at all -
@@ -58,15 +51,16 @@ export async function GET(req: NextRequest, { params }: Props) {
       viewer: ctx.role,
     }),
     getDepartmentBreakdown(ctx.workspace.id),
-    getUpcomingCelebrations(ctx.workspace.id, today),
   ])
 
   return NextResponse.json({
     activeMembers: memberIds.length,
     onLeaveToday: onLeaveMembers.length,
-    pendingApprovals: approvals.items.slice(0, 5),
+    // Unsliced. The widget is a fixed-height card with its own scroll body, so
+    // capping at five bought nothing except an approvals queue that claimed to
+    // be five items long. `pendingApprovalsTotal` still feeds the greeting line.
+    pendingApprovals: approvals.items,
     pendingApprovalsTotal: approvals.items.length,
     departmentBreakdown,
-    celebrations,
   } satisfies OverviewWidgetsResponse)
 }

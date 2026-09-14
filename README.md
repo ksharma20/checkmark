@@ -265,7 +265,9 @@ Verify with `sqlite3 venzio.db ".tables"`.
 
 | Table                     | Purpose                                                                |
 | ------------------------- | ---------------------------------------------------------------------- |
-| `workspaces`              | slug, name, plan, `display_timezone`, `working_days`, `allow_remote`, `leaves_enabled`, `leave_cutover_date`, `checkin_reminder_at`, `checkout_reminder_at`, `archived_at` |
+| `workspaces`              | slug, name, plan, `display_timezone`, `working_days`, `allow_remote`, `leaves_enabled`, `leave_cutover_date`, `notification_categories_off`, `archived_at` (plus vestigial `checkin_reminder_at` / `checkout_reminder_at`) |
+| `member_reminder_prefs`   | per-member, per-workspace `checkin_at` / `checkout_at` - the reminder schedule; NULL = that kind off |
+| `member_presence_prefs`   | per-member session ladder: `half_day_after_h`, `full_day_after_h`, `repeat_every_h`, `auto_checkout_after_h` |
 | `workspace_members`       | User ↔ workspace membership, `role` (FK by key to `workspace_roles`), consent status + token |
 | `workspace_roles`         | Per-workspace roles. `permissions` is the JSON grid; `scope`; soft-deleted |
 | `workspace_domains`       | Email domains for auto-enrolment                                       |
@@ -715,23 +717,48 @@ are gated on the same resource.
 
 Two independent passes run from `POST /api/push/cron`.
 
-**Pass 1 - event-anchored** (in the route). Iterates open `presence_events`:
-milestone pushes at 4, 8, 12, 16, 18, 20 and 22 hours; a warning when
-`scheduled_checkout_at` is within 60 minutes, carrying "Extend 4h" and "Checkout Now"
-actions; and auto-checkout once that time passes. Check-in schedules auto-checkout at
-**T+12h**; `POST /api/checkin/extend` pushes it out **+4h** at a time, up to a hard limit of
-24h from check-in. Progress is recorded in `presence_events.push_reminders_sent`.
+Both are **push-only**: neither writes a `notifications` row, so neither appears in the
+in-app feed. Only the organisation's two notification categories (`approvals`,
+`announcements`) do that. Both passes are also **member-configured** - the workspace sets
+neither schedule.
+
+**Pass 1 - event-anchored** (in the route). Iterates open `presence_events` and fires the
+member's own session ladder, resolved by `resolveLadder()` in `src/lib/presence-ladder.ts`
+from `member_presence_prefs`: a half-day rung, a full-day rung, and an overtime rung
+repeating every N hours until the session closes. Every hour is the member's; a member with
+no row gets no rungs at all, because the ladder is opt-in. Progress is recorded in
+`presence_events.push_reminders_sent` under the keys `half`, `full`, `ot-<n>` and
+`autocheckedout`.
+
+Two guards keep it honest. A rung more than `LADDER_WINDOW_H` (1.5h) past its hour is
+**claimed without being sent** - GitHub Actions cron is best-effort, and without this an
+event left stale by an outage fired every rung plus the auto-checkout notice seconds apart.
+And because the batch is read once and then looped, the route re-checks `isEventOpen()`
+immediately before each push, so a member who checks out mid-loop is not buzzed.
+
+Auto-checkout is a **mechanic, not a nudge**: it runs first, unconditionally, and cannot be
+switched off - a session that never closes corrupts the day's attendance. Check-in schedules
+it at the member's `auto_checkout_after_h` (default **12h**, the previous hardcoded value, so
+an unconfigured member is unaffected); `POST /api/checkin/extend` pushes it out **+4h** at a
+time up to `MAX_AUTO_CHECKOUT_H` (24h) from check-in. `autoCheckoutEvent()` reports whether it
+actually closed anything, so the "we closed your session" notice is only sent when a session
+really closed.
 
 **Pass 2 - wall-clock** (`src/lib/reminders.ts`). The first pass starts from open events, so
 it is structurally incapable of noticing someone who *never checked in*. This pass anchors on
-workspaces instead. `workspaces.checkin_reminder_at` / `checkout_reminder_at` hold an `HH:MM`
-wall-clock time in the workspace's own timezone; `NULL` means off. Gates, in order:
+workspaces instead - one holidays, leave and parental query per workspace rather than per
+member - but the *times* are per member: `member_reminder_prefs.checkin_at` /
+`checkout_at` hold an `HH:MM` wall-clock time in the workspace's own timezone, and `NULL`
+means that kind is off. There is deliberately no separate on/off column: **the time is the
+switch**. `workspaces.checkin_reminder_at` / `checkout_reminder_at` still exist but are
+vestigial - never read as the schedule again. Gates, in order:
 
 1. archived workspace → excluded by the query
 2. not a working day per `workspaces.working_days` → skip the workspace
 3. a `workspace_holidays` date → skip the workspace
-4. now is not within `REMINDER_GRACE_MIN` (90 min) after the configured time → skip the kind
-5. member on approved leave **or** in an active maternity case → skip the member
+4. no member's time falls within `REMINDER_GRACE_MIN` (30 min) after it → return before any
+   member query
+5. member on approved leave **or** in an active parental-leave case → skip the member
 6. already reminded today → skip the member
 
 Gate 6 is a `reminder_log` insert protected by a partial unique index, so the insert *is* the
@@ -740,8 +767,12 @@ reminder per kind per local day.
 
 **The workflow runs `0,30 * * * *`, not hourly.** India (UTC+5:30), Iran (+3:30) and parts of
 Australia (+9:30 / +10:30) sit on half-hour offsets, so an hourly UTC schedule lands at :30
-past their local hour and a 10:00 IST reminder could never fire on time. GitHub Actions cron
-is best-effort, which is what the 90-minute grace window absorbs.
+past their local hour and a 10:00 IST reminder could never fire on time. With a 30-minute
+window against a 30-minute tick, every minute of the day is reachable exactly once and the
+worst-case lateness is 29 minutes. The accepted cost is stated plainly: a skipped or badly
+delayed run **drops** that person's reminder for the day rather than delivering it stale,
+because a reminder that arrives hours late is a nag, and a nag is what makes somebody revoke
+push permission entirely - which would also cost them the approval notifications that matter.
 
 ---
 
@@ -799,7 +830,7 @@ Bottom nav is three tabs: **Timeline · Home · Leave**. `/me/orgs`, `/me/profil
 check-in still proceeds with null GPS and a toast explains why. The server writes the
 `presence_events` row, kicks off a Nominatim reverse-geocode in the background (stored as
 `location_label` - it may stay NULL, which is acceptable, not a bug), schedules auto-checkout
-at T+12h, and updates `user_stats`. Rate limit: 10 check-ins per hour per user.
+at the member's `auto_checkout_after_h` (default 12h), and updates `user_stats`. Rate limit: 10 check-ins per hour per user.
 
 **Checkout collects signals too** - GPS, IP and device info are stored for both ends of an
 event, in the `checkout_*` columns.
@@ -936,7 +967,7 @@ Workspace-admin routes return `403 { "error": "Forbidden", "code": "FORBIDDEN" }
 
 | Method | Route                   | Description                                                    |
 | ------ | ----------------------- | -------------------------------------------------------------- |
-| POST   | `/api/checkin`          | Create a presence event. 10 / hour / user. Schedules auto-checkout at T+12h |
+| POST   | `/api/checkin`          | Create a presence event. 10 / hour / user. Schedules auto-checkout at the member's `auto_checkout_after_h` (default 12h) |
 | POST   | `/api/checkin/checkout` | Close the open event; stores checkout GPS / IP / label          |
 | POST   | `/api/checkin/extend`   | Push `scheduled_checkout_at` out 4h, capped at 24h from check-in |
 | GET    | `/api/checkin/status`   | `{ state: 'checked_in' \| 'checked_out', activeEvent }`         |
@@ -955,6 +986,7 @@ Workspace-admin routes return `403 { "error": "Forbidden", "code": "FORBIDDEN" }
 | POST        | `/api/me/reactivate`              | Reactivate a deactivated account (public route)    |
 | POST        | `/api/me/consent`                 | Accept / decline a workspace invite                |
 | DELETE      | `/api/me/workspaces/[workspaceId]`| Leave a workspace                                  |
+| GET/PATCH   | `/api/me/presence-prefs`          | The member's session ladder (account-level, no workspace) |
 | GET         | `/api/me/notifications`           | Notification feed                                  |
 | PATCH       | `/api/me/notifications/read`      | Mark read                                          |
 | GET         | `/api/me/notifications/unread-count` | Badge count                                     |
@@ -966,6 +998,7 @@ All guarded by `requireWsMember()` and scoped to the session user. No permission
 
 | Method | Route                                    | Description                                          |
 | ------ | ---------------------------------------- | ---------------------------------------------------- |
+| GET/PATCH | `/api/me/ws/[slug]/reminder-times`    | The member's check-in / check-out reminder times for this workspace |
 | GET    | `/api/me/ws/[slug]/today`                | Today's roster + `{ id, name, slug }` + `viewerRole`  |
 | GET    | `/api/me/ws/[slug]/counts`               | `{ present, visited, notIn, total }`                  |
 | GET    | `/api/me/ws/[slug]/events`               | Own events in range **with** workspace `matched_by`   |

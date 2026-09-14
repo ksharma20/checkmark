@@ -14,34 +14,19 @@ const MONTH_NAMES = [
 ]
 
 /**
- * Day-cell fills. `remote` collapses onto the office colour when the workspace
- * has no signals configured: with nothing to match against, "remote" is not a
- * distinction the data can actually make.
+ * The class list for one day cell.
+ *
+ * `remote` collapses onto the office paint when the workspace has no signals
+ * configured: with nothing to match against, "remote" is not a distinction the
+ * data can actually make. The colours themselves live in `globals.css` under
+ * `.mcal-cell` - they used to be inline style objects here, which put them
+ * outside every selector list that file uses to enforce the design rules.
  */
-function dayColor(status: DayStatus, signalsConfigured: boolean): string {
-  switch (status) {
-    case 'absent':  return 'color-mix(in srgb, var(--danger) 15%, transparent)'
-    case 'leave':   return 'color-mix(in srgb, var(--info) 15%, transparent)'
-    case 'holiday': return 'var(--surface-2)'
-    case 'office':  return 'color-mix(in srgb, var(--brand) 20%, transparent)'
-    case 'remote':  return signalsConfigured
-      ? 'color-mix(in srgb, var(--amber) 22%, transparent)'
-      : 'color-mix(in srgb, var(--brand) 20%, transparent)'
-    default:        return 'transparent'
-  }
-}
-
-function dayBorder(status: DayStatus, signalsConfigured: boolean): string {
-  switch (status) {
-    case 'absent':  return 'color-mix(in srgb, var(--danger) 35%, transparent)'
-    case 'leave':   return 'color-mix(in srgb, var(--info) 35%, transparent)'
-    case 'holiday': return 'var(--border)'
-    case 'office':  return 'color-mix(in srgb, var(--brand) 45%, transparent)'
-    case 'remote':  return signalsConfigured
-      ? 'color-mix(in srgb, var(--amber) 45%, transparent)'
-      : 'color-mix(in srgb, var(--brand) 45%, transparent)'
-    default:        return 'transparent'
-  }
+function cellClass(status: DayStatus, signalsConfigured: boolean): string {
+  const parts = ['mcal-cell']
+  if (status !== 'future') parts.push(`is-${status}`)
+  if (status === 'remote' && !signalsConfigured) parts.push('is-unconfigured')
+  return parts.join(' ')
 }
 
 const STATUS_LABEL: Record<DayStatus, string> = {
@@ -53,13 +38,11 @@ const STATUS_LABEL: Record<DayStatus, string> = {
   future: '',
 }
 
-function LegendItem({ color, border, label }: { color: string; border: string; label: string }) {
+/** The swatch renders the grid's own class, so legend and cell cannot drift. */
+function LegendItem({ cellClassName, label }: { cellClassName: string; label: string }) {
   return (
     <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-      <span
-        aria-hidden
-        style={{ width: '14px', height: '14px', borderRadius: '4px', background: color, border: `1px solid ${border}` }}
-      />
+      <span aria-hidden className={`${cellClassName} mcal-swatch`} />
       <span className="t-muted">{label}</span>
     </span>
   )
@@ -77,49 +60,22 @@ interface CellProps {
 function CalendarCell({ day, dateStr, status, signalsConfigured, joinedDate, offDays }: CellProps) {
   // Noon UTC, so the weekday never rolls over for a viewer west of UTC.
   const isWeekend = offDays.includes(new Date(`${dateStr}T12:00:00Z`).getUTCDay())
-  const base: React.CSSProperties = {
-    width: '100%',
-    height: '28px',
-    borderRadius: '4px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontFamily: 'var(--font-mono)',
-    fontSize: '10px',
-  }
 
   if (dateStr < joinedDate) {
-    return (
-      <div
-        title={t.cellPreJoin(dateStr)}
-        style={{ ...base, background: 'var(--surface-1)', border: '1px dashed var(--border)', opacity: 0.45, color: 'var(--text-muted)' }}
-      >
-        {day}
-      </div>
-    )
+    return <div className="mcal-cell is-prejoin" title={t.cellPreJoin(dateStr)}>{day}</div>
   }
 
   if (isWeekend) {
     return (
-      <div
-        title={t.cellStatus(dateStr, t.legendWeekend)}
-        style={{ ...base, background: 'var(--surface-2)', border: '1px solid var(--border)', opacity: 0.45, color: 'var(--text-muted)' }}
-      >
-        {day}
-      </div>
+      <div className="mcal-cell is-weekend" title={t.cellStatus(dateStr, t.legendWeekend)}>{day}</div>
     )
   }
 
   const resolved: DayStatus = status ?? 'absent'
   return (
     <div
+      className={cellClass(resolved, signalsConfigured)}
       title={t.cellStatus(dateStr, STATUS_LABEL[resolved] || t.legendAbsent)}
-      style={{
-        ...base,
-        background: dayColor(resolved, signalsConfigured),
-        border: `1px solid ${dayBorder(resolved, signalsConfigured)}`,
-        fontWeight: resolved === 'office' ? 600 : 400,
-      }}
     >
       {day}
     </div>
@@ -149,7 +105,7 @@ function MemberRow({
         minWidth: 'max-content',
       }}
     >
-      <div style={{ width: '170px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+      <div className="mcal-name">
         <Avatar name={member.name} size={30} />
         <div style={{ minWidth: 0 }}>
           <div style={{ fontSize: '13px', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -314,21 +270,16 @@ export default function MonthlyClient({ slug, tz, canExport, historyMonths }: Pr
         <div className="row-between" style={{ flexWrap: 'wrap', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
             <LegendItem
-              color={dayColor('office', signalsConfigured)}
-              border={dayBorder('office', signalsConfigured)}
+              cellClassName={cellClass('office', signalsConfigured)}
               label={signalsConfigured ? t.legendOffice : t.legendPresent}
             />
             {signalsConfigured && (
-              <LegendItem
-                color={dayColor('remote', true)}
-                border={dayBorder('remote', true)}
-                label={t.legendRemote}
-              />
+              <LegendItem cellClassName={cellClass('remote', true)} label={t.legendRemote} />
             )}
-            <LegendItem color={dayColor('absent', signalsConfigured)} border={dayBorder('absent', signalsConfigured)} label={t.legendAbsent} />
-            <LegendItem color={dayColor('leave', signalsConfigured)} border={dayBorder('leave', signalsConfigured)} label={t.legendLeave} />
-            <LegendItem color={dayColor('holiday', signalsConfigured)} border={dayBorder('holiday', signalsConfigured)} label={t.legendHoliday} />
-            <LegendItem color="var(--surface-2)" border="var(--border)" label={t.legendWeekend} />
+            <LegendItem cellClassName={cellClass('absent', signalsConfigured)} label={t.legendAbsent} />
+            <LegendItem cellClassName={cellClass('leave', signalsConfigured)} label={t.legendLeave} />
+            <LegendItem cellClassName={cellClass('holiday', signalsConfigured)} label={t.legendHoliday} />
+            <LegendItem cellClassName="mcal-cell is-weekend" label={t.legendWeekend} />
           </div>
           <span className="t-muted">{t.workingDays(data.working_days)}</span>
         </div>

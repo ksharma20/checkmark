@@ -2,15 +2,16 @@
 
 import Link from 'next/link'
 import { useState, useEffect, useCallback } from 'react'
-import { Users, Building2, Home, CalendarOff, Activity } from 'lucide-react'
+import { Users, Building2, Home, CalendarOff, Activity, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { DashboardResponse } from '@/app/api/ws/[slug]/dashboard/route'
 import type { InsightsResponse } from '@/app/api/ws/[slug]/insights/route'
 import type { OverviewWidgetsResponse } from '@/app/api/ws/[slug]/overview/route'
+import type { CelebrationsResponse } from '@/app/api/ws/[slug]/celebrations/route'
 import type { ApprovalItem } from '@/lib/approvals'
 import { ApprovalRow } from '@/components/ws/ApprovalRow'
 import PresenceChip from '@/components/ws/PresenceChip'
 import {
-  AreaChart, Button, Card, Chip, DataTable, DeptBars, EmptyState, Skeleton, StatCard,
+  AreaChart, Button, Card, Chip, DataTable, DeptBars, EmptyState, IconButton, Skeleton, StatCard,
   type AreaChartPoint, type Column, type DeptBarItem,
 } from '@/components/ui'
 import { useToast } from '@/components/shared/Toast'
@@ -23,6 +24,34 @@ interface Props {
   adminFirstName: string
   /** `approvals:write` - read-only roles see the queue without action buttons. */
   canAction: boolean
+  /**
+   * The WORKSPACE's today (`YYYY-MM-DD`), resolved on the server. Both date
+   * steppers clamp against it; a browser's own date is the viewer's timezone.
+   */
+  todayIso: string
+}
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+/** `YYYY-MM-DD` shifted by whole days, in UTC so no DST boundary moves it. */
+function shiftDay(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
+/** `YYYY-MM` shifted by whole months. */
+function shiftMonth(iso: string, months: number): string {
+  const [y, m] = iso.split('-').map(Number)
+  const d = new Date(Date.UTC(y, m - 1 + months, 1))
+  return d.toISOString().slice(0, 7)
+}
+
+function monthLabel(iso: string): string {
+  const [y, m] = iso.split('-').map(Number)
+  return `${MONTH_NAMES[m - 1]} ${y}`
 }
 
 const CELEBRATION_EMOJI = { birthday: '🎂', anniversary: '🎉' } as const
@@ -43,7 +72,7 @@ function hourLabel(key: string): string {
 
 type LocationRow = { label: string; count: number }
 
-export default function TodayClient({ slug, planLimitBanner, adminFirstName, canAction }: Props) {
+export default function TodayClient({ slug, planLimitBanner, adminFirstName, canAction, todayIso }: Props) {
   const { show: showToast } = useToast()
 
   const [dash, setDash] = useState<DashboardResponse | null>(null)
@@ -51,6 +80,24 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
   const [hourly, setHourly] = useState<InsightsResponse | null>(null)
   const [hourlyLoading, setHourlyLoading] = useState(true)
   const [overview, setOverview] = useState<OverviewWidgetsResponse | null>(null)
+
+  /**
+   * Recent activity is addressed by DAY, celebrations by MONTH.
+   *
+   * Both own their own fetch rather than riding on the polling `dash` / the
+   * parameterless `/overview`: stepping back a day must not drag the stat row,
+   * the hourly chart and the location table off today with it.
+   *
+   * `activityDash` is null while the card is showing today, and the card falls
+   * back to the polling `dash` - so the common case costs no extra request.
+   */
+  const [activityDate, setActivityDate] = useState(todayIso)
+  const [activityDash, setActivityDash] = useState<DashboardResponse | null>(null)
+  const [activityLoading, setActivityLoading] = useState(false)
+  const [celebMonth, setCelebMonth] = useState(todayIso.slice(0, 7))
+  const [celebrations, setCelebrations] = useState<CelebrationsResponse | null>(null)
+  const [celebLoading, setCelebLoading] = useState(true)
+  const [celebFailed, setCelebFailed] = useState(false)
 
   const [busyId, setBusyId] = useState<string | null>(null)
   const [decliningId, setDecliningId] = useState<string | null>(null)
@@ -85,6 +132,40 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
       if (!silent) setHourlyLoading(false)
     }
   }, [slug])
+
+  useEffect(() => {
+    if (activityDate === todayIso) { setActivityDash(null); return }
+    let cancelled = false
+    setActivityLoading(true)
+    fetch(`/api/ws/${slug}/dashboard?date=${activityDate}&limit=1`, { cache: 'no-store' })
+      .then(async (res) => { if (res.ok && !cancelled) setActivityDash(await res.json()) })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setActivityLoading(false) })
+    return () => { cancelled = true }
+  }, [slug, activityDate, todayIso])
+
+  // Same shape as the day stepper above, and deliberately so: a `cancelled`
+  // flag scoped to this run, checked after every await. A slow response for
+  // month A resolves only after its own effect has been torn down, so it can
+  // never overwrite - or re-open the skeleton on - month B's rows.
+  //
+  // The loading flag is what keeps the heading honest: while a month is in
+  // flight the body is a skeleton, so there are no rows left under it to
+  // describe the month before last.
+  useEffect(() => {
+    let cancelled = false
+    setCelebLoading(true)
+    setCelebFailed(false)
+    fetch(`/api/ws/${slug}/celebrations?month=${celebMonth}`, { cache: 'no-store' })
+      .then(async (res) => {
+        if (!res.ok) { if (!cancelled) setCelebFailed(true); return }
+        const data: CelebrationsResponse = await res.json()
+        if (!cancelled) setCelebrations(data)
+      })
+      .catch(() => { if (!cancelled) setCelebFailed(true) })
+      .finally(() => { if (!cancelled) setCelebLoading(false) })
+    return () => { cancelled = true }
+  }, [slug, celebMonth])
 
   const fetchOverview = useCallback(async () => {
     const res = await fetch(`/api/ws/${slug}/overview`, { cache: 'no-store' })
@@ -193,15 +274,33 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
       : []),
   ]
 
-  const recentActivity = (dash?.all_members ?? [])
+  // Unsliced: the card is fixed-height with its own scroll body, so a top-6
+  // cap only hid people. On today it reads the polling `dash`; on any other
+  // day, that day's own fetch.
+  const activitySource = activityDate === todayIso ? dash : activityDash
+  const recentActivity = (activitySource?.all_members ?? [])
     .filter((m) => m.latest_event)
     .sort((a, b) => b.latest_event!.checkin_at.localeCompare(a.latest_event!.checkin_at))
-    .slice(0, 6)
+
+  // The month the celebrations card is DESCRIBING, which is not always the one
+  // the stepper last asked for. Once rows are on screen the heading names the
+  // month the ROUTE echoed back beside them - the route falls back to the
+  // workspace's current month on an unparseable param, and `month` exists in
+  // the response precisely so the heading follows the rows rather than the
+  // request. While a fetch is in flight or has failed there are no rows to
+  // disagree with, so the requested month is the only thing left to name.
+  const shownCelebMonth = celebLoading || celebFailed || !celebrations
+    ? celebMonth
+    : celebrations.month
 
   const rowStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '10px',
     padding: '11px 20px', borderTop: '1px solid var(--border)',
   }
+  /**
+   * The scroll body's own row padding, for a skeleton that has no row to
+   * inherit it from. Shared by both steppers so the two cards cannot drift.
+   */
   const panelHeadStyle: React.CSSProperties = {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     gap: '10px', padding: '16px 20px', borderBottom: '1px solid var(--border)',
@@ -311,11 +410,12 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
             <p className="t-h2">{en.wsOverview.pendingApprovalsTitle}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
               {pendingTotal > 0 && <Chip tone="partial">{pendingTotal}</Chip>}
-              {pendingTotal > (overview?.pendingApprovals.length ?? 0) && (
-                <Link href={`/ws/${slug}/approvals`} className="t-secondary" style={{ fontWeight: 600 }}>
-                  {wsAdmin.overview.viewAll(pendingTotal)}
-                </Link>
-              )}
+              {/* The queue is no longer capped at five, so this link is not
+                  "see the ones we hid" - it is the route to the full screen,
+                  where search and the type filter live. Always offered. */}
+              <Link href={`/ws/${slug}/approvals`} className="t-secondary" style={{ fontWeight: 600 }}>
+                {wsAdmin.overview.openApprovals}
+              </Link>
             </div>
           </div>
           <div className="scroll-body">
@@ -370,12 +470,38 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
       {/* ── Recent activity + celebrations ── */}
       <div className="fx-spring" style={{ display: 'flex', gap: '14px', marginTop: '14px', flexWrap: 'wrap' }}>
         <Card fixedHeight padded={false} style={{ flex: '1.3 1 380px', marginTop: 0, overflow: 'hidden' }}>
-          <p className="t-h2" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-            {en.wsOverview.recentActivityTitle}
-          </p>
+          {/* The day stepper lives in the HEADER, so the card's heading and its
+              rows can never describe different days. Next is disabled on the
+              workspace's today; the plan's history floor is what stops Previous
+              running off the end, and it is enforced server-side. */}
+          <div style={panelHeadStyle}>
+            <p className="t-h2">{en.wsOverview.recentActivityTitle}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <IconButton
+                variant="plain"
+                label={wsAdmin.overview.prevDay}
+                icon={<ChevronLeft size={16} />}
+                onClick={() => setActivityDate((d) => shiftDay(d, -1))}
+              />
+              <span className="t-secondary mono" style={{ minWidth: '92px', textAlign: 'center', fontSize: '12px' }}>
+                {activityDate === todayIso ? wsAdmin.overview.today : activityDate}
+              </span>
+              <IconButton
+                variant="plain"
+                label={wsAdmin.overview.nextDay}
+                icon={<ChevronRight size={16} />}
+                disabled={activityDate >= todayIso}
+                onClick={() => setActivityDate((d) => shiftDay(d, 1))}
+              />
+            </div>
+          </div>
           <div className="scroll-body">
-            {recentActivity.length === 0 ? (
-              <EmptyState title={en.wsOverview.recentActivityEmpty} />
+            {activityLoading ? (
+              <div className="scroll-body-pad"><Skeleton height={120} /></div>
+            ) : recentActivity.length === 0 ? (
+              <EmptyState title={activityDate === todayIso
+                ? en.wsOverview.recentActivityEmpty
+                : wsAdmin.overview.recentActivityEmptyDay} />
             ) : (
               recentActivity.map((m) => (
                 <Link
@@ -402,17 +528,46 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
         </Card>
 
         <Card fixedHeight padded={false} style={{ flex: '1 1 280px', marginTop: 0, overflow: 'hidden' }}>
-          <p className="t-h2" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
-            {en.wsOverview.celebrationsTitle}
-          </p>
+          <div style={panelHeadStyle}>
+            <p className="t-h2">{en.wsOverview.celebrationsTitle}</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <IconButton
+                variant="plain"
+                label={wsAdmin.overview.prevMonth}
+                icon={<ChevronLeft size={16} />}
+                onClick={() => setCelebMonth((m) => shiftMonth(m, -1))}
+              />
+              <span className="t-secondary" style={{ minWidth: '104px', textAlign: 'center', fontSize: '12px' }}>
+                {monthLabel(shownCelebMonth)}
+              </span>
+              {/* No upper clamp: next year's birthdays are already knowable,
+                  and unlike attendance there is no event that has not happened
+                  yet to mislead anybody. */}
+              <IconButton
+                variant="plain"
+                label={wsAdmin.overview.nextMonth}
+                icon={<ChevronRight size={16} />}
+                onClick={() => setCelebMonth((m) => shiftMonth(m, 1))}
+              />
+            </div>
+          </div>
           <div className="scroll-body">
-            {overview && overview.celebrations.length === 0 ? (
+            {celebLoading ? (
+              <div className="scroll-body-pad"><Skeleton height={120} /></div>
+            ) : celebFailed ? (
               <EmptyState
-                title={en.wsOverview.celebrationsEmpty}
+                title={wsAdmin.overview.celebrationsErrorTitle}
+                hint={wsAdmin.overview.celebrationsErrorHint}
+              />
+            ) : celebrations && celebrations.celebrations.length === 0 ? (
+              <EmptyState
+                title={shownCelebMonth === todayIso.slice(0, 7)
+                  ? en.wsOverview.celebrationsEmpty
+                  : wsAdmin.overview.celebrationsEmptyMonth}
                 hint={wsAdmin.overview.celebrationsEmptyHint}
               />
             ) : (
-              overview?.celebrations.map((c) => (
+              celebrations?.celebrations.map((c) => (
                 <div key={`${c.employeeId}-${c.kind}`} style={rowStyle}>
                   <span
                     aria-hidden

@@ -136,6 +136,49 @@ export default function EmployeeDocuments({ slug, employeeId, canWrite }: Props)
         {wsEmployees.documentsTitle}
       </p>
 
+      {/* The add-slot form sits ABOVE the list. A form's height is fixed; the
+          document list grows with every upload, so putting the form last meant
+          scrolling past every existing file to reach the control that adds
+          one. Same rule the /me leave tabs follow. */}
+      {canWrite && (
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <p className="t-eyebrow" style={{ marginBottom: '10px' }}>{wsEmployees.documentAddSlotTitle}</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+            <Field label={wsEmployees.documentSlotNameLabel} htmlFor="doc-slot-name">
+              <Input
+                id="doc-slot-name"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder={wsEmployees.documentSlotNamePlaceholder}
+              />
+            </Field>
+            <Field label={wsEmployees.documentSlotOwnerLabel} htmlFor="doc-slot-owner">
+              <Select
+                id="doc-slot-owner"
+                value={newOwner}
+                onChange={e => setNewOwner(e.target.value as DocumentOwner)}
+                options={[
+                  { value: 'admin', label: wsEmployees.documentSlotOwnerAdmin },
+                  { value: 'employee', label: wsEmployees.documentSlotOwnerEmployee },
+                ]}
+              />
+            </Field>
+          </div>
+          {/* Disabled while ANY upload is in flight. Two files dropped here
+              before the first POST answers would derive the same doc_key and
+              race for the same slot - the unique index rejects the loser, and
+              the user's second file silently vanishes into a 409. */}
+          <Dropzone
+            compact
+            accept={ACCEPT}
+            disabled={busyId !== null}
+            label={wsEmployees.documentSlotFileLabel}
+            onFile={submitNewSlot}
+            style={{ marginTop: '12px' }}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div style={{ padding: '16px 20px' }}><SkeletonText lines={3} /></div>
       ) : docs.length === 0 ? (
@@ -257,44 +300,6 @@ export default function EmployeeDocuments({ slug, employeeId, canWrite }: Props)
         })
       )}
 
-      {canWrite && (
-        <div style={{ padding: '16px 20px', borderTop: '1px solid var(--border)' }}>
-          <p className="t-eyebrow" style={{ marginBottom: '10px' }}>{wsEmployees.documentAddSlotTitle}</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-            <Field label={wsEmployees.documentSlotNameLabel} htmlFor="doc-slot-name">
-              <Input
-                id="doc-slot-name"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                placeholder={wsEmployees.documentSlotNamePlaceholder}
-              />
-            </Field>
-            <Field label={wsEmployees.documentSlotOwnerLabel} htmlFor="doc-slot-owner">
-              <Select
-                id="doc-slot-owner"
-                value={newOwner}
-                onChange={e => setNewOwner(e.target.value as DocumentOwner)}
-                options={[
-                  { value: 'admin', label: wsEmployees.documentSlotOwnerAdmin },
-                  { value: 'employee', label: wsEmployees.documentSlotOwnerEmployee },
-                ]}
-              />
-            </Field>
-          </div>
-          {/* Disabled while ANY upload is in flight. Two files dropped here
-              before the first POST answers would derive the same doc_key and
-              race for the same slot - the unique index rejects the loser, and
-              the user's second file silently vanishes into a 409. */}
-          <Dropzone
-            compact
-            accept={ACCEPT}
-            disabled={busyId !== null}
-            label={wsEmployees.documentSlotFileLabel}
-            onFile={submitNewSlot}
-            style={{ marginTop: '12px' }}
-          />
-        </div>
-      )}
     </Card>
   )
 }

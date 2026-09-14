@@ -1,8 +1,9 @@
 import { createNotification, type NotificationType } from '@/lib/db/queries/notifications'
 import { getWorkspaceById } from '@/lib/db/queries/workspaces'
 import {
+  getCategoryChoices,
   getMutedCategories,
-  mutedUserIdsFor,
+  isPushMuted,
 } from '@/lib/db/queries/notification-prefs'
 import { notificationHref, type NotificationSurface } from '@/lib/client/notification-href'
 import { sendPushToUser, type PushPayload } from '@/lib/push'
@@ -32,6 +33,12 @@ import { CATEGORY_DEFS, CATEGORY_OF, parseCategoriesOff } from '@/lib/notificati
  * suppressed the row would make the bell count depend on preferences at read
  * time as well as write time, and would let somebody lose a rejection notice
  * they only meant to stop being paged about.
+ *
+ * Step 4 currently resolves to nothing: no category in the catalogue is
+ * `memberMutable`, so no member holds a preference and every recipient gets the
+ * push. The step is kept in place, flag-driven, rather than removed - the long
+ * comment at the branch itself argues why, and the rule it encodes is the one
+ * thing here that is expensive to get wrong twice.
  *
  * Step 2 is the exception, and is different on purpose: a workspace switching a
  * category off is saying the category does not apply to this organisation at
@@ -78,16 +85,43 @@ export async function notify(params: {
     if (off.has(category)) return
   }
 
-  // 4. Whose push is muted. An immutable category skips the query entirely -
-  //    nobody can hold a mute for it, so reading is pointless work.
+  // 4. Whose push is suppressed. An immutable category skips the query entirely
+  //    - nobody can hold a preference for it, so reading is pointless work and
+  //    its catalogue default is never consulted.
+  //
+  //    "Muted" is resolved, not read: a member with no row picks up the
+  //    category's `defaultOn`, so the set is built by resolving each RECIPIENT
+  //    rather than by listing the table's rows - a member-mutable, opt-in
+  //    category's audience is precisely the people this table has no rows for.
+  //    Step 3 below is unaffected either way: every recipient still gets their
+  //    feed row, whatever this resolves to.
+  //
+  //    **This whole block is DEAD CODE today.** `def.memberMutable` is `false`
+  //    for every category in the catalogue - `reminders` and `presence` left it
+  //    when they became schedules rather than categories (see
+  //    `lib/notifications/categories.ts`) - so `muted` is always empty and every
+  //    recipient gets the push.
+  //
+  //    It is kept rather than deleted because it reads
+  //    `CATEGORY_DEFS[category].memberMutable` rather than testing a hardcoded
+  //    list of keys: a future member-mutable category revives this path by
+  //    setting one flag in the catalogue, with no edit here and no chance of
+  //    this file being the one place somebody forgot to update. Deleting it
+  //    would mean re-deriving the resolved-default logic from scratch at the
+  //    moment it is needed - rediscovering that absence is not the same as
+  //    "unmuted", and that the workspace and account scopes need different
+  //    reads - which is the worst possible time to get it wrong, because the
+  //    failure mode is silent: a push simply arrives for somebody who asked not
+  //    to receive it.
   let muted: Set<string> = new Set()
   if (def.memberMutable) {
     if (params.workspaceId) {
-      muted = await mutedUserIdsFor(params.workspaceId, category)
+      const choices = await getCategoryChoices(params.workspaceId, category)
+      muted = new Set(params.userIds.filter((id) => isPushMuted(choices, id)))
     } else {
-      // No workspace to key on, so resolve per member. Only reachable for an
-      // account-scoped category, which today means this branch is unused by
-      // `notify()` - `notifyPresence()` is the account-scoped path.
+      // No workspace to key on, so resolve per member. Only reachable for a
+      // `scope: 'account'` category, of which there are none - doubly dead, and
+      // kept for the same reason as its sibling above.
       const perUser = await Promise.all(
         params.userIds.map(async (id) => [id, await getMutedCategories(id, null)] as const),
       )
@@ -138,23 +172,27 @@ export async function notify(params: {
   )
 }
 
-/**
- * The presence ladder's send path - the 5h / 10h / 12h pushes.
+/*
+ * `notifyPresence()` used to live here - the send path for the 5h / 10h /
+ * auto-checkout ladder. It is gone, and what it did has moved rather than
+ * disappeared.
  *
- * Separate from `notify()` for two structural reasons, not for convenience:
+ * The ladder now resolves its own schedule in
+ * `src/app/api/push/cron/route.ts`, against `member_presence_prefs`: the member
+ * sets the hours, and **having them set IS the opt-in**. There is no longer a
+ * `presence` category, so there is nothing for this file to look up - the
+ * account-level mute and the "every workspace must agree" vote that
+ * `notifyPresence()` encoded describe a model the product no longer has. A
+ * member's own nudges about their own session are a schedule, not a class of
+ * broadcast (see `lib/notifications/categories.ts`).
  *
- *  - It writes **no `notifications` row**. These three are the only messages in
- *    the product that are push-only, a deliberate choice: a nudge to go home is
- *    worthless an hour later, and putting it in the feed would fill the bell
- *    with things nobody will ever revisit. The accepted cost is that muting
- *    `presence` means total silence, including the auto-checkout confirmation.
- *
- *  - It has **no workspace**. `presence_events` carries no `workspace_id` and
- *    deliberately never will, so the preference has to be account-level. A
- *    member in two workspaces has one check-in session, not two.
+ * Two things about it are unchanged and must stay that way. It is **push-only**:
+ * the ladder writes no `notifications` row, because a nudge to go home is
+ * worthless an hour later and putting it in the feed fills the bell with things
+ * nobody will revisit. And it is therefore a **sanctioned exception to
+ * invariant 24** - it calls `sendPushToUser()` without going through `notify()`,
+ * which is legitimate precisely because there is no feed row and no category to
+ * check, not because the seam is optional. The MECHANIC never depended on any of
+ * this: `autoCheckoutEvent()` runs before the push and unconditionally, so
+ * sessions close on time whether or not anybody is told.
  */
-export async function notifyPresence(userId: string, payload: PushPayload): Promise<void> {
-  const muted = await getMutedCategories(userId, null)
-  if (muted.has('presence')) return
-  await sendPushToUser(userId, payload)
-}

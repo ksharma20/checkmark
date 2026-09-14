@@ -33,10 +33,16 @@ function TypeIcon({ type }: { type: Notification['type'] }) {
   const props = { size: 15, strokeWidth: 2, 'aria-hidden': true } as const
   if (type.startsWith('leave_')) return <CalendarDays {...props} />
   if (type.startsWith('regularization_')) return <Clock {...props} />
-  if (type === 'checkin_reminder' || type === 'checkout_reminder') return <Bell {...props} />
   if (type.startsWith('document_')) return <FileText {...props} />
   if (type === 'announcement') return <Megaphone {...props} />
   // An unknown type is still a notification: a bell is the honest default.
+  //
+  // That fallback is what carries the retired reminder types. `checkin_reminder`
+  // and `checkout_reminder` left `NotificationType` when reminders became a
+  // push-only schedule, so naming them here no longer typechecks - but rows
+  // written before that change are still in the database and still render
+  // through this component. They landed on a bell when they were named; they
+  // land on the same bell now, so nothing in the feed changed.
   return <Bell {...props} />
 }
 
@@ -45,9 +51,11 @@ function iconColor(type: Notification['type']): string {
   // in `_approved`, so it is named rather than pattern-matched.
   if (type.endsWith('_approved') || type === 'document_verified') return 'var(--teal)'
   if (type.endsWith('_rejected')) return 'var(--danger)'
-  // Announcements and everything neutral (submitted, reminders) stay brand
-  // green - nothing has gone wrong, and nothing has been decided in your
-  // favour either.
+  // Announcements and everything neutral stay brand green - nothing has gone
+  // wrong, and nothing has been decided in your favour either. No arm names a
+  // type literal, which is why this function needed no edit when the two
+  // reminder types left `NotificationType`: historical rows still carrying them
+  // fall through to exactly the green they always got.
   return 'var(--brand)'
 }
 

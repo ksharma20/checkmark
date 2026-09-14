@@ -17,7 +17,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          # Full history: the develop rebuild walks back up to SCAN_LIMIT commits.
+          fetch-depth: 0
 
       - name: Configure git
         run: |
@@ -36,43 +39,224 @@ jobs:
           git reset --hard upstream/main
           git push origin main --force
 
-      # Optional: keep `develop` current by opening a PR from `main` → `develop`.
-      # This supports the company workflow where:
-      # - `main` is mirror-only (synced from OSS)
-      # - all human PRs merge into `develop` (preview/staging)
-      - name: Prepare sync branch (main → develop)
-        id: prep_develop_pr
+      # `develop` is REBUILT on `main`, never merged into.
+      #
+      # `main` is a squash of `develop`, so at the moment of the squash `main`'s tree
+      # equals the tree of the develop commit that was squashed. Walking develop's
+      # first-parent line back to the newest commit with that tree recovers the cut
+      # point with no bookkeeping. Where main has moved beyond that squash, the merge
+      # base is used instead. Everything after the cut is replayed onto the new `main`.
+      - name: Rebuild develop on main
+        id: rebuild
+        env:
+          SCAN_LIMIT: "200"
+          DRY_RUN: "0"
         run: |
-          if git show-ref --verify --quiet refs/remotes/origin/develop; then
-            git fetch origin
-            git checkout -B sync/main-to-develop origin/develop
-            if git merge --no-edit origin/main; then
-              echo "has_develop=true" >> "$GITHUB_OUTPUT"
-              echo "merge_ok=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "has_develop=true" >> "$GITHUB_OUTPUT"
-              echo "merge_ok=false" >> "$GITHUB_OUTPUT"
-              echo "Merge conflict: cannot auto-merge origin/main into origin/develop"
-              exit 1
-            fi
-          else
-            echo "has_develop=false" >> "$GITHUB_OUTPUT"
-            echo "merge_ok=false" >> "$GITHUB_OUTPUT"
-            echo "No origin/develop branch found. Skipping develop sync PR."
+          set -euo pipefail
+
+          # Bound here as well as in env: above. Under `set -u` an unbound SCAN_LIMIT
+          # makes the tree scan's command substitution yield nothing, which is NOT an
+          # abort - the loop just never runs, CUT stays empty and the merge-base
+          # fallback takes over silently. A masked failure is worse than a wrong value.
+          SCAN_LIMIT="${SCAN_LIMIT:-200}"
+          DRY_RUN="${DRY_RUN:-0}"
+
+          git fetch origin --prune
+
+          if ! git show-ref --verify --quiet refs/remotes/origin/develop; then
+            echo "No origin/develop. Nothing to rebuild."
+            echo "status=no-develop" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-      - name: Create PR to sync main into develop
-        if: steps.prep_develop_pr.outputs.has_develop == 'true' && steps.prep_develop_pr.outputs.merge_ok == 'true'
-        uses: peter-evans/create-pull-request@v6
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          base: develop
-          branch: sync/main-to-develop
-          title: "chore(sync): merge main into develop"
-          labels: |
-            sync
-          body: |
-            This PR keeps `develop` up to date with `main`.
+          MAIN=$(git rev-parse origin/main)
+          DEV=$(git rev-parse origin/develop)
+          MAIN_TREE=$(git rev-parse "origin/main^{tree}")
 
-            - `main` is synced from OSS `main` by automation
-            - `develop` is the human PR target (preview/staging)
+          # Already rebuilt: if main is an ancestor of develop, develop is main plus
+          # whatever has been pushed since. Nothing to do, whatever that carry set is.
+          if git merge-base --is-ancestor "$MAIN" "$DEV"; then
+            echo "origin/main is already an ancestor of origin/develop. Nothing to do."
+            echo "status=up-to-date" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Cut point, resolved in two ways. The tree match is tried FIRST because it
+          # is exact: it names the develop state that main already contains, whatever
+          # main's history looks like. --first-parent so the cut can only land on
+          # develop's mainline; a side-branch commit that coincidentally matched would
+          # make CUT..develop carry mainline commits it should not.
+          CUT=""
+          CUT_SOURCE=""
+          for c in $(git rev-list --first-parent -n "$SCAN_LIMIT" origin/develop); do
+            if [ "$(git rev-parse "$c^{tree}")" = "$MAIN_TREE" ]; then
+              CUT="$c"; CUT_SOURCE="tree-match"; break
+            fi
+          done
+
+          # Fallback: the merge base. Every rebuild leaves develop sitting directly on a
+          # main commit, and OSS squashes are appended to OSS main, so the merge base IS
+          # the main commit develop was last built on — the exact cut point, immune to
+          # anything main gained afterwards. This branch is reached when main carries a
+          # change no develop commit has: a PR merged straight into OSS main, or review
+          # edits applied on top of the squash.
+          #
+          # It is only correct while develop is in that rebuilt shape, so it is guarded:
+          # a rebuilt develop is linear (rebase output plus squash merges), and merge
+          # commits in the carry set mean develop still holds a pre-rebuild history, for
+          # which the merge base is far back and would replay work main already has.
+          if [ -z "$CUT" ]; then
+            MB=$(git merge-base "$MAIN" "$DEV" || true)
+            if [ -n "$MB" ]; then
+              if [ -n "$(git rev-list --merges "$MB..$DEV")" ]; then
+                echo "::error::Merge-base fallback refused: $MB..origin/develop contains merge commits,"
+                echo "so origin/develop is not in its rebuilt shape and the merge base is not the cut point."
+                echo "status=unshaped-develop" >> "$GITHUB_OUTPUT"
+                exit 1
+              fi
+              CUT="$MB"; CUT_SOURCE="merge-base"
+            fi
+          fi
+
+          if [ -z "$CUT" ]; then
+            echo "::error::No commit on origin/develop within $SCAN_LIMIT has origin/main's tree,"
+            echo "and origin/main and origin/develop share no history."
+            echo "Refusing to rebuild: the cut point cannot be identified."
+            echo "status=no-cut-point" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+          echo "cut source: $CUT_SOURCE"
+          echo "cut point : $CUT $(git log -1 --format=%s "$CUT")"
+          echo "carry set :"
+          git log --oneline --no-merges "$CUT..origin/develop" || true
+
+          TS=$(date -u +%Y%m%dT%H%M%SZ)
+          BACKUP="backup/develop/$TS"
+
+          # Replay. `rebase --onto`, not `cherry-pick`: the carry set contains merge
+          # commits and cherry-pick refuses a merge without -m. Plain rebase drops the
+          # merges and replays the real commits, which is the linear develop we want.
+          git checkout -B develop "$DEV"
+          if git rebase --onto "$MAIN" "$CUT" develop; then
+            # Backup immediately before the rewrite, and only when there IS one: the
+            # rebase runs on a local branch, so origin/develop is untouched until the
+            # push below. Pushed rather than kept local because the runner is destroyed
+            # after the job, which would leave an undo button that no longer exists.
+            # `set -e` means a failed backup push aborts before develop is rewritten.
+            # Undo is:
+            #   git push origin origin/backup/develop/<ts>:develop --force
+            # (the origin/ prefix is required - the backup is only a remote-tracking
+            # ref in a fresh clone, so the bare name does not resolve)
+            if [ "$DRY_RUN" != "1" ]; then
+              git push origin "$DEV:refs/heads/$BACKUP"
+              echo "backup=$BACKUP" >> "$GITHUB_OUTPUT"
+              git push origin develop --force-with-lease="develop:$DEV"
+            fi
+            echo "status=rebuilt" >> "$GITHUB_OUTPUT"
+            echo "cut_source=$CUT_SOURCE" >> "$GITHUB_OUTPUT"
+            echo "conflict=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Conflict: the OSS squash landed with edits on top of what develop sent.
+          # origin/develop is left EXACTLY as it was; the partial replay is pushed for
+          # a human to finish.
+          PARTIAL=$(git rev-parse HEAD)
+          STUCK=$(git rev-parse REBASE_HEAD 2>/dev/null || echo "")
+          STUCK_SUBJECT=""
+          if [ -n "$STUCK" ]; then STUCK_SUBJECT=$(git log -1 --format=%s "$STUCK"); fi
+          git rebase --abort || git rebase --quit || true
+
+          if [ "$DRY_RUN" != "1" ]; then
+            git push origin "$PARTIAL:refs/heads/sync/develop-rebuild" --force
+          fi
+
+          {
+            echo "conflict=true"
+            echo "status=conflict"
+            echo "cut=$CUT"
+            echo "stuck=$STUCK"
+            echo "stuck_subject=$STUCK_SUBJECT"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "::warning::Rebuild of develop conflicted on ${STUCK:-unknown} (${STUCK_SUBJECT:-})."
+
+      # A PR is the notification surface, NOT the fix. It must never be merged:
+      # upstream_company_develop_to_oss.yaml upstreams any merged PR into develop
+      # unless it is labeled `sync`, so the label is load-bearing against an echo loop.
+      - name: Open DO NOT MERGE PR for the conflicted rebuild
+        if: steps.rebuild.outputs.conflict == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          CUT: ${{ steps.rebuild.outputs.cut }}
+          STUCK: ${{ steps.rebuild.outputs.stuck }}
+          STUCK_SUBJECT: ${{ steps.rebuild.outputs.stuck_subject }}
+        run: |
+          set -euo pipefail
+
+          # The `sync` label is what stops upstream_company_develop_to_oss.yaml echoing
+          # this PR back at OSS main if it is ever merged, and `gh pr create --label`
+          # FAILS when the label does not exist. --force makes this idempotent.
+          gh label create sync --repo "$REPO" --color ededed \
+            --description "Branch sync bookkeeping - never upstreamed" --force
+
+          EXISTING="$(gh pr list --repo "$REPO" --head sync/develop-rebuild --base develop --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$EXISTING" ]; then
+            echo "Existing rebuild PR found: #$EXISTING"
+            exit 0
+          fi
+
+          BODY=$(cat <<EOF
+          **DO NOT MERGE.** This PR is a notification, not a fix. Merging it would create a
+          merge commit on \`develop\` and re-create the divergence the rebuild exists to remove.
+
+          The nightly rebuild of \`develop\` onto \`main\` stopped on a conflict.
+          \`origin/develop\` has **not** been touched.
+
+          | | |
+          |---|---|
+          | Cut point | \`$CUT\` |
+          | Conflicting commit | \`$STUCK\` — $STUCK_SUBJECT |
+          | Partial replay | \`sync/develop-rebuild\` |
+
+          Finish it locally:
+
+          \`\`\`bash
+          git fetch origin
+          git checkout -B develop origin/develop
+          git rebase --onto origin/main $CUT develop
+          # resolve, then:
+          git rebase --continue
+          git push origin develop --force-with-lease
+          \`\`\`
+
+          Then close this PR and delete \`sync/develop-rebuild\`.
+          EOF
+          )
+
+          gh pr create \
+            --repo "$REPO" \
+            --base develop \
+            --head sync/develop-rebuild \
+            --label sync \
+            --title "DO NOT MERGE — develop rebuild conflicted on $STUCK" \
+            --body "$BODY"
+
+      # Backup branches are an undo button with a shelf life, not an archive.
+      - name: Prune backup branches older than 30 days
+        if: always() && steps.rebuild.outputs.status != 'no-develop'
+        run: |
+          set -euo pipefail
+          CUTOFF=$(date -u -d '30 days ago' +%Y%m%dT%H%M%SZ)
+          git fetch origin --prune
+          # strip=3 yields the full branch name (backup/develop/<ts>); the timestamp
+          # is its last path component, and the ISO basic format sorts lexically.
+          for branch in $(git for-each-ref --format='%(refname:strip=3)' 'refs/remotes/origin/backup/develop/*'); do
+            TS_PART="${branch##*/}"
+            if [[ "$TS_PART" < "$CUTOFF" ]]; then
+              echo "Deleting stale backup branch $branch"
+              git push origin --delete "$branch" || true
+            fi
+          done

@@ -142,6 +142,8 @@ sequenceDiagram
   end
   API->>DB: INSERT leave_requests (status='pending')
   API->>DB: getActiveWorkspaceAdmins(ws, excluding the requester)
+  API->>API: notify({ userIds: admins, type: 'leave_submitted', surface: 'ws' })
+  Note over API: category 'approvals'; the workspace switch is checked ONCE<br/>for the whole fan-out, not once per admin
   par per admin, best-effort
     API->>DB: createNotification(type='leave_submitted', refType='leave_request')
     API->>AD: sendPushToUser(title, body, tag=leave-submitted-<id>)
@@ -152,6 +154,12 @@ sequenceDiagram
 Notification failure is caught and swallowed — it must never block the response.
 `getActiveWorkspaceAdmins()` selects `role IN ('owner','admin')`, so a custom
 role holding `approvals:write` is **not** notified of a new request today.
+
+Everything here goes through `notify()` (invariant 24), so the `approvals`
+category is resolved once for the fan-out: a workspace that has switched it off
+gets **no row and no push** for either half of the approval — the request
+reaching the approver *or* the outcome reaching the requester, since those are
+one category.
 
 ### Approve / reject
 
@@ -174,9 +182,10 @@ means the row is gone (`404 NOT_FOUND`) or someone else already actioned it
 (`409 ALREADY_ACTIONED`). Rejection requires a non-empty `rejection_reason`
 (`422`).
 
-On success the handler notifies the requester **inline**, in the same request —
-an in-app `notifications` row plus a push, wrapped in `Promise.allSettled` so
-one failing does not lose the other:
+On success the handler notifies the requester **inline**, in the same request,
+through `notify()` — an in-app `notifications` row plus a push, wrapped in
+`Promise.allSettled` so one failing does not lose the other. The row is written
+unconditionally; only the push is ever suppressed:
 
 | Action | `notifications.type` |
 |--------|----------------------|

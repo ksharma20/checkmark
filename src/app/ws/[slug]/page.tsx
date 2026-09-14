@@ -6,6 +6,7 @@ import { getWsRole } from '@/lib/ws-access'
 import { can } from '@/lib/permissions/can'
 import { Action, Resource } from '@/lib/permissions/catalogue'
 import { getPlanLimits } from '@/lib/plans'
+import { todayInTz } from '@/lib/timezone'
 import { wsAdmin } from '@/locales/en/ws-overview'
 import TodayClient from './TodayClient'
 
@@ -67,6 +68,11 @@ export default async function WsDashboardPage({ params }: Props) {
       planLimitBanner={planLimitBanner}
       adminFirstName={adminFirstName}
       canAction={canAction}
+      /* The WORKSPACE's today, resolved server-side. The Recent-activity and
+         Celebrations steppers need a "now" to clamp against, and a browser's
+         own date is the viewer's timezone - an admin in London must not be
+         able to page into a day that has not started in Kolkata. */
+      todayIso={todayInTz(workspace.display_timezone)}
     />
   )
 }

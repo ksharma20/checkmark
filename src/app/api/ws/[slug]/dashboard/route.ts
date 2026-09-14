@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getActiveMembersWithDetails } from '@/lib/db/queries/workspaces'
 import { requireWsAccess } from '@/lib/ws-access'
-import { queryWorkspaceEvents } from '@/lib/signals'
+import { queryWorkspaceEvents, deriveConfiguredTypes } from '@/lib/signals'
+import { getWorkspaceSignals } from '@/lib/db/queries/signals'
 import type { PresenceEventWithMatch, MatchedBy } from '@/lib/signals'
 import type { MemberWithUser } from '@/lib/db/queries/workspaces'
 import { todayInTz, localMidnightToUtc } from '@/lib/timezone'
@@ -40,6 +41,16 @@ export interface DashboardResponse {
   counts: { present: number; visited: number; notIn: number; total: number; office: number; remote: number }
   location_counts: { label: string; count: number }[]
   workspace_name: string
+  /**
+   * Which signal types this workspace matches against, so the member
+   * slide-over can draw a tick or a cross for THOSE and nothing else. Without
+   * it the client only has `matched_signals` - the positives - and cannot tell
+   * "configured and failed" from "never configured", which is why it used to
+   * show Wi-Fi ✗ against every member forever.
+   *
+   * An empty array means config-light: nothing to fail against.
+   */
+  configured_signal_types: string[]
 }
 
 function nextDayStr(dateStr: string): string {
@@ -78,16 +89,28 @@ export async function GET(
     Math.max(1, parseInt(sp.get("limit") ?? "10", 10)),
   );
 
-  // Today's UTC bounds
+  // Which local day to report on.
+  //
+  // Defaults to today. `?date=` lets the Overview's Recent-activity card step
+  // backwards without a second route; an unparseable or future value falls
+  // back to today rather than 400-ing, the way the assets route drops an
+  // unrecognised status - a stale bookmark should not become an error page.
+  // The plan's history floor is still enforced downstream by
+  // `queryWorkspaceEvents`, so an over-far date simply returns nothing.
   const tz = workspace.display_timezone
-  const todayStr = todayInTz(tz)
+  const today = todayInTz(tz)
+  const dateParam = sp.get('date')
+  const todayStr = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= today
+    ? dateParam
+    : today
   const startUtc = localMidnightToUtc(todayStr, tz)
   const endUtc = localMidnightToUtc(nextDayStr(todayStr), tz)
 
-  // Fetch events + members in parallel
-  const [events, members] = await Promise.all([
+  // Fetch events + members + signal config in parallel
+  const [events, members, wsSignals] = await Promise.all([
     queryWorkspaceEvents(workspace.id, workspace.plan, { startDate: startUtc, endDate: endUtc }),
     getActiveMembersWithDetails(workspace.id),
+    getWorkspaceSignals(workspace.id),
   ])
 
   // Group events by user_id
@@ -213,5 +236,5 @@ export async function GET(
   const offset = (page - 1) * limit
   const paged = filtered.slice(offset, offset + limit)
 
-  return NextResponse.json({ members: paged, all_members: allMembers, total, page, limit, counts, location_counts, workspace_name: workspace.name } satisfies DashboardResponse)
+  return NextResponse.json({ members: paged, all_members: allMembers, total, page, limit, counts, location_counts, workspace_name: workspace.name, configured_signal_types: deriveConfiguredTypes(wsSignals) } satisfies DashboardResponse)
 }

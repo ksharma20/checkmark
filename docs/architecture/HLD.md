@@ -63,7 +63,10 @@ graph TB
     Auth["lib/auth.ts\nJWT · bcrypt · OTP cookies"]
     Signals["lib/signals.ts\nqueryWorkspaceEvents()\nAND semantics (gps + ip)"]
     Attend["lib/attendance-summary.ts\nday-level office/remote/absent"]
-    Reminders["lib/reminders.ts\nwall-clock reminder pass"]
+    Reminders["lib/reminders.ts\nwall-clock pass over members' own times"]
+    Ladder["lib/presence-ladder.ts  (PURE)\nresolveLadder() · LADDER_WINDOW_H"]
+    Notify["lib/notify.ts\nthe one seam: category → row → push"]
+    Categories["lib/notifications/categories.ts\nCATEGORY_OF · CATEGORY_DEFS\napprovals · announcements"]
     Approvals["lib/approvals.ts\nleave · regularization · doc"]
     Storage["lib/storage.ts\nDocumentStore seam"]
     Crypto["lib/encryption.ts\nAES-256-GCM field encryption"]
@@ -74,7 +77,7 @@ graph TB
 
   subgraph DBLayer["Database Layer"]
     DBIndex["lib/db/index.ts\nbetter-sqlite3 (dev) ↔ Turso/libSQL (prod)"]
-    Queries["lib/db/queries/  (18 domain files)\nusers · events · workspaces · roles · signals · stats\ntokens · push · notifications · holidays · leaves · maternity\nregularizations · reminders · employees · employees-list\nassets · documents"]
+    Queries["lib/db/queries/\nusers · events · workspaces · roles · signals · stats\ntokens · push · notifications · notification-prefs\nholidays · leaves · maternity · parental-extensions\nregularizations · reminders · presence-prefs · hierarchy\nemployees · employees-list · assets · documents"]
     Migrate["scripts/migrate.js\nTHE schema source of truth"]
   end
 
@@ -180,7 +183,7 @@ erDiagram
     string event_type "office_checkin | remote_checkin"
     datetime checkin_at
     datetime checkout_at
-    datetime scheduled_checkout_at
+    datetime scheduled_checkout_at "member's auto_checkout_after_h, clamped [1,24]"
     string checkout_reason
     real gps_lat
     real gps_lng
@@ -202,7 +205,7 @@ erDiagram
     string device_info
     string device_timezone
     string trust_flags
-    string push_reminders_sent "JSON array - cron dedupe"
+    string push_reminders_sent "JSON array - ladder dedupe keys"
     string note
     string source
     string api_token_id FK
@@ -213,7 +216,7 @@ erDiagram
     string id PK
     string user_id FK
     string workspace_id FK "nullable"
-    string type
+    string type "category via CATEGORY_OF - approvals | announcements only"
     string title
     string body
     string ref_id
@@ -227,8 +230,17 @@ erDiagram
   users ||--|| user_stats : has
   users ||--o{ push_subscriptions : subscribes
   users ||--o{ notifications : receives
+  users ||--|| member_presence_prefs : "one session ladder"
+  users ||--o{ member_reminder_prefs : "one schedule per workspace"
   user_api_tokens ||--o{ presence_events : "sourced"
 ```
+
+**Only two things write a `notifications` row**: the `approvals` and
+`announcements` categories. The wall-clock reminders and the session ladder are
+**push-only** — `checkin_reminder` / `checkout_reminder` have left
+`NotificationType` — so a member's own nudges leave no trace in this table. That
+is deliberate (a nudge is worthless an hour later) and its cost is registered in
+`docs/known-gaps.md`.
 
 **`presence_events` carries no `workspace_id`.** Verification is always computed
 for a chosen workspace, and membership is what scopes every query over it.
@@ -250,8 +262,9 @@ erDiagram
     int leaves_enabled
     string working_days "JSON, DEFAULT '[1,2,3,4,5]'"
     string leave_cutover_date
-    string checkin_reminder_at "HH:MM or NULL"
-    string checkout_reminder_at "HH:MM or NULL"
+    string checkin_reminder_at "VESTIGIAL - never read as the schedule"
+    string checkout_reminder_at "VESTIGIAL - never read as the schedule"
+    string notification_categories_off "JSON array of DISABLED category keys"
     datetime archived_at
   }
 
@@ -319,17 +332,46 @@ erDiagram
     string local_date
   }
 
+  member_reminder_prefs {
+    string id PK
+    string user_id FK
+    string workspace_id FK
+    string checkin_at "HH:MM in the WORKSPACE tz, NULL = off"
+    string checkout_at "HH:MM, NULL = off"
+  }
+
+  member_presence_prefs {
+    string user_id PK "account-scoped - a session has no workspace"
+    real half_day_after_h "NULL = off"
+    real full_day_after_h "NULL = off"
+    real repeat_every_h "NULL = off, needs full_day"
+    real auto_checkout_after_h "NOT NULL DEFAULT 12 - a MECHANIC"
+  }
+
   workspaces ||--o{ workspace_members : has
   workspaces ||--o{ workspace_roles : "seeds owner/admin/member"
   workspaces ||--o{ workspace_domains : claims
   workspaces ||--o{ workspace_signal_config : configures
   workspaces ||--o{ admin_overrides : logs
   workspaces ||--o{ reminder_log : dedupes
+  workspaces ||--o{ member_reminder_prefs : "scopes (one row per member)"
   workspace_roles ||--o{ workspace_members : "grants (LEFT JOIN on key)"
 ```
 
 `reminder_log` has a unique index on `(workspace_id, user_id, kind, local_date)`;
-`workspace_roles` on `(workspace_id, key) WHERE deleted_at IS NULL`.
+`workspace_roles` on `(workspace_id, key) WHERE deleted_at IS NULL`;
+`member_reminder_prefs` on `(user_id, workspace_id)` — a **plain** UNIQUE, not a
+partial one, and only because `workspace_id` is NOT NULL there. SQLite treats
+NULLs as DISTINCT in a unique index, which is why `notification_prefs` needs two
+partial indexes for the same job.
+
+**Neither preferences table has an `enabled` or `muted` column, and neither may
+grow one.** The stored time (or rung hour) **is** the switch: a row holding
+`checkin_at = '09:30'` beside `enabled = 0` is a question no code in the system
+could answer, because neither column would be wrong. `auto_checkout_after_h` is
+the one NOT NULL value in either table, because auto-checkout is a mechanic — an
+open `presence_events` row is what the day's attendance is computed from, and
+invariant 4 forbids repairing it by editing.
 
 ### 3.3 Workforce - employees, leave, assets, documents
 
