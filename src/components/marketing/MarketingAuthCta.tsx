@@ -25,7 +25,7 @@ import { marketing } from '@/locales/en/marketing'
 type Variant = 'light' | 'dark'
 
 const LINK_CLASS: Record<Variant, string> = {
-  dark: 'hidden h-11 items-center px-4 text-sm font-medium text-checkmark-text-muted no-underline transition-colors hover:text-checkmark-brand sm:inline-flex',
+  dark: 'hidden h-11 items-center px-4 text-sm font-medium text-checkmark-text-muted no-underline transition-colors hover:text-checkmark-brand-on-dark sm:inline-flex',
   light: 'hidden h-11 items-center px-4 text-sm text-text-primary no-underline transition-colors hover:text-brand sm:inline-flex',
 }
 

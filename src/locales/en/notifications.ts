@@ -19,6 +19,60 @@ export const notificationsUi = {
 }
 
 /**
+ * The workspace invitation, as a notification.
+ *
+ * An invitation used to reach the person by email and nothing else, so somebody
+ * who already belonged to one workspace had no way of learning about a second -
+ * their bell is scoped to the workspace they are in, and an invitation is by
+ * definition from one they are not. The email is still sent and is still the
+ * only channel for an address with no account behind it.
+ *
+ * The workspace NAME is in both the title and the body, and that is the
+ * exception `/me`'s no-workspace-names convention names explicitly: the reader
+ * is choosing BETWEEN workspaces here - one they are in, one that has asked -
+ * so the name is the information rather than decoration.
+ */
+export const invitationNotification = {
+  title: (workspaceName: string) => `${workspaceName} invited you to join`,
+  body: (workspaceName: string) =>
+    `Accept to join ${workspaceName} and start recording your presence there. The invitation expires in seven days.`,
+  /**
+   * Sent at registration for an invitation that was already waiting on the
+   * address. A different body, because nothing has just happened - the
+   * invitation is older than the account, and saying "invited you" in the past
+   * tense next to a brand-new sign-up reads as a message that arrived late.
+   */
+  waitingBody: (workspaceName: string) =>
+    `${workspaceName} invited you before you signed up. Accept to join, or decline if you did not expect this.`,
+}
+
+/**
+ * The invitation row's own controls, inside the notification feed.
+ *
+ * Five closed states and one open one, because a notification is never unsent
+ * (invariant 22) and an invitation is answered exactly once: the row survives
+ * being accepted, declined, revoked and expired, and has to say which of those
+ * happened rather than keep offering a button whose only outcome is a refusal.
+ * The live state comes from a LEFT JOIN back onto `workspace_members`, never
+ * from the row itself - see `src/lib/client/invite-state.ts`.
+ */
+export const inviteRow = {
+  accept: 'Accept',
+  decline: 'Decline',
+  working: 'Working…',
+  /** Past its deadline. Decline is still offered; Accept is not. */
+  expired: 'Expired',
+  expiredHint: 'Ask an admin to send you a new invitation.',
+  accepted: 'Joined',
+  declined: 'Declined',
+  /** The membership row is gone, or moved to a state with nothing left to answer. */
+  withdrawn: 'No longer available',
+  /** Addressed to a different email than the one signed in. */
+  notYours: 'Sent to a different email address',
+  failed: 'Could not answer that invitation. Please try again.',
+}
+
+/**
  * Copy for the document review notifications.
  *
  * Kept in this module rather than the inline `en.notifications` group because

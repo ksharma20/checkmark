@@ -15,10 +15,10 @@ export default function CTABandFooter() {
         />
 
         <div className="reveal relative z-10">
-          <h2 className="mb-4 font-dm-sans text-3xl font-black leading-tight tracking-tight md:text-4xl">
+          <h2 className="mb-4 font-heading text-3xl font-extrabold leading-tight tracking-tight md:text-4xl">
             {copy.headingBefore}
             <br />
-            <em className="font-syne italic text-checkmark-brand">{copy.headingEmphasis}</em>
+            <em className="font-heading not-italic text-checkmark-brand-on-dark">{copy.headingEmphasis}</em>
           </h2>
           <p className="mb-10 text-base text-checkmark-text-muted md:text-lg">{copy.description}</p>
           <div className="flex flex-wrap items-center justify-center gap-3.5">
@@ -30,7 +30,7 @@ export default function CTABandFooter() {
             </Link>
             <a
               href={copy.secondaryHref}
-              className="rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text no-underline transition-colors hover:border-checkmark-brand hover:text-checkmark-brand"
+              className="rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text no-underline transition-colors hover:border-checkmark-brand-on-dark hover:text-checkmark-brand-on-dark"
             >
               {copy.secondaryCta}
             </a>
@@ -54,7 +54,7 @@ export default function CTABandFooter() {
             <li key={link.href}>
               <Link
                 href={link.href}
-                className="text-xs text-checkmark-text-muted no-underline transition-colors hover:text-checkmark-brand"
+                className="text-xs text-checkmark-text-muted no-underline transition-colors hover:text-checkmark-brand-on-dark"
               >
                 {link.label}
               </Link>

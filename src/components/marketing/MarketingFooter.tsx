@@ -18,7 +18,7 @@ export default function MarketingFooter() {
             <li key={link.href}>
               <Link
                 href={link.href}
-                className="text-[13px] text-text-muted no-underline transition-colors hover:text-brand"
+                className="text-[13px] text-text-secondary no-underline transition-colors hover:text-brand"
               >
                 {link.label}
               </Link>
@@ -26,7 +26,7 @@ export default function MarketingFooter() {
           ))}
         </ul>
 
-        <p className="m-0 text-center text-xs text-text-muted">
+        <p className="m-0 text-center text-xs text-text-secondary">
           {marketing.footer.tagline(new Date().getFullYear())}
         </p>
       </div>

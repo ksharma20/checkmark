@@ -32,11 +32,11 @@ import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn';
 
-import Image from 'next/image'
 import { en } from '@/locales/en'
 import { auth } from '@/locales/en/auth'
 import { startProgress, stopProgress } from '@/components/shared/TopProgressBar'
-import { Button, Card, Field, Input } from '@/components/ui'
+import { Button, Field, Input, Skeleton } from '@/components/ui'
+import AuthShell from '@/components/marketing/AuthShell'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -225,16 +225,8 @@ function EmailStep({
 
   return (
     <div>
-      <h1 className="mb-2 flex items-center gap-2 font-heading text-[26px] font-bold text-navy">
-        {auth.email.headingPrefix}{' '}
-        <Image
-          src="/logo.png"
-          alt={en.brand.name}
-          width={130}
-          height={38}
-          className="inline-block h-auto w-[130px] object-contain align-middle"
-          priority
-        />
+      <h1 className="mb-2 font-heading text-[26px] font-bold text-navy">
+        {auth.email.headingPrefix} {en.brand.name}
       </h1>
       <p className="mb-7 text-sm text-text-secondary">{auth.email.subtitle}</p>
       <FieldGroup
@@ -784,26 +776,7 @@ function LoginFlow() {
   }
 
   return (
-    <main className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-surface-1 px-4 py-6">
-      {/* Ambient glow and grid - the same treatment as the landing page hero. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute left-1/2 top-[-10%] z-0 h-[500px] w-[700px] -translate-x-1/2"
-        style={{ background: 'radial-gradient(ellipse at center, var(--brand-glow) 0%, transparent 70%)' }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 z-0"
-        style={{
-          backgroundImage:
-            'linear-gradient(rgba(27,77,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(27,77,255,0.04) 1px, transparent 1px)',
-          backgroundSize: '60px 60px',
-          maskImage: 'radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%)',
-        }}
-      />
-      {/* No elevation: `.card` is an inline surface, and the design system
-          reserves --shadow-* for overlays. */}
-      <Card className="relative z-[1] w-full max-w-[420px]" style={{ padding: '32px 28px' }}>
+    <>
         {step === 'email' && (
           <EmailStep
             onExisting={(e) => { setEmail(e); setStep('password') }}
@@ -857,15 +830,57 @@ function LoginFlow() {
             onSuccess={handleSuccess}
           />
         )}
-      </Card>
-    </main>
+    </>
   )
 }
 
+/**
+ * Stands in for whichever step is about to mount, at the shape of the one that
+ * almost always is: heading, subtitle, one labelled field, one full-width
+ * button. Skeletons, not a spinner - the design system has no spinner, and this
+ * one has a job beyond politeness (see below).
+ */
+function LoginSkeleton() {
+  return (
+    <div aria-hidden="true">
+      <Skeleton width={200} height={26} radius={8} />
+      <div className="mt-3">
+        <Skeleton width={260} height={14} />
+      </div>
+      <div className="mt-7">
+        <Skeleton width={110} height={12} />
+      </div>
+      <div className="mt-2">
+        <Skeleton height={48} radius={10} />
+      </div>
+      <div className="mt-5">
+        <Skeleton height={44} radius={10} />
+      </div>
+    </div>
+  )
+}
+
+/**
+ * `AuthShell` is OUTSIDE the Suspense boundary, and that placement is the whole
+ * point of this component existing separately from `LoginFlow`.
+ *
+ * `LoginFlow` reads `useSearchParams` (for `?invite=`), which opts its subtree
+ * out of the static prerender. With the boundary wrapped around the entire page
+ * - and with no fallback, as it was - the prerendered HTML for `/login` was
+ * EMPTY: the first screen after the landing page painted nothing at all until
+ * the JavaScript arrived and hydrated.
+ *
+ * Hoisting the frame above the boundary means the brand mark, the ambient wash
+ * and the card are in the server HTML, and only the step machine waits. The
+ * fallback then has something to sit inside, so the page goes
+ * frame -> skeleton -> form rather than blank -> form.
+ */
 export default function LoginPage() {
   return (
-    <Suspense>
-      <LoginFlow />
-    </Suspense>
+    <AuthShell>
+      <Suspense fallback={<LoginSkeleton />}>
+        <LoginFlow />
+      </Suspense>
+    </AuthShell>
   )
 }

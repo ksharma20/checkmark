@@ -64,9 +64,9 @@ export default function NotificationPanel({ slug, onClose }: { slug: string; onC
     }}>
       {/* Sticky header — does not scroll with the list */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-        <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', fontWeight: 600, color: 'var(--navy)' }}>{en.notifications.bellAriaLabel}</span>
+        <span style={{ fontFamily: 'var(--font-body)', fontSize: '14px', fontWeight: 600, color: 'var(--navy)' }}>{en.notifications.bellAriaLabel}</span>
         {unreadCount > 0 && (
-          <button type="button" onClick={markAll} style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: '12px', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer', padding: 0 }}>
+          <button type="button" onClick={markAll} style={{ background: 'none', border: 'none', color: 'var(--brand)', fontSize: '12px', fontFamily: 'var(--font-body)', cursor: 'pointer', padding: 0 }}>
             {en.notifications.markAllRead}
           </button>
         )}
@@ -79,7 +79,7 @@ export default function NotificationPanel({ slug, onClose }: { slug: string; onC
             {[1, 2, 3].map(i => <div key={i} style={{ height: '64px', background: 'var(--surface-2)', borderRadius: '6px' }} />)}
           </div>
         ) : notifications.length === 0 ? (
-          <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'DM Sans, sans-serif', fontSize: '13px' }}>
+          <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)', fontFamily: 'var(--font-body)', fontSize: '13px' }}>
             {en.notifications.empty}
           </div>
         ) : notifications.map(n => <NotificationRow key={n.id} notification={n} onClick={() => handleRow(n)} />)}

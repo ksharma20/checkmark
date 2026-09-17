@@ -21,8 +21,8 @@ export const metadata: Metadata = {
 
 const S = {
   section: { maxWidth: '760px', margin: '0 auto', padding: '80px 24px' } as React.CSSProperties,
-  h1: { fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 'clamp(30px, 4vw, 44px)', lineHeight: 1.1, letterSpacing: '-1px', color: 'var(--navy)', margin: '0 0 8px' } as React.CSSProperties,
-  h2: { fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '22px', color: 'var(--navy)', margin: '48px 0 12px', letterSpacing: '-0.3px' } as React.CSSProperties,
+  h1: { fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 'clamp(30px, 4vw, 44px)', lineHeight: 1.1, letterSpacing: '-1px', color: 'var(--navy)', margin: '0 0 8px' } as React.CSSProperties,
+  h2: { fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '22px', color: 'var(--navy)', margin: '48px 0 12px', letterSpacing: '-0.3px' } as React.CSSProperties,
   body: { fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.8, margin: '0 0 16px' } as React.CSSProperties,
   li: { fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.8 } as React.CSSProperties,
   code: { fontSize: '13px', background: 'var(--surface-2)', padding: '2px 6px', borderRadius: '4px' } as React.CSSProperties,
@@ -41,9 +41,9 @@ export default function TermsPage() {
         <p
           style={{
             fontSize: "12px",
-            color: "var(--text-muted)",
+            color: "var(--text-secondary)",
             margin: "0 0 12px",
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "var(--font-body)",
           }}
         >
           Effective date: 17 September 2026 · Last updated: 17 September 2026

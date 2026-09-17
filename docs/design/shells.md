@@ -2,6 +2,8 @@
 
 Two page frames, one per product surface. They share the token set and the primitives and nothing else — different widths, different navigation, different density, because they answer different questions.
 
+A third frame, [`.auth-shell`](#auth-shell--the-way-in), wraps the screens a person meets *before* either of them.
+
 | | `.shell-me` | `.shell-ws` |
 |---|---|---|
 | Route | `/me/*` | `/ws/:slug/*` |
@@ -13,6 +15,54 @@ Two page frames, one per product surface. They share the token set and the primi
 | `theme-color` | `#F8FAFC` (`--surface-1`) | `#0D1B2A` (`--header-bg`) |
 
 Both are installable PWAs with separate manifests, so a member and an admin can have both icons on one device.
+
+---
+
+## `.auth-shell` — the way in
+
+`/login`, `/join/[slug]` and `/consent/[token]`. Built by
+**`src/components/marketing/AuthShell.tsx`**; the CSS is `.auth-*` in
+`globals.css`.
+
+There used to be three of these and they had already drifted. `/login` carried
+the treatment as Tailwind utilities plus two inline style objects; `/join` and
+`/consent` each re-declared the whole thing — card, glow, grid, every type rule —
+as inline style objects, and only `/login` had the ambient glow at all. The font
+families were spelled out as literal strings in all three, which is the part that
+made consolidating them urgent rather than tidy: a literal `'Syne, sans-serif'`
+stops resolving the moment the family is self-hosted under a generated name, and
+it fails silently, in the system sans.
+
+| Piece | What it is |
+|---|---|
+| `.auth-shell` | Centred flex column on `--surface-1`, `min-height: 100dvh`, safe-area padding at the bottom |
+| `.auth-shell::before` | The ambient `--brand-glow` wash — the landing hero's, at a quieter amplitude |
+| `.auth-shell::after` | The 60px grid, masked to a radial falloff |
+| `.auth-brand` | The wordmark, linked home, **above** the card |
+| `.auth-card` | 420px. `.is-standalone` adds the inline-surface border; `/login` composes it with `Card`. `.is-centered` for result cards |
+| `.auth-title` / `.auth-body` / `.auth-actions` / `.auth-link` / `.auth-error` | Type and controls |
+
+Three things worth keeping:
+
+- **Both decorative layers are absolutely positioned**, which is also what keeps
+  them out of the flex flow — an absolutely positioned child of a flex container
+  is not a flex item, so neither becomes a third column beside the mark and the
+  card.
+- **The mark is above the card, not inside it.** On `/login` it used to live
+  inside the *first* step's `<h1>`, so the brand vanished the moment somebody
+  typed their email and moved to the password. It is now the same object in the
+  same place for all seven steps and all three routes.
+- **`.auth-link` carries `min-height: 44px`.** On a result card it is the only
+  thing on the page, and on a phone it is the only thing to hit.
+
+The glow and the grid are the one place the marketing surface reaches into the
+product, and that is deliberate: `/login` is the first screen after the landing
+page and should not look like different software.
+
+`.public-shell`, in `src/app/(public)/layout.tsx`, is the floor under all of the
+above and under the marketing pages — a `100dvh` minimum and the page ground, so
+a short page does not leave the browser's default white below the fold. Each page
+paints its own background over it.
 
 ---
 

@@ -1,20 +1,82 @@
 # Typography
 
-Three fonts, one loaded `@import` at the top of `src/app/globals.css`:
+## How the fonts load
+
+Three families, **self-hosted by `next/font/google` in `src/app/layout.tsx`**:
+
+```ts
+const syne          = Syne({ subsets: ["latin"], display: "swap", variable: "--ff-syne" })
+const dmSans        = DM_Sans({ subsets: ["latin"], display: "swap", variable: "--ff-dm-sans" })
+const jetBrainsMono = JetBrains_Mono({ subsets: ["latin"], display: "swap", variable: "--ff-mono" })
+```
+
+They used to come from a `@import url("https://fonts.googleapis.com/...")` at the
+top of `globals.css`, and **in production none of them ever loaded**. The CSS
+build hoists and strips a remote `@import`, so every deployed page rendered in
+the system sans — silently, because text still appears, just in the wrong face.
+Never put a font `@import` back in that file.
+
+`next/font` downloads the files at build time, serves them from our own origin,
+and generates a size-adjusted local fallback, so there is no request to a third
+party at runtime and no layout shift when the real face arrives. It also means
+the privacy policy no longer lists Google Fonts as a service the browser
+contacts, because it does not.
+
+**No `weight` is passed**, on purpose. All three are variable fonts, so one file
+per family carries the whole axis:
 
 ```
-DM Sans            300 400 500 600 700 800, italic 400
-Syne               400 500 600 700 800
-JetBrains Mono     400 500 600 700
+Syne             400–800   (no italic axis at all)
+DM Sans          100–1000
+JetBrains Mono   100–800
 ```
+
+Two consequences worth knowing before you write a class:
+
+- **A weight past the axis clamps, it is not synthesised.** `font-black` (900) on
+  a Syne heading renders Syne 800. Spell the weight that exists — `font-extrabold`
+  — so the markup says what renders.
+- **Syne has no italic.** `font-syne italic` produced a synthetic oblique: the
+  browser shearing upright glyphs, which is exactly the smear a type designer
+  draws a real italic to avoid. The marketing headings that used it now carry
+  `not-italic` on the `<em>`. Do not set `italic` on anything in Syne.
+
+### The variable names
+
+next/font writes `--ff-syne` / `--ff-dm-sans` / `--ff-mono` onto `<html>`. The
+semantic tokens are built on those in a plain `@theme` block in `globals.css`:
+
+```css
+@theme {
+  --font-heading:  var(--ff-syne), sans-serif;
+  --font-body:     var(--ff-dm-sans), sans-serif;
+  --font-mono:     var(--ff-mono), ui-monospace, monospace;
+}
+```
+
+`@theme`, not `@theme inline`: it has to emit `--font-heading` into `:root` as
+well as generate the `font-heading` utility, because around a hundred call sites
+read `var(--font-heading)` directly. And the two layers are deliberately named
+differently — a theme key and the raw family sharing one name would be circular.
+
+**Never write a family name as a literal.** `fontFamily: 'Syne, sans-serif'` in a
+style object resolved fine while the font came from Google and resolves to
+nothing now that it is self-hosted under a generated name — and it fails
+silently, in the system sans. Use `var(--font-heading)` / `var(--font-body)` /
+`var(--font-mono)`, or the Tailwind `font-heading` / `font-body` / `font-mono`
+utilities.
 
 ## The three roles
 
 | Font | Token | Role |
 |---|---|---|
-| **DM Sans** | `--font-body`, `--font-dm-sans` | Everything by default. Set on `body`, and inherited by `.btn`, `.input` and `.tabbar button` via explicit `font-family: inherit` — form controls do not inherit fonts on their own |
-| **Syne** | `--font-heading`, `--font-syne` | Headings only. Applied by an element selector on `h1`–`h6`, plus `.brand-mark` and `.brand-name` |
+| **DM Sans** | `--font-body` | Everything by default. Set on `body`, and inherited by `.btn`, `.input` and `.tabbar button` via explicit `font-family: inherit` — form controls do not inherit fonts on their own |
+| **Syne** | `--font-heading` | Headings only. Applied by an element selector on `h1`–`h6`, plus `.brand-mark`, `.brand-name` and `.auth-title` |
 | **JetBrains Mono** | `--font-mono` | `code`, `pre`, `.mono`, and `.stat-num` |
+
+The `--font-syne` and `--font-dm-sans` aliases are **gone**. They existed so the
+landing components could spell the family rather than the role, and those call
+sites now use `font-heading` / `font-body` like everything else.
 
 Syne is a wide geometric display face. It is doing one job: making a heading unmistakably a heading without needing a large size jump, in a product whose pages are dense with numbers and tables. Its wide, idiosyncratic letterforms lose legibility at small sizes and in running text — that is why it is kept to headings. Do not use it for body copy, labels or buttons.
 

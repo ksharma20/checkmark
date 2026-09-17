@@ -32,7 +32,12 @@ export const auth = {
   },
 
   email: {
-    /** Rendered before the wordmark image, so the brand name is not repeated here. */
+    /**
+     * Rendered as `${headingPrefix} ${en.brand.name}`. It used to sit beside an
+     * inline wordmark image inside the <h1>; the mark now lives above the card
+     * in `AuthShell`, where it stays put for all seven steps instead of
+     * vanishing after the first.
+     */
     headingPrefix: 'Welcome to',
     subtitle: 'Enter your email to sign in or create an account.',
     label: 'Email address',

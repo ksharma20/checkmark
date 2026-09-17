@@ -87,7 +87,7 @@ function WorkspaceBadge({ notification }: { notification: Notification }) {
   return (
     <span style={{
       display: 'inline-block', maxWidth: '100%',
-      fontFamily: 'DM Sans, sans-serif', fontSize: '10px',
+      fontFamily: 'var(--font-body)', fontSize: '10px',
       fontWeight: 600, lineHeight: '14px', letterSpacing: '0.02em',
       padding: '1px 7px', borderRadius: '999px',
       color, border: `1px solid ${personal ? 'var(--border)' : color}`,
@@ -144,14 +144,14 @@ export default function NotificationRow({ notification, onClick, showWorkspace =
         <TypeIcon type={notification.type} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: unread ? 600 : 400, color: 'var(--navy)', lineHeight: '1.4' }}>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: unread ? 600 : 400, color: 'var(--navy)', lineHeight: '1.4' }}>
           {notification.title}
         </div>
-        <div style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+        <div style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
           {notification.body}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px', minWidth: 0 }}>
-          <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
+          <span style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--text-muted)', flexShrink: 0 }}>
             {formatRelativeTime(notification.created_at)}
           </span>
           {showWorkspace && <WorkspaceBadge notification={notification} />}

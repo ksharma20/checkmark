@@ -20,7 +20,7 @@ export default function robots(): MetadataRoute.Robots {
       // `/ws` or `/me`, both of which are disallowed below. A crawler following
       // it only ever reaches `/login`, so there is nothing to index and no
       // reason to spend the request.
-      disallow: ["/api/", "/me/", "/ws/", "/login", "/consent/", "/dashboard"],
+      disallow: ["/api/", "/me/", "/ws/", "/login", "/consent/", "/join/", "/dashboard"],
     },
     sitemap: `${siteUrl}/sitemap.xml`,
     host: siteUrl,

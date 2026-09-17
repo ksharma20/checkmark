@@ -102,22 +102,22 @@ export default function PwaInstallPrompt() {
       <div style={{
         width: '40px', height: '40px', borderRadius: '10px', flexShrink: 0,
         background: 'var(--brand)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '16px', color: '#fff',
+        fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '16px', color: '#fff',
       }}>
         ✓
       </div>
 
       {/* Text */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '13px', fontWeight: 700, color: '#fff', margin: 0 }}>
+        <p style={{ fontFamily: 'var(--font-heading)', fontSize: '13px', fontWeight: 700, color: '#fff', margin: 0 }}>
           Add to Home Screen
         </p>
         {isIos ? (
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0, marginTop: '1px' }}>
+          <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0, marginTop: '1px' }}>
             Tap <strong style={{ color: 'rgba(255,255,255,0.85)' }}>Share</strong> then &ldquo;Add to Home Screen&rdquo;
           </p>
         ) : (
-          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0, marginTop: '1px' }}>
+          <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', color: 'rgba(255,255,255,0.6)', margin: 0, marginTop: '1px' }}>
             Install for the best experience
           </p>
         )}
@@ -133,7 +133,7 @@ export default function PwaInstallPrompt() {
               height: '34px', padding: '0 14px',
               background: 'var(--brand)', color: '#fff',
               border: 'none', borderRadius: 'var(--radius-sm)',
-              fontFamily: 'DM Sans, sans-serif', fontSize: '13px', fontWeight: 500,
+              fontFamily: 'var(--font-body)', fontSize: '13px', fontWeight: 500,
               cursor: 'pointer',
             }}
           >
@@ -147,7 +147,7 @@ export default function PwaInstallPrompt() {
             height: '34px', padding: '0 10px',
             background: 'transparent', color: 'rgba(255,255,255,0.5)',
             border: '1px solid rgba(255,255,255,0.15)', borderRadius: 'var(--radius-sm)',
-            fontFamily: 'DM Sans, sans-serif', fontSize: '13px',
+            fontFamily: 'var(--font-body)', fontSize: '13px',
             cursor: 'pointer',
           }}
         >

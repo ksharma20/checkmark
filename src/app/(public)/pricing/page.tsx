@@ -20,13 +20,16 @@ export const metadata: Metadata = {
 };
 
 const S = {
-  label: { fontSize: '12px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--brand)', fontFamily: 'DM Sans, sans-serif', margin: 0 },
-  h1: { fontFamily: 'Syne, sans-serif', fontSize: '40px', fontWeight: 800, color: 'var(--navy)', margin: '12px 0 12px' } as React.CSSProperties,
-  h2: { fontFamily: 'Syne, sans-serif', fontSize: '24px', fontWeight: 700, color: 'var(--navy)', margin: '0 0 12px' } as React.CSSProperties,
-  body: { fontFamily: 'DM Sans, sans-serif', fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 } as React.CSSProperties,
+  label: { fontSize: '12px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--brand)', fontFamily: 'var(--font-body)', margin: 0 },
+  h1: { fontFamily: 'var(--font-heading)', fontSize: '40px', fontWeight: 800, color: 'var(--navy)', margin: '12px 0 12px' } as React.CSSProperties,
+  h2: { fontFamily: 'var(--font-heading)', fontSize: '24px', fontWeight: 700, color: 'var(--navy)', margin: '0 0 12px' } as React.CSSProperties,
+  body: { fontFamily: 'var(--font-body)', fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.6, margin: 0 } as React.CSSProperties,
   card: { background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '32px 28px' } as React.CSSProperties,
-  btnPrimary: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', background: 'var(--brand)', color: '#fff', borderRadius: '8px', fontWeight: 600, fontSize: '14px', textDecoration: 'none' } as React.CSSProperties,
-  btnSecondary: { display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '12px 24px', background: 'var(--surface-0)', color: 'var(--navy)', border: '1px solid var(--border)', borderRadius: '8px', fontWeight: 600, fontSize: '14px', textDecoration: 'none' } as React.CSSProperties,
+  /* `minHeight: 44px` on all three CTAs below, not padding arithmetic: the
+     project's touch floor is a height, and padding stops being that height the
+     moment the label wraps. */
+  btnPrimary: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', gap: '8px', padding: '0 24px', background: 'var(--brand)', color: '#fff', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '14px', textDecoration: 'none' } as React.CSSProperties,
+  btnSecondary: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minHeight: '44px', gap: '8px', padding: '0 24px', background: 'var(--surface-0)', color: 'var(--navy)', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: '14px', textDecoration: 'none' } as React.CSSProperties,
 }
 
 function OptionCards() {
@@ -44,11 +47,13 @@ function OptionCards() {
       >
         {copy.options.map((option) => {
           const ctaStyle: React.CSSProperties = {
-            display: "block",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: "44px",
             textAlign: "center",
-            padding: "10px 0",
             borderRadius: "var(--radius-md)",
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "var(--font-body)",
             fontWeight: 600,
             fontSize: "14px",
             textDecoration: "none",
@@ -68,7 +73,7 @@ function OptionCards() {
             >
               <p
                 style={{
-                  fontFamily: "Syne, sans-serif",
+                  fontFamily: "var(--font-heading)",
                   fontWeight: 700,
                   fontSize: "18px",
                   color: option.highlight ? "#fff" : "var(--navy)",
@@ -79,7 +84,7 @@ function OptionCards() {
               </p>
               <p
                 style={{
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "var(--font-body)",
                   fontSize: "13px",
                   color: option.highlight
                     ? "rgba(255,255,255,0.75)"
@@ -93,7 +98,7 @@ function OptionCards() {
               <div style={{ marginBottom: "24px" }}>
                 <span
                   style={{
-                    fontFamily: "Syne, sans-serif",
+                    fontFamily: "var(--font-heading)",
                     fontWeight: 800,
                     fontSize: "36px",
                     color: option.highlight ? "#fff" : "var(--navy)",
@@ -103,11 +108,11 @@ function OptionCards() {
                 </span>
                 <span
                   style={{
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "var(--font-body)",
                     fontSize: "13px",
                     color: option.highlight
-                      ? "rgba(255,255,255,0.65)"
-                      : "var(--text-muted)",
+                      ? "rgba(255,255,255,0.88)"
+                      : "var(--text-secondary)",
                     marginLeft: "6px",
                   }}
                 >
@@ -147,7 +152,7 @@ function OptionCards() {
                       display: "flex",
                       alignItems: "flex-start",
                       gap: "8px",
-                      fontFamily: "DM Sans, sans-serif",
+                      fontFamily: "var(--font-body)",
                       fontSize: "14px",
                       color: option.highlight
                         ? "rgba(255,255,255,0.9)"
@@ -229,7 +234,7 @@ export default function PricingPage() {
                   display: "flex",
                   alignItems: "flex-start",
                   gap: "8px",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "var(--font-body)",
                   fontSize: "14px",
                   color: "var(--text-primary)",
                 }}
@@ -280,7 +285,7 @@ export default function PricingPage() {
           </div>
           <p
             style={{
-              color: "var(--text-muted)",
+              color: "var(--text-secondary)",
               fontSize: "12px",
               marginTop: "16px",
             }}

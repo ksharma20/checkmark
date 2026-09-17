@@ -74,7 +74,7 @@ export default function MarketingNav({
                 href={link.href}
                 className={
                   dark
-                    ? 'text-sm font-medium text-checkmark-text-muted no-underline transition-colors hover:text-checkmark-brand'
+                    ? 'text-sm font-medium text-checkmark-text-muted no-underline transition-colors hover:text-checkmark-brand-on-dark'
                     : 'rounded-sm px-3.5 py-1.5 text-sm text-text-secondary no-underline transition-colors hover:text-brand'
                 }
               >

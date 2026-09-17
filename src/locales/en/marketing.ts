@@ -11,9 +11,30 @@
  * single document read top to bottom, not a set of reusable labels.
  *
  * Every claim here must be one the code can back. Two signal types exist - GPS
- * and IP - and when both are configured both must match. Presence events are
- * never edited or deleted. Nobody pays. Anything else is a promise, and a
- * marketing page is not the place to make one.
+ * and IP (`deriveConfiguredTypes` in src/lib/signals.ts returns nothing else) -
+ * and when both are configured both must match. Presence events are never
+ * edited or deleted. Nobody pays. Anything else is a promise, and a marketing
+ * page is not the place to make one.
+ *
+ * THE ORDER OF THE ARGUMENT IS THE POSITIONING, and it is deliberate.
+ *
+ * The page leads with the PERSON - "own where you've been" - and only then
+ * reaches the organisation's need to verify. That is not a softer way of saying
+ * the same thing: `presence_events` carries no `workspace_id`, so a check-in
+ * genuinely is the member's row and a workspace genuinely is a query over it.
+ * Copy that opened with "know who's actually at work" sold the opposite product
+ * - it made the reader the subject of the tool rather than its owner, which is
+ * the one thing the design spec says the surface must never do.
+ *
+ * Three claims carry most of the weight and each is checkable:
+ *   - AND, not OR. Configure GPS and IP and both must match; one match is
+ *     `partial`, and the member sees that word on their own timeline.
+ *   - Nothing runs in the background. Both signals are read inside the tap.
+ *   - Nobody pays, and the history is not the employer's to keep.
+ *
+ * Do not reintroduce claims the code cannot serve: there is no Wi-Fi signal
+ * type, no face or biometric check, no hardware, no payroll pipe, no retention
+ * window, and no measured metric anybody can source.
  */
 
 /*
@@ -38,6 +59,7 @@ export const marketing = {
     /** In-page section jumps - passed by the landing page only. */
     landingLinks: [
       { label: 'How it works', href: '#how' },
+      { label: 'Who it’s for', href: '#for-who' },
       { label: 'Features', href: '#features' },
       { label: 'Industries', href: '#industries' },
       { label: 'Compare', href: '#compare' },
@@ -71,13 +93,13 @@ export const marketing = {
   },
 
   hero: {
-    badge: 'Free and open source',
-    headingBefore: 'Know who’s ',
-    headingEmphasis: 'actually',
-    headingAfter: ' at work',
+    badge: 'Open source · Apache 2.0',
+    headingBefore: 'Own ',
+    headingEmphasis: 'where you’ve been',
+    headingAfter: '.',
     subtitle:
-      'CheckMark replaces manual check-ins, WhatsApp selfies and spreadsheet chaos with one tap, verified by GPS and IP. Know where your team is. Own where you’ve been.',
-    primaryCta: 'Get Started - It’s Free',
+      'One tap when you arrive, one when you leave, and the record is yours. The workspaces you join query that record through rules they set - they never own it, and nobody can edit or delete what you logged.',
+    primaryCta: 'Start your record - it’s free',
     secondaryCta: 'See how it works',
     sceneAlt: 'CheckMark',
     verifiedBadge: 'Verified',
@@ -86,94 +108,97 @@ export const marketing = {
 
   marquee: {
     items: [
-      'No app install required',
+      'Your history, on your account',
+      'Nothing is recorded in the background',
       'GPS + IP verification',
-      'Works in coworking spaces',
       'Check-ins are never edited or deleted',
+      'No app install · no hardware',
       'Open source · Apache 2.0',
-      'Free for everyone',
+      'Nobody pays',
     ],
   },
 
   howItWorks: {
     eyebrow: 'How it works',
-    headingBefore: 'One tap. Two ',
-    headingEmphasis: 'signals',
-    headingAfter: '. Zero chaos.',
+    headingBefore: 'One tap. Nothing in the ',
+    headingEmphasis: 'background',
+    headingAfter: '.',
     description:
-      'CheckMark records presence in a second. You tap once; the checking happens on the server.',
+      'CheckMark reads a signal at the moment you tap, and at no other moment. There is no tracker to leave running and nothing to switch off when you go home.',
     steps: [
       {
         num: '01',
-        title: 'Tap "I’m at office"',
+        title: 'You tap "I’m here"',
         description:
-          'One tap from the home-screen shortcut. No app store. Works in the browser on any smartphone.',
+          'From the browser, or a shortcut on your home screen. No app store, no clocking machine, no hardware anywhere in this.',
         icon: 'location',
       },
       {
         num: '02',
-        title: 'Two signals, at that moment only',
+        title: 'Two signals, read once',
         description:
-          'Your GPS position and IP address are captured when you tap - never in the background.',
+          'Your GPS position and your IP address, captured inside that tap. Neither is sampled before it or after it.',
         icon: 'signal',
       },
       {
         num: '03',
-        title: 'Checked against your office',
+        title: 'Your workspace applies its own rules',
         description:
-          'Every signal your workspace has configured must match. Match only some and the check-in is marked partial, not verified.',
+          'Configure GPS and IP and both must match to count as verified - match one and the check-in is partial, and your timeline says so too. Configure nothing and every check-in counts.',
         icon: 'check',
       },
       {
         num: '04',
-        title: 'Attendance adds itself up',
+        title: 'The record stays yours',
         description:
-          'Office, remote and leave days are counted per member in a monthly grid you can export to Excel.',
+          'The timeline sits on your account, not inside a company. The days roll up into a monthly grid your workspace can export.',
         icon: 'chart',
       },
     ],
   },
 
   features: {
-    eyebrow: 'Platform features',
-    headingBefore: 'Built for the ',
-    headingEmphasis: 'hybrid era',
-    headingAfter: '',
-    description: 'One platform, two ways to use it.',
+    eyebrow: 'What you get',
+    headingBefore: 'One record, read ',
+    headingEmphasis: 'two ways',
+    headingAfter: '.',
+    description:
+      'The same check-in answers a person’s question and an organisation’s, without either having to take the other’s spreadsheet on trust.',
     items: [
       {
-        title: 'Hybrid Office Mode',
+        title: 'History you own',
         description:
-          'Register your office by GPS, by IP, or both. Check-ins that match every configured signal count as office days.',
-        icon: 'grid',
-      },
-      {
-        title: 'Field Force Mode',
-        description:
-          'No office to register? Skip the signals. Check-ins are still recorded with a GPS position and a place name wherever location is allowed.',
-        icon: 'map',
-      },
-      {
-        title: 'History You Own',
-        description:
-          'Check-ins are never edited or deleted - not by you, not by an admin. A correction is recorded beside the original, never over it.',
+          'A check-in is stored against your account and carries no company on it. Join a workspace, leave it, join another - the timeline stays where it was.',
         icon: 'lock',
       },
       {
-        title: 'Zero Hardware',
-        description: 'No clocking machines. No IT setup. A phone and a browser are enough.',
-        icon: 'phone',
+        title: 'Nothing edited behind you',
+        description:
+          'No check-in is ever modified or deleted, by anyone. An admin correction is recorded beside the original and both stay visible to you.',
+        icon: 'shield',
       },
       {
-        title: 'Coworking-Ready',
+        title: 'Verification you can read',
         description:
-          'Register more than one location, coworking spaces included. Members check in the same way wherever they are.',
+          'The matching rule is a function in a public repository, not a black box. You can read exactly why a check-in counted - and so can your admin.',
+        icon: 'code',
+      },
+      {
+        title: 'Office mode',
+        description:
+          'Register an office by GPS, by IP, or both, and as many locations as you run. Coworking desks register the same way a leased floor does.',
         icon: 'building',
       },
       {
-        title: 'Leave, Holidays and People',
+        title: 'Field mode',
         description:
-          'Leave balances and approvals, a holiday calendar, a people directory and documents sit in the same workspace as attendance.',
+          'Nothing to register? Skip the signals entirely. Every check-in is still logged with a position and a place name wherever location is allowed.',
+        icon: 'map',
+      },
+      {
+        title: 'The rest of the workspace',
+        description:
+          'Leave balances and approvals, a holiday calendar, a people directory, documents and announcements sit beside attendance, not in another tool.',
         icon: 'integration',
       },
     ],
@@ -280,6 +305,14 @@ export const marketing = {
     footnote: 'Based on publicly listed features. Check each vendor for the current picture.',
     groups: [
       {
+        category: 'Ownership',
+        items: [
+          { feature: 'Record belongs to the person, not the employer', checkmark: 'yes', keka: 'no', whatsapp: 'no' },
+          { feature: 'History survives leaving the organisation', checkmark: 'yes', keka: 'no', whatsapp: 'no' },
+          { feature: 'Nobody can edit or delete a recorded check-in', checkmark: 'yes', keka: 'no', whatsapp: 'no' },
+        ],
+      },
+      {
         category: 'Openness',
         items: [
           { feature: 'Open source / self-hostable', checkmark: 'yes', keka: 'no', whatsapp: 'no' },
@@ -298,36 +331,37 @@ export const marketing = {
   },
 
   forWho: {
-    eyebrow: 'Built for everyone',
-    headingBefore: 'One platform. ',
-    headingEmphasis: 'Two perspectives.',
+    eyebrow: 'Two perspectives',
+    headingBefore: 'Yours first. ',
+    headingEmphasis: 'Theirs second.',
     headingAfter: '',
     description:
-      'A personal tool for the people checking in, and verified data for the organisation. Users own their data; organisations query it, they do not own it.',
+      'A person records their presence because the record is worth having. An organisation queries that record through rules it sets. Users never pay, and organisations never own the history they are reading.',
     perspectives: [
       {
-        label: 'For Individuals',
+        label: 'For you',
         title: 'Your work, on your record.',
         description:
-          'Your check-ins belong to your account, not to any one employer.',
+          'Your check-ins are stored against your account, and they outlast any one employer.',
         points: [
           { title: 'Personal timeline', desc: 'Each check-in, how long you stayed, and where.' },
-          { title: 'Nothing hidden', desc: 'You see whether a check-in counted as verified - the same answer your admin sees.' },
-          { title: 'Work streaks', desc: 'Track consistency and build sustainable work habits.' },
+          { title: 'Nothing hidden', desc: 'You see whether a check-in counted as verified, partial or neither - the same answer your admin is looking at.' },
+          { title: 'Nothing in the background', desc: 'Location and IP are read inside the tap, and at no other time.' },
           { title: 'One account, many workspaces', desc: 'A single check-in counts for every workspace you belong to.' },
-          { title: 'Always free', desc: 'Individuals never pay.' },
+          { title: 'Always free', desc: 'Individuals never pay. There is no tier to reach for.' },
         ],
       },
       {
-        label: 'For Organisations',
-        title: 'Clean data. Zero drama.',
+        label: 'For organisations',
+        title: 'Verify without surveilling.',
         description:
-          'Stop reconciling attendance by hand. Get verified data you can export.',
+          'Set the rules, query what matches them, export the answer. You get a number at month end, not a feed of where everyone went.',
         points: [
-          { title: 'Automatic summaries', desc: 'Office, remote and leave days per member, in a monthly grid.' },
-          { title: 'Multi-location support', desc: 'Register several offices and coworking hubs in one workspace.' },
-          { title: 'Field force visibility', desc: 'Today’s check-ins, with a place name where one resolves.' },
-          { title: 'Audit-ready logs', desc: 'Every check-in is timestamped and never edited.' },
+          { title: 'Your rules, your filter', desc: 'Configure GPS, IP, both or nothing at all. Verification is computed against what your workspace configured, and only that.' },
+          { title: 'Automatic summaries', desc: 'Office, remote and leave days per member, in a monthly grid you can export.' },
+          { title: 'Corrections, not edits', desc: 'An override is recorded beside the check-in. The original stays, and the member can see both.' },
+          { title: 'No hardware, no rollout', desc: 'Nothing to mount on a wall and nothing to push through an app store. A browser is the whole install.' },
+          { title: 'Self-host it', desc: 'Apache 2.0. Run the entire thing on your own infrastructure if the data should not leave it.' },
         ],
       },
     ],
@@ -338,45 +372,45 @@ export const marketing = {
     headingBefore: 'Questions we get ',
     headingEmphasis: 'a lot',
     headingAfter: '',
-    description: 'Everything you need to know before you get started.',
+    description: 'The ones worth answering before you sign in.',
     items: [
       {
-        q: 'How does CheckMark verify I am actually at the office?',
-        a: 'When you tap check-in, CheckMark captures your GPS position and IP address and compares them with the locations your workspace has configured. If both GPS and IP are configured, both must match.',
+        q: 'Does CheckMark track me in the background?',
+        a: 'No. Your GPS position and your IP address are read at the moment you tap check in or check out, and at no other moment. There is no always-on location and nothing left running - close the tab and nothing further is recorded.',
       },
       {
-        q: 'Do I need to install an app?',
-        a: 'No. CheckMark is a Progressive Web App. Open it in the browser and add it to your home screen.',
-      },
-      {
-        q: 'What if I work from a coworking space?',
-        a: 'Coworking locations can be registered and verified the same way as office locations.',
+        q: 'How does the verification actually work?',
+        a: 'Your workspace registers its locations by GPS, by IP, or both. If it has configured both, a check-in must match BOTH to count as verified; matching one makes it partial, and your own timeline shows that word too. A workspace that has configured nothing counts every check-in - there is nothing for it to fail against.',
       },
       {
         q: 'Who owns the check-in data?',
-        a: 'You do. A workspace you belong to can see your check-ins, but nobody - including its admins - can edit or delete them.',
+        a: 'You do. A check-in is stored against your account and carries no company on it at all. Workspaces you belong to query it through their own rules, and nobody - including an admin - can edit or delete something you recorded.',
       },
       {
-        q: 'How long does setup take?',
-        a: 'Create a workspace, add your office location and invite your team. There is no hardware to install.',
+        q: 'What happens to my history if I leave the company?',
+        a: 'It stays with you. What ends is your membership of that workspace; the record it was querying sits on your account and does not leave with them.',
       },
       {
-        q: 'Does CheckMark track me continuously?',
-        a: 'No. Data is captured only when you tap check-in or check-out.',
+        q: 'Do I need to install an app, or any hardware?',
+        a: 'Neither. CheckMark is a Progressive Web App - open it in the browser and add it to your home screen. There is nothing to mount on a wall, no cards and no readers of any kind.',
+      },
+      {
+        q: 'What if I work from a coworking space?',
+        a: 'Register it like any other location. A workspace can hold several, so a coworking desk, a leased floor and a second city all sit side by side.',
       },
       {
         q: 'Is CheckMark free?',
-        a: 'Yes, for everyone. CheckMark is open source under the Apache 2.0 licence: self-host it, or use the hosted instance at no cost.',
+        a: 'Yes, for everyone. It is open source under the Apache 2.0 licence: self-host it on your own infrastructure, or use the hosted instance at no cost. Individuals never pay, and today nor does any organisation.',
       },
     ],
   },
 
   ctaBand: {
-    headingBefore: 'Stop chasing',
-    headingEmphasis: 'presence data.',
+    headingBefore: 'Know where your team is.',
+    headingEmphasis: 'Own where you’ve been.',
     description:
-      'Know where your team is. Own where you’ve been. Free and open source, for everyone.',
-    primaryCta: 'Get Started - It’s Free',
+      'Free, open source and yours to self-host. Start your own record, or bring a team onto one.',
+    primaryCta: 'Start your record - it’s free',
     secondaryCta: 'Talk to us',
     secondaryHref: `mailto:${contactEmail}`,
     copyright: (year: number) =>

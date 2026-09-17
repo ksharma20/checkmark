@@ -20,6 +20,7 @@ import { wsPerson } from './en/ws-person'
 import { wsReminders } from './en/ws-reminders'
 import { meAnnouncements } from './en/me-announcements'
 import { meSpace } from './en/me-space'
+import { access } from './en/access'
 import { auth } from './en/auth'
 
 export const en = {
@@ -34,6 +35,7 @@ export const en = {
   meSettings,
   meAnnouncements,
   meSpace,
+  access,
   auth,
   marketing,
   documents,

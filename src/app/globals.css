@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
@@ -32,6 +31,14 @@
   --ease-spring:     cubic-bezier(0.34,1.56,0.64,1);
   --ease-drawer:     cubic-bezier(0.32,0.72,0,1);
   --checkmark-brand: #1B4DFF;
+  /* The SAME brand, lightened, for TEXT and LINKS on the dark marketing ground.
+     #1B4DFF on --bg-dark (#0D1B2A) measures 2.94:1 - it fails WCAG AA for body
+     text (4.5:1) and even the 3:1 floor for large text and UI. #7C97FF measures
+     6.40:1 on --bg-dark, 5.63:1 on --bg-card and 5.16:1 on --bg-card2, so it
+     clears AA on every dark surface the marketing pages use.
+     Fills keep --checkmark-brand: white on #1B4DFF is 5.91:1 and is the
+     electric blue the brand is actually built on. This token is for ink. */
+  --brand-on-dark:   #7C97FF;
   --brand-dim:       #1640E0;
   --brand-glow:      rgba(27,77,255,0.18);
   --bg-dark:         #0D1B2A;
@@ -62,12 +69,8 @@
   --radius-md:            var(--radius-md);
   --radius-lg:            var(--radius-lg);
   --radius-xl:            var(--radius-xl);
-  --font-heading:         'Syne', sans-serif;
-  --font-body:            'DM Sans', sans-serif;
-  --font-mono:            'JetBrains Mono', monospace;
-  --font-dm-sans:         'DM Sans', sans-serif;
-  --font-syne:            'Syne', sans-serif;
   --color-checkmark-brand:   var(--checkmark-brand);
+  --color-checkmark-brand-on-dark: var(--brand-on-dark);
   --color-checkmark-brand-dim: var(--brand-dim);
   --color-checkmark-brand-glow: var(--brand-glow);
   --color-checkmark-bg-dark: var(--bg-dark);
@@ -82,6 +85,27 @@
   --animate-pulse-dot:    pulseDot 2s infinite;
   --animate-marquee:      marquee 28s linear infinite;
   --animate-ind-fade-in:  indFadeIn 0.35s ease both;
+}
+
+/* Fonts.
+ *
+ * `--ff-syne` / `--ff-dm-sans` / `--ff-mono` are set by next/font in
+ * src/app/layout.tsx, which self-hosts the three families and puts the
+ * variables on <html>. Nothing here names a family literally: this file used to
+ * pull them from Google with an `@import`, which the production CSS build
+ * strips, so every deployed page fell back to the system sans and the brand
+ * type never shipped.
+ *
+ * This is a plain `@theme`, not `@theme inline`, on purpose - it has to emit
+ * `--font-heading` into :root as well as generate the `font-heading` utility,
+ * because ~100 call sites read `var(--font-heading)` directly.
+ *
+ * The next/font variables are deliberately NOT called `--font-syne`: a theme key
+ * and the raw family sharing one name would be circular. */
+@theme {
+  --font-heading:  var(--ff-syne), sans-serif;
+  --font-body:     var(--ff-dm-sans), sans-serif;
+  --font-mono:     var(--ff-mono), ui-monospace, monospace;
 }
 
 * {
@@ -102,7 +126,7 @@ body {
   max-width: 100vw;
   background: var(--surface-0);
   color: var(--text-primary);
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* extra bottom padding so fixed BottomNav never covers content */
@@ -129,11 +153,11 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Syne', sans-serif;
+  font-family: var(--font-heading);
 }
 
 code, pre, .mono {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
 }
 
 @keyframes pulse {
@@ -782,7 +806,7 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   background: var(--header-bg); border: 1px solid rgba(255,255,255,0.1);
   border-radius: 11px; padding: 13px 18px;
   box-shadow: 0 12px 40px rgba(13,27,42,0.4);
-  font-family: 'DM Sans', sans-serif;
+  font-family: var(--font-body);
   font-size: 13px; font-weight: 600; color: var(--checkmark-text);
   animation: toastIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -1816,3 +1840,141 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   display: flex; align-items: center; justify-content: center;
   border: 1.5px dashed var(--brand); color: var(--brand); background: transparent;
 }
+
+/* ── Public surface ───────────────────────────────────────────────────────── */
+/* The floor under every page in src/app/(public). Each page paints its own
+   background over this; the ground is declared so a short page does not leave
+   the browser's default white below the fold. */
+.public-shell { min-height: 100dvh; background: var(--surface-1); }
+
+/* ── Public auth surfaces: /login, /join, /consent ─────────────────────────── */
+/* One shell for the three screens a person meets BEFORE they are inside the
+   product. There used to be three of them: /login carried the treatment as
+   Tailwind utilities plus two inline style objects, while /join and /consent
+   each re-declared the whole thing - card, glow, grid, every type rule - as
+   inline styles, twice, with the font families written out as literal strings.
+
+   Invariant 15 is the standing reason, but the literal families are the sharp
+   one: `fontFamily: 'Syne, sans-serif'` stops resolving the instant the family
+   is self-hosted under a generated name, and it fails silently - the text keeps
+   rendering, in the system sans.
+
+   The glow and the grid are the landing hero's treatment at a quieter
+   amplitude, and that is deliberate rather than decorative: /login is the first
+   screen after the marketing page and must not look like different software. */
+.auth-shell {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  overflow: hidden;
+  background: var(--surface-1);
+  padding: 32px 16px calc(32px + env(safe-area-inset-bottom));
+}
+
+/* Both layers are decorative, pointer-transparent and absolutely positioned -
+   which is also what keeps them OUT of the flex flow. An absolutely positioned
+   child of a flex container is not a flex item, so neither of these becomes a
+   third column beside the brand mark and the card. */
+.auth-shell::before,
+.auth-shell::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  z-index: 0;
+}
+.auth-shell::before {
+  left: 50%;
+  top: -10%;
+  width: 700px;
+  height: 500px;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, var(--brand-glow) 0%, transparent 70%);
+}
+.auth-shell::after {
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in srgb, var(--brand) 4%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--brand) 4%, transparent) 1px, transparent 1px);
+  background-size: 60px 60px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+}
+
+/* The mark sits ABOVE the card, not inside it, so all three screens and all
+   seven /login steps are topped by the same thing in the same place. It used to
+   be inline in the email step's <h1> only, which meant the brand vanished the
+   moment somebody moved on to the password. */
+.auth-brand {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 420px;
+  padding: 32px 28px;
+}
+/* An inline surface: separated by --border alone. Elevation is for overlays. */
+.auth-card.is-standalone {
+  background: var(--surface-0);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+.auth-card.is-centered { text-align: center; }
+
+.auth-title {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--navy);
+  margin: 0 0 8px;
+}
+.auth-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin: 0 0 22px;
+}
+.auth-body strong { color: var(--text-primary); font-weight: 600; }
+.auth-body:last-child { margin-bottom: 0; }
+
+.auth-actions { display: flex; gap: 10px; }
+.auth-actions > * { flex: 1; }
+
+/* A link, not a button, but it still has to clear the 44px floor - these are
+   the only thing on the page on a phone. */
+.auth-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  color: var(--brand);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-link:hover { text-decoration: underline; }
+
+.auth-error { margin-top: 10px; font-size: 13px; color: var(--danger); }
+
+/* ── Notification rows ───────────────────────────────────────────────────── */
+/* An invitation row carries Accept/Decline, and buttons cannot nest, so the row
+   is a container: a button for the content, an actions strip beside it. The
+   strip is indented to the text column so the actions read as part of the row
+   they belong to rather than as a new item. */
+.notif-row        { border-bottom: 1px solid var(--border); border-left: 3px solid transparent; background: var(--surface-0); }
+.notif-row-unread { background: var(--surface-2); border-left-color: var(--brand); }
+.notif-row-main   { display: flex; align-items: flex-start; gap: 10px; padding: 12px 16px; width: 100%; text-align: left; background: transparent; border: none; cursor: pointer; min-height: 44px; font-family: var(--font-body); }
+.notif-row-actions { padding: 0 16px 12px 41px; }
+.notif-invite-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

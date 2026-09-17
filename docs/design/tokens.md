@@ -101,7 +101,8 @@ These tokens back `src/components/Hero.tsx` and the other landing components, wh
 
 | Token | Value |
 |---|---|
-| `--checkmark-brand` | `#1B4DFF` (same as `--brand`) |
+| `--checkmark-brand` | `#1B4DFF` (same as `--brand`) — **fills only** |
+| `--brand-on-dark` | `#7C97FF` — **text and links on dark** |
 | `--brand-dim` | `#1640E0` |
 | `--brand-glow` | `rgba(27,77,255,0.18)` |
 | `--bg-dark` | `#0D1B2A` |
@@ -110,6 +111,42 @@ These tokens back `src/components/Hero.tsx` and the other landing components, wh
 | `--checkmark-text` | `#F1F5F9` |
 | `--checkmark-muted` | `#94A3B8` (same as `--text-muted`) |
 | `--checkmark-border` | `rgba(27,77,255,0.15)` |
+
+### Two blues, and which one is ink
+
+`--brand` is an electric blue chosen against white. On the dark marketing ground
+it is close to unreadable, and the numbers are not marginal:
+
+| Ink | on `--bg-dark` | on `--bg-card` | on `--bg-card2` |
+|---|---|---|---|
+| `#1B4DFF` (`--checkmark-brand`) | **2.94:1** | 2.59:1 | 2.37:1 |
+| `#7C97FF` (`--brand-on-dark`) | **6.40:1** | 5.63:1 | 5.16:1 |
+| `#F1F5F9` (`--checkmark-text`) | 16.0:1 | 14.1:1 | 12.9:1 |
+| `#94A3B8` (`--checkmark-muted`) | 6.78:1 | 5.97:1 | 5.47:1 |
+
+`#1B4DFF` fails AA for body text (4.5:1) **and** the 3:1 floor for large text and
+UI components, on all three dark surfaces. It was the colour of every eyebrow,
+every emphasised heading word, every feature icon and every nav hover on the
+landing page.
+
+So the split is by **role, not by surface family**:
+
+- **Ink on dark → `--brand-on-dark`.** `text-checkmark-brand-on-dark`,
+  `hover:text-checkmark-brand-on-dark`, `border-checkmark-brand-on-dark`.
+- **Fills anywhere → `--checkmark-brand` / `--brand`.** A filled button, a badge,
+  a step disc, the tint behind an icon. White on `#1B4DFF` is 5.91:1, and the
+  electric blue is the brand.
+
+**Do not dim brand ink with `opacity`.** It silently undoes the token: the
+`--brand-on-dark` category label was at `opacity-70` and measured 3.30:1, and
+`--checkmark-muted` at `opacity-60` measured 2.94:1. Both are back at full
+strength — the hierarchy they were reaching for is already carried by size and
+weight.
+
+On the **light** marketing pages the same rule applies in the other direction:
+`--text-muted` (`#94A3B8`) is 2.56:1 on `--surface-0` and is a hint colour, not a
+text colour. Informational copy — an effective date, what a plan includes — uses
+`--text-secondary` (`#64748B`, 4.76:1).
 
 ## Workspace swatch colours — the badge contract
 

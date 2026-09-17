@@ -1281,6 +1281,7 @@ The palette is the design-spec **electric blue** (`#1B4DFF`) on deep navy, with 
 | Variable | Value | Use |
 |----------|-------|-----|
 | `--brand` | `#1B4DFF` | Primary buttons, links, active nav, verified state |
+| `--brand-on-dark` | `#7C97FF` | Text and links on the dark marketing sections. `--brand` is 2.94:1 there and fails AA; this is 6.40:1. Fills stay `--brand` (white on it is 5.91:1) |
 | `--brand-hover` | `#1640E0` | Hover fill on `.btn-primary` only |
 | `--navy` | `#0D1B2A` | Headings, `.stat-num`, dark text |
 | `--teal` | `#00D4AA` | Success accent (toast success dot) |
@@ -1306,6 +1307,8 @@ The palette is the design-spec **electric blue** (`#1B4DFF`) on deep navy, with 
 | `--ease-drawer` | `cubic-bezier(0.32,0.72,0,1)` | Bottom sheet only |
 
 Fonts: **Syne** (headings), **DM Sans** (body), **JetBrains Mono** (`.stat-num`, code, timestamps).
+
+**They are loaded by `next/font/google` in `src/app/layout.tsx`, never by an `@import` in `globals.css`.** The `@import` that used to sit there was stripped from the production CSS build, so every visitor got the system sans and nobody noticed - the page still rendered, just in the wrong face. next/font self-hosts the files, writes `--ff-syne` / `--ff-dm-sans` / `--ff-mono` onto `<html>`, and `@theme` maps them to `--font-heading` / `--font-body` / `--font-mono`, which is what every call site reads. All three are variable fonts, so no `weight` is passed: a weight past the axis clamps instead of being synthesised. Syne has **no italic axis** - `italic` on a heading is a browser-faked oblique, not a typeface.
 
 Rules:
 - **No shadows on inline surfaces.** Cards, inputs, chips, rows and tables are separated by `--border` alone. Elevation exists only where something floats *above* the page: toasts, modals, slide-overs, bottom sheets, dropdowns and the active `.tabbar` pill. A shadow on a card is a bug; a shadow on a modal is the design.
@@ -1516,6 +1519,8 @@ Do not re-add upgrade prompts, pricing links or plan badges to the app.
 - Never skip `requireWsAccess(req, slug, Resource, Action)` on a `/api/ws/[slug]/*` route — and never reintroduce `requireWsAdmin()`
 - Never put a shadow on an inline surface (cards, inputs, chips, rows); shadows are for overlays only
 - Never add gradients to app UI
+- Never write a font family as a literal string (`'Syne, sans-serif'`) — under self-hosted fonts the family name is generated, so the literal resolves to nothing and falls back to the system sans **silently**. Use `var(--font-heading)` / `var(--font-body)` / `var(--font-mono)`
+- Never dim text with `opacity` to create hierarchy — it multiplies against the background and silently undoes whatever contrast the colour token guaranteed (`--brand-on-dark` at `opacity-70` measures 3.30:1 and fails AA). Reach for a dimmer token instead
 - Never write a `<style>` block in a component or an ad-hoc inline style object — add a class to `globals.css`. An inline style is also unreachable by a media query, so anything that has to change at a breakpoint *must* be a class
 - Never put a breakpoint override for a selector *earlier* in `globals.css` than the base rule for the same selector — the file has no cascade layers, so the later rule wins and the override is silently dead. This has now bitten twice (`.stat-row`, `.nav-drawer-toggle` vs `.icon-btn`)
 - Never give a `/ws` screen an icon that only reads next to its own label — the 64px rail removes every label, so the glyph is the whole distinction

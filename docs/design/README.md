@@ -49,7 +49,11 @@ A shadow on a card is a bug. A shadow on a modal is the design.
 
 **Why this is mechanical, not aesthetic:** the reduced-motion guard, the 44px rule and the elevation rule are all written as *selector lists* in `globals.css`. A style declared anywhere else is invisible to them, and therefore silently exempt from all three. An inline `animation:` cannot be switched off by `prefers-reduced-motion`. An inline `height: 32px` cannot be raised to 44. If a primitive needs a class the stylesheet does not have, add the class.
 
-Known exceptions, all pre-dating the rule and all worth fixing when touched: `src/components/shared/Toast.tsx` (inline styles plus the `vzToastIn` keyframe, which is also missing from the reduced-motion guard), `src/components/shared/TopProgressBar.tsx`, `src/app/ws/[slug]/members/[memberId]/page.tsx`. The marketing components (`src/components/Hero.tsx`, `ComingSoon.tsx`, `src/app/(public)/for-you/page.tsx`) are outside the app design system by design and keep their own Tailwind styling.
+Known exceptions, all pre-dating the rule and all worth fixing when touched: `src/components/shared/Toast.tsx` (inline styles plus the `vzToastIn` keyframe, which is also missing from the reduced-motion guard) and `src/components/shared/TopProgressBar.tsx`. The marketing components (`src/components/Hero.tsx` and the other landing sections, `src/app/(public)/for-teams|for-you|pricing|open-source|privacy|terms`) are outside the app design system by design and keep their own Tailwind and style-object layout.
+
+**`/login`, `/join` and `/consent` are no longer in that exemption.** They are product screens that happen to sit under `(public)`, not marketing, and they now render through `.auth-*` classes and `AuthShell` — see [shells.md](./shells.md#auth-shell--the-way-in). The exemption covers pages that sell the product, not the door into it.
+
+One thing the exemption never covered, on either side of that line: **a font family written as a literal string**. `fontFamily: 'Syne, sans-serif'` resolved while the fonts came from Google and resolves to nothing now they are self-hosted under a generated name — silently, in the system sans. Always `var(--font-heading)` / `var(--font-body)` / `var(--font-mono)`.
 
 Note that `globals.css` already defines a `.toast` class that nothing currently uses — the live toast is the inline-styled one above. Prefer the class if you rework it.
 

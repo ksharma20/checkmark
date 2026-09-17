@@ -82,7 +82,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
 
   return (
     <div>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>
+      <p style={{ fontFamily: 'var(--font-body)', fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '8px' }}>
         {label}
       </p>
       <div style={{ overflowX: 'auto', paddingBottom: '4px' }}>
@@ -138,7 +138,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
                       textAnchor="middle"
                       fill="#fff"
                       fontSize={10}
-                      fontFamily="DM Sans, sans-serif"
+                      fontFamily="var(--font-body)"
                     >
                       {valueKey === 'unique_users'
                         ? `${val}/${totalMembers}`
@@ -155,7 +155,7 @@ function BarChart({ buckets, valueKey, color, label, totalMembers }: BarChartPro
                     textAnchor="middle"
                     fill="var(--text-muted)"
                     fontSize={9}
-                    fontFamily="DM Sans, sans-serif"
+                    fontFamily="var(--font-body)"
                   >
                     {b.label.length > 6 ? b.label.slice(0, 6) : b.label}
                   </text>
@@ -180,14 +180,14 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
       padding: '16px 18px',
       flex: '1 1 120px',
     }}>
-      <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>
+      <p style={{ fontFamily: 'var(--font-body)', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: '6px' }}>
         {label}
       </p>
-      <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '24px', fontWeight: 700, color: color ?? 'var(--navy)', lineHeight: 1 }}>
+      <p style={{ fontFamily: 'var(--font-heading)', fontSize: '24px', fontWeight: 700, color: color ?? 'var(--navy)', lineHeight: 1 }}>
         {value}
       </p>
       {sub && (
-        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
+        <p style={{ fontFamily: 'var(--font-body)', fontSize: '11px', color: 'var(--text-muted)', marginTop: '3px' }}>
           {sub}
         </p>
       )}
@@ -246,7 +246,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
       >
         <h1
           style={{
-            fontFamily: "Syne, sans-serif",
+            fontFamily: "var(--font-heading)",
             fontSize: "22px",
             fontWeight: 700,
             color: "var(--navy)",
@@ -257,7 +257,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
         </h1>
         <p
           style={{
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "var(--font-body)",
             fontSize: "14px",
             color: "var(--text-secondary)",
           }}
@@ -283,7 +283,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
                 border: `1px solid ${interval === iv.key ? "var(--brand)" : "var(--border)"}`,
                 borderRadius: "var(--radius-md)",
                 fontSize: "13px",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "var(--font-body)",
                 fontWeight: interval === iv.key ? 600 : 400,
                 cursor: "pointer",
                 transition: "background 0.15s, color 0.15s",
@@ -316,7 +316,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-md)",
                 fontSize: "13px",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "var(--font-body)",
                 color: "var(--navy)",
                 background: "var(--surface-0)",
                 cursor: "pointer",
@@ -327,7 +327,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
               style={{
                 fontSize: "13px",
                 color: "var(--text-muted)",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "var(--font-body)",
               }}
             >
               to
@@ -344,7 +344,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
                 border: "1px solid var(--border)",
                 borderRadius: "var(--radius-md)",
                 fontSize: "13px",
-                fontFamily: "DM Sans, sans-serif",
+                fontFamily: "var(--font-body)",
                 color: "var(--navy)",
                 background: "var(--surface-0)",
                 cursor: "pointer",
@@ -356,7 +356,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
                 style={{
                   fontSize: "12px",
                   color: "var(--danger)",
-                  fontFamily: "DM Sans, sans-serif",
+                  fontFamily: "var(--font-body)",
                 }}
               >
                 Start date must be before end date
@@ -379,7 +379,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
         >
           <p
             style={{
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "var(--font-body)",
               fontSize: "15px",
               color: "var(--text-secondary)",
               marginBottom: "4px",
@@ -402,7 +402,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
         >
           <p
             style={{
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "var(--font-body)",
               fontSize: "15px",
               color: "var(--text-secondary)",
               marginBottom: "4px",
@@ -412,7 +412,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
           </p>
           <p
             style={{
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "var(--font-body)",
               fontSize: "13px",
               color: "var(--text-muted)",
             }}
@@ -515,7 +515,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
               >
                 <p
                   style={{
-                    fontFamily: "DM Sans, sans-serif",
+                    fontFamily: "var(--font-body)",
                     fontSize: "12px",
                     fontWeight: 600,
                     color: "var(--text-muted)",
@@ -552,7 +552,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
                         >
                           <span
                             style={{
-                              fontFamily: "DM Sans, sans-serif",
+                              fontFamily: "var(--font-body)",
                               fontSize: "12px",
                               color: "var(--text-secondary)",
                               minWidth: "60px",
@@ -587,7 +587,7 @@ export default function InsightsClient({ slug, workspaceCreatedAt }: Props) {
                           </div>
                           <span
                             style={{
-                              fontFamily: "JetBrains Mono, monospace",
+                              fontFamily: "var(--font-mono)",
                               fontSize: "11px",
                               color: "var(--text-muted)",
                               minWidth: "40px",

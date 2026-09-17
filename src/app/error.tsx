@@ -16,14 +16,14 @@ export default function GlobalError({
         justifyContent: 'center',
         minHeight: '100dvh',
         padding: '24px',
-        fontFamily: 'DM Sans, sans-serif',
+        fontFamily: 'var(--font-body)',
         textAlign: 'center',
         background: 'var(--surface-1)',
       }}
     >
       <p
         style={{
-          fontFamily: 'Syne, sans-serif',
+          fontFamily: 'var(--font-heading)',
           fontSize: '20px',
           fontWeight: 700,
           color: 'var(--navy)',
@@ -58,7 +58,7 @@ export default function GlobalError({
           border: 'none',
           borderRadius: 'var(--radius-md)',
           fontSize: '14px',
-          fontFamily: 'DM Sans, sans-serif',
+          fontFamily: 'var(--font-body)',
           fontWeight: 500,
           cursor: 'pointer',
         }}

@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@/components/ui'
+import { access } from '@/locales/en/access'
 
 interface Props {
   memberId: string
@@ -32,87 +34,41 @@ export default function JoinClient({ memberId, workspaceName }: Props) {
       } else {
         const data = await res.json()
         if (data.code === 'INVITE_EXPIRED') setExpired(true)
-        setError(data.error || 'Something went wrong')
+        setError(data.error || access.join.genericError)
         setLoading(null)
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(access.join.genericError)
       setLoading(null)
     }
   }
 
   return (
-    <div>
-      <h1
-        style={{
-          fontFamily: 'Syne, sans-serif',
-          fontSize: '22px',
-          fontWeight: 700,
-          color: 'var(--navy)',
-          marginBottom: '8px',
-        }}
-      >
-        You&apos;ve been invited
-      </h1>
-      <p
-        style={{
-          fontFamily: 'DM Sans, sans-serif',
-          fontSize: '14px',
-          color: 'var(--text-secondary)',
-          marginBottom: '24px',
-        }}
-      >
-        <strong>{workspaceName}</strong> wants to include your presence events in their dashboard.
-        Your data always belongs to you - you can revoke this at any time.
-      </p>
+    <>
+      <h1 className="auth-title">{access.join.invitedTitle}</h1>
+      <p className="auth-body">{access.join.invitedBody(workspaceName)}</p>
 
-      <div style={{ display: 'flex', gap: '10px' }}>
+      <div className="auth-actions">
         {!expired && (
-        <button
-          onClick={() => handle('accept')}
-          disabled={!!loading}
-          style={{
-            flex: 1,
-            height: '48px',
-            background: 'var(--brand)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 'var(--radius-md)',
-            fontFamily: 'DM Sans, sans-serif',
-            fontWeight: 600,
-            fontSize: '15px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading === 'accept' ? 'Accepting…' : 'Accept'}
-        </button>
+          <Button onClick={() => handle('accept')} loading={loading === 'accept'} disabled={!!loading}>
+            {loading === 'accept' ? access.join.accepting : access.join.accept}
+          </Button>
         )}
-        <button
+        <Button
+          variant="secondary"
           onClick={() => handle('decline')}
+          loading={loading === 'decline'}
           disabled={!!loading}
-          style={{
-            flex: 1,
-            height: '48px',
-            background: 'transparent',
-            color: 'var(--text-secondary)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-md)',
-            fontFamily: 'DM Sans, sans-serif',
-            fontSize: '15px',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            opacity: loading ? 0.7 : 1,
-          }}
         >
-          {loading === 'decline' ? 'Declining…' : 'Decline'}
-        </button>
+          {loading === 'decline' ? access.join.declining : access.join.decline}
+        </Button>
       </div>
 
       {error && (
-        <p style={{ marginTop: '10px', fontSize: '13px', color: 'var(--danger)', fontFamily: 'DM Sans, sans-serif' }}>
+        <p role="alert" className="auth-error">
           {error}
         </p>
       )}
-    </div>
+    </>
   )
 }

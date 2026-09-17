@@ -22,14 +22,14 @@ export default function Hero() {
         }}
       />
 
-      <p className="mb-8 inline-flex animate-fade-up items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--checkmark-brand)_30%,transparent)] bg-[color-mix(in_srgb,var(--checkmark-brand)_10%,transparent)] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-checkmark-brand" style={{ animationDelay: '0.1s' }}>
+      <p className="mb-8 inline-flex animate-fade-up items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--checkmark-brand)_30%,transparent)] bg-[color-mix(in_srgb,var(--checkmark-brand)_10%,transparent)] px-4 py-1.5 text-xs font-bold uppercase tracking-[0.08em] text-checkmark-brand-on-dark" style={{ animationDelay: '0.1s' }}>
         <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse-dot rounded-full bg-checkmark-brand" />
         {copy.badge}
       </p>
 
-      <h1 className="relative z-10 mb-7 animate-fade-up font-dm-sans text-5xl font-black leading-[1.04] tracking-tight text-checkmark-text md:text-7xl" style={{ animationDelay: '0.2s' }}>
+      <h1 className="relative z-10 mb-7 animate-fade-up font-heading text-5xl font-extrabold leading-[1.04] tracking-tight text-checkmark-text md:text-7xl" style={{ animationDelay: '0.2s' }}>
         {copy.headingBefore}
-        <em className="relative inline-block font-syne italic text-checkmark-brand">
+        <em className="relative inline-block font-heading not-italic text-checkmark-brand-on-dark">
           {copy.headingEmphasis}
           <span aria-hidden="true" className="hero-underline absolute -bottom-1 left-0 right-0 h-0.5 rounded bg-checkmark-brand" />
         </em>
@@ -49,7 +49,7 @@ export default function Hero() {
         </Link>
         <Link
           href="#how"
-          className="flex items-center gap-2 rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text-muted no-underline transition-colors hover:border-checkmark-brand hover:text-checkmark-brand"
+          className="flex items-center gap-2 rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text-muted no-underline transition-colors hover:border-checkmark-brand-on-dark hover:text-checkmark-brand-on-dark"
         >
           <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <circle cx="12" cy="12" r="10" />
@@ -112,7 +112,7 @@ function PinScene() {
         ].map((ring) => (
           <div
             key={ring.size}
-            className="hero-anim absolute left-1/2 top-[40px] rounded-full border-[1.5px] border-checkmark-brand"
+            className="hero-anim absolute left-1/2 top-[40px] rounded-full border-[1.5px] border-checkmark-brand-on-dark"
             style={{
               width: `${ring.size}px`,
               height: `${ring.size}px`,
@@ -122,7 +122,7 @@ function PinScene() {
           />
         ))}
 
-        <div className="hero-anim absolute left-[calc(50%+28px)] top-0.5 z-20 flex items-center gap-1 whitespace-nowrap rounded-full bg-checkmark-brand px-2.5 py-1 text-xs font-black text-white" style={{ opacity: 0, animation: 'badgeLoopSync 2s 2.0s cubic-bezier(0.34,1.56,0.64,1) infinite' }}>
+        <div className="hero-anim absolute left-[calc(50%+28px)] top-0.5 z-20 flex items-center gap-1 whitespace-nowrap rounded-full bg-checkmark-brand px-2.5 py-1 text-xs font-bold text-white" style={{ opacity: 0, animation: 'badgeLoopSync 2s 2.0s cubic-bezier(0.34,1.56,0.64,1) infinite' }}>
           <svg viewBox="0 0 16 16" width="14" height="14"><polyline points="3,8 7,12 13,4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
           {marketing.hero.verifiedBadge}
         </div>
@@ -132,7 +132,7 @@ function PinScene() {
         {marketing.hero.signalTags.map((label, i) => (
           <div
             key={label}
-            className="hero-anim flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--checkmark-brand)_25%,transparent)] bg-[color-mix(in_srgb,var(--bg-card)_90%,transparent)] px-3 py-1 text-xs font-semibold text-checkmark-brand backdrop-blur-lg"
+            className="hero-anim flex items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--checkmark-brand)_25%,transparent)] bg-[color-mix(in_srgb,var(--bg-card)_90%,transparent)] px-3 py-1 text-xs font-semibold text-checkmark-brand-on-dark backdrop-blur-lg"
             style={{ opacity: 0, animation: `tagLoopSync 2s ${2.05 + i * 0.1}s ease infinite` }}
           >
             <span>{label}</span>

@@ -39,11 +39,22 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="w-full overflow-hidden bg-checkmark-bg-dark font-dm-sans text-checkmark-text">
+    <main className="w-full overflow-hidden bg-checkmark-bg-dark font-body text-checkmark-text">
       <div className="pointer-events-none fixed left-1/2 top-[-20%] z-0 h-[700px] w-[900px] -translate-x-1/2 bg-[radial-gradient(ellipse_at_center,rgba(27,77,255,0.09)_0%,transparent_70%)]" />
       <MarketingNav variant="dark" links={marketing.nav.landingLinks} />
 
-      {/* 1 - Hero: base #0D1B2A */}
+      {/* The section ORDER is the argument, not a layout choice.
+          Hero states what the reader owns; How it works shows there is nothing
+          running behind them; ForWho is the pivot where the organisation's need
+          finally appears, AFTER the reader knows the record is theirs. Features,
+          Industries and Compare are evidence for a decision already framed.
+          Putting ForWho after Compare - where it used to sit - meant three org
+          sections ran before the person was answered at all.
+
+          Backgrounds alternate base (#0D1B2A) / alt (#1E2D3D) down the page; a
+          re-order has to keep that stripe intact or two sections merge. */}
+
+      {/* 1 - Hero: base */}
       <Hero />
 
       {/* 2 - Marquee: alt */}
@@ -55,24 +66,24 @@ export default function Home() {
       <HowItWorks />
       <SectionDivider />
 
-      {/* 4 - Features: alt */}
+      {/* 4 - ForWho: alt - the user/organisation pivot */}
       <div className="bg-checkmark-bg-card2">
-        <Features />
+        <ForWho />
       </div>
       <SectionDivider />
 
-      {/* 5 - Industries: base */}
-      <Industries />
+      {/* 5 - Features: base */}
+      <Features />
       <SectionDivider />
 
-      {/* 6 - ComparisonTable: alt */}
+      {/* 6 - Industries: alt */}
       <div className="bg-checkmark-bg-card2">
-        <ComparisonTable />
+        <Industries />
       </div>
       <SectionDivider />
 
-      {/* 7 - ForWho: base */}
-      <ForWho />
+      {/* 7 - ComparisonTable: base */}
+      <ComparisonTable />
       <SectionDivider />
 
       {/* 8 - FAQ: alt */}

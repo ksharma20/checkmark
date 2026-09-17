@@ -41,6 +41,43 @@ This is the sanctioned pattern for any future control whose recognisable form is
 
 ---
 
+## Colour contrast
+
+The app surfaces are dark ink on white and were never the problem. The
+**marketing surface renders dark**, and `--brand` (`#1B4DFF`) is a blue chosen
+against white: on `--bg-dark` it measures **2.94:1**, which fails AA for body
+text (4.5:1) and fails even the 3:1 floor for large text and UI components.
+
+`--brand-on-dark` (`#7C97FF`) is the same brand lightened for **ink**, and clears
+AA on every dark surface the marketing pages use:
+
+| Ink | `--bg-dark` `#0D1B2A` | `--bg-card` `#1A2635` | `--bg-card2` `#1E2D3D` |
+|---|---|---|---|
+| `#1B4DFF` | 2.94:1 ✗ | 2.59:1 ✗ | 2.37:1 ✗ |
+| `#7C97FF` | 6.40:1 ✓ | 5.63:1 ✓ | 5.16:1 ✓ |
+| `#F1F5F9` body | 16.0:1 ✓ | 14.1:1 ✓ | 12.9:1 ✓ |
+| `#94A3B8` muted | 6.78:1 ✓ | 5.97:1 ✓ | 5.47:1 ✓ |
+
+White on a `#1B4DFF` **fill** is 5.91:1, so filled buttons and badges keep the
+electric blue. The split is by role — ink vs fill — not by surface family. See
+[tokens.md](./tokens.md#two-blues-and-which-one-is-ink).
+
+Two traps that were live in the codebase and are worth stating as rules:
+
+- **`opacity` on text silently undoes a contrast token.** `--brand-on-dark` at
+  `opacity-70` is 3.30:1; `--checkmark-muted` at `opacity-60` is 2.94:1. Both
+  read as "a slightly quieter version of a colour that passed", and neither does.
+  Carry hierarchy with size, weight and a second *token*, never with alpha.
+- **`--text-muted` (`#94A3B8`) is 2.56:1 on white.** It is a hint and
+  empty-state colour, not a text colour. Informational copy on a light page —
+  an effective date, what a plan includes — uses `--text-secondary`
+  (`#64748B`, 4.76:1).
+
+Ratios above are computed with the WCAG 2.x relative-luminance formula against
+the flat surface token, not a composited screenshot.
+
+---
+
 ## Real elements, real semantics
 
 The primitives never fake a control with a `<div onClick>`:

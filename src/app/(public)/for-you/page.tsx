@@ -20,13 +20,13 @@ export const metadata: Metadata = {
 
 const S = {
   section: { maxWidth: '1100px', margin: '0 auto', padding: '80px 24px' } as React.CSSProperties,
-  label: { fontSize: '12px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--brand)', fontFamily: 'DM Sans, sans-serif' },
-  h1: { fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 'clamp(34px, 5vw, 52px)', lineHeight: 1.1, letterSpacing: '-1.2px', color: 'var(--navy)', margin: 0 } as React.CSSProperties,
-  h2: { fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 'clamp(26px, 4vw, 38px)', lineHeight: 1.15, letterSpacing: '-0.8px', color: 'var(--navy)', margin: 0 } as React.CSSProperties,
+  label: { fontSize: '12px', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' as const, color: 'var(--brand)', fontFamily: 'var(--font-body)' },
+  h1: { fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 'clamp(34px, 5vw, 52px)', lineHeight: 1.1, letterSpacing: '-1.2px', color: 'var(--navy)', margin: 0 } as React.CSSProperties,
+  h2: { fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 'clamp(26px, 4vw, 38px)', lineHeight: 1.15, letterSpacing: '-0.8px', color: 'var(--navy)', margin: 0 } as React.CSSProperties,
   body: { fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: 0 } as React.CSSProperties,
   sub: { fontSize: 'clamp(15px, 2vw, 18px)', color: 'var(--text-secondary)', lineHeight: 1.65, margin: 0 } as React.CSSProperties,
   card: { background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px' } as React.CSSProperties,
-  btnPrimary: { height: '50px', padding: '0 28px', background: 'var(--brand)', color: '#fff', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: 600, fontFamily: 'DM Sans, sans-serif', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' } as React.CSSProperties,
+  btnPrimary: { height: '50px', padding: '0 28px', background: 'var(--brand)', color: '#fff', borderRadius: 'var(--radius-md)', fontSize: '15px', fontWeight: 600, fontFamily: 'var(--font-body)', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' } as React.CSSProperties,
 }
 
 const features = [
@@ -139,7 +139,7 @@ export default function ForYouPage() {
                 <span style={{ fontSize: "28px" }}>{f.icon}</span>
                 <p
                   style={{
-                    fontFamily: "Syne, sans-serif",
+                    fontFamily: "var(--font-heading)",
                     fontWeight: 600,
                     fontSize: "16px",
                     color: "var(--navy)",
@@ -240,7 +240,7 @@ export default function ForYouPage() {
                   <div>
                     <p
                       style={{
-                        fontFamily: "Syne, sans-serif",
+                        fontFamily: "var(--font-heading)",
                         fontWeight: 600,
                         fontSize: "14px",
                         color: "var(--navy)",
@@ -285,7 +285,7 @@ export default function ForYouPage() {
               >
                 <p
                   style={{
-                    fontFamily: "Syne, sans-serif",
+                    fontFamily: "var(--font-heading)",
                     fontWeight: 600,
                     fontSize: "15px",
                     color: "var(--navy)",

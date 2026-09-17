@@ -20,8 +20,8 @@ export const metadata: Metadata = {
 
 const S = {
   section: { maxWidth: '760px', margin: '0 auto', padding: '80px 24px' } as React.CSSProperties,
-  h1: { fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: 'clamp(30px, 4vw, 44px)', lineHeight: 1.1, letterSpacing: '-1px', color: 'var(--navy)', margin: '0 0 8px' } as React.CSSProperties,
-  h2: { fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '22px', color: 'var(--navy)', margin: '48px 0 12px', letterSpacing: '-0.3px' } as React.CSSProperties,
+  h1: { fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: 'clamp(30px, 4vw, 44px)', lineHeight: 1.1, letterSpacing: '-1px', color: 'var(--navy)', margin: '0 0 8px' } as React.CSSProperties,
+  h2: { fontFamily: 'var(--font-heading)', fontWeight: 700, fontSize: '22px', color: 'var(--navy)', margin: '48px 0 12px', letterSpacing: '-0.3px' } as React.CSSProperties,
   body: { fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.8, margin: '0 0 16px' } as React.CSSProperties,
   li: { fontSize: '15px', color: 'var(--text-secondary)', lineHeight: 1.8 } as React.CSSProperties,
   ul: { margin: '0 0 24px', paddingLeft: '20px', display: 'flex', flexDirection: 'column', gap: '8px' } as React.CSSProperties,
@@ -56,7 +56,6 @@ const services = [
   { name: 'ip-api.com', what: 'Looks up the approximate location of the IP address used for a check-in or check-out, and whether it belongs to a VPN, proxy or hosting provider. Receives that IP address. The request is made over plain HTTP.' },
   { name: 'Nominatim (OpenStreetMap)', what: 'Turns GPS coordinates into a location label. Receives the coordinates of a check-in or check-out.' },
   { name: 'Your browser’s push service', what: 'If you enable notifications, reminders are delivered through the push service your browser vendor runs (for example Google, Mozilla or Apple).' },
-  { name: 'Google Fonts', what: 'The site’s fonts are loaded from Google’s servers, which receive your IP address and browser details when a page loads.' },
   { name: 'Hosting and database providers', what: 'The hosted instance runs on third-party cloud infrastructure, which stores and processes the data above on our behalf.' },
 ]
 
@@ -77,9 +76,9 @@ export default function PrivacyPage() {
         <p
           style={{
             fontSize: "12px",
-            color: "var(--text-muted)",
+            color: "var(--text-secondary)",
             margin: "0 0 12px",
-            fontFamily: "DM Sans, sans-serif",
+            fontFamily: "var(--font-body)",
           }}
         >
           Effective date: 17 September 2026 · Last updated: 17 September 2026
@@ -128,7 +127,7 @@ export default function PrivacyPage() {
               width: "100%",
               borderCollapse: "collapse",
               fontSize: "14px",
-              fontFamily: "DM Sans, sans-serif",
+              fontFamily: "var(--font-body)",
             }}
           >
             <thead>
