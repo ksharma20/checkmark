@@ -50,10 +50,8 @@ export async function POST(request: NextRequest) {
     return apiError("Invalid credentials", "INVALID_CREDENTIALS", 401);
   }
 
-  const bypass = process.env.LOGIN_BYPASS == body.password;
   const valid = await verifyPassword(body.password, user.password_hash);
-  
-  if (!valid && !bypass) {
+  if (!valid) {
     return apiError("Invalid credentials", "INVALID_CREDENTIALS", 401);
   }
 

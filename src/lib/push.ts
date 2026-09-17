@@ -1,10 +1,11 @@
 import webpush from 'web-push'
 import { getPushSubscriptionsForUser, deletePushSubscription } from '@/lib/db/queries/push'
+import { en } from '@/locales/en'
 
 function getVapidConfig() {
   const publicKey = process.env.VAPID_PUBLIC_KEY
   const privateKey = process.env.VAPID_PRIVATE_KEY
-  const email = process.env.VAPID_EMAIL ?? 'mailto:kabir.innovate@gmail.com'
+  const email = process.env.VAPID_EMAIL ?? `mailto:${en.brand.email}`
   if (!publicKey || !privateKey) throw new Error('VAPID keys not configured')
   return { publicKey, privateKey, email }
 }

@@ -20,8 +20,8 @@ export interface ListPeopleOpts {
  * `workspace_members` and `employees` are separate tables and nothing links
  * them automatically: an employee row is only ever created by an admin filling
  * the wizard in. So a directory driven by `employees` shows the handful of
- * people HR has got round to, not the workforce - in the live `acme`
- * workspace that was 1 row out of 34 members.
+ * people HR has got round to, not the workforce - in a real workspace that
+ * was one row out of dozens of members.
  *
  * The directory is therefore a list of MEMBERS with the HR record overlaid
  * where one exists. `employee: null` is not an error state, it is simply
