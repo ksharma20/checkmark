@@ -83,7 +83,7 @@ Both entry points land on `/me/notifications`; the `?ws=` query param is what di
 | Top-bar bell | `/me/notifications?ws=<active slug>` | The active workspace only, no per-row badges — the heading already names it. Polls `GET /api/me/ws/[slug]/notifications/unread-count` |
 | Avatar sheet → Notifications | `/me/notifications` | Every workspace, each row badged with its workspace colour. Polls `GET /api/me/notifications/unread-count` |
 
-**`/me/announcements`** is the member's policy archive — every notice posted to the active workspace, with any attached policy document. It is reached from the avatar sheet, not the bottom nav, which is deliberately fixed at three tabs; and it is where an `announcement` notification now lands, because a notification row has nowhere to put a file.
+**`/me/announcements`** is the member's policy archive — every notice posted to the active workspace, with any attached policy document. It is reached from the avatar sheet, not the bottom nav, which carries four tabs — Timeline, Home, Space, Leave — and grows one only for a surface used daily (`/me/space` earned the fourth; an archive read a few times a year did not); and it is where an `announcement` notification now lands, because a notification row has nowhere to put a file.
 
 `?ws=` is validated server-side in `src/app/me/notifications/page.tsx` against real memberships; a bogus slug falls back to the unified view. The client never reads `?ws=` itself. With no workspace at all the bell falls back to the global feed — that is where a pending invitation shows up.
 

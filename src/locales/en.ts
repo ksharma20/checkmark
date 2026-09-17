@@ -19,6 +19,7 @@ import { wsAnnouncements } from './en/ws-announcements'
 import { wsPerson } from './en/ws-person'
 import { wsReminders } from './en/ws-reminders'
 import { meAnnouncements } from './en/me-announcements'
+import { meSpace } from './en/me-space'
 import { auth } from './en/auth'
 
 export const en = {
@@ -32,6 +33,7 @@ export const en = {
   meScreens,
   meSettings,
   meAnnouncements,
+  meSpace,
   auth,
   marketing,
   documents,

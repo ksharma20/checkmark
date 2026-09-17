@@ -1124,6 +1124,88 @@ const ADDITIVE_MIGRATIONS = [
    ON parental_leave_extensions(workspace_id, status)`,
   `CREATE INDEX IF NOT EXISTS idx_parental_extensions_case
    ON parental_leave_extensions(case_id)`,
+
+  // ── Personal space (/me/space) ──────────────────────────────────────────────
+  //
+  // Three tables that belong to a PERSON, not to a workspace, and that is the
+  // whole reason they sit apart from everything above: there is no
+  // `workspace_id` column on any of them and there must never be one. A note, a
+  // to-do and a focus session are the member's own - they follow the account
+  // across workspaces, they survive leaving one, and no admin surface reads
+  // them. `ON DELETE CASCADE` to `users(id)` says the same thing from the other
+  // end: when the account goes, so does the content, because nobody else has a
+  // claim on it.
+  //
+  // Notes and to-dos are SOFT-deleted (invariant 5) and every read filters
+  // `deleted_at IS NULL`. Focus sessions are not: a session row is only ever
+  // written once, when the timer has already stopped, so there is no edit to
+  // undo and nothing a tombstone would preserve that the row itself does not.
+  `CREATE TABLE IF NOT EXISTS user_notes (
+  id         TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title      TEXT,
+  content    TEXT NOT NULL DEFAULT '',
+  pinned     INTEGER NOT NULL DEFAULT 0,
+  color      TEXT NOT NULL DEFAULT 'default' CHECK(color IN ('default','yellow','teal','coral','purple')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  deleted_at TEXT
+)`,
+  // The list read is "this member's live notes, pinned first, newest first".
+  // Partial on `deleted_at IS NULL` because a deleted note is never listed, so
+  // indexing it would only make the index bigger than the answer it serves.
+  `CREATE INDEX IF NOT EXISTS idx_user_notes_user
+   ON user_notes(user_id, pinned DESC, created_at DESC) WHERE deleted_at IS NULL`,
+
+  // display_order is what the member's own ordering is stored in, and it is a
+  // plain INTEGER rather than a position in an array because reordering has to
+  // be a write per row inside one transaction - there is no list object to
+  // rewrite. It is NOT unique: two rows sharing an order is untidy, not broken,
+  // and a UNIQUE index would make any reorder that passes through a transient
+  // collision fail outright.
+  `CREATE TABLE IF NOT EXISTS user_todos (
+  id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id       TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  text          TEXT NOT NULL,
+  done          INTEGER NOT NULL DEFAULT 0,
+  due_date      TEXT,
+  priority      TEXT NOT NULL DEFAULT 'none' CHECK(priority IN ('none','low','medium','high')),
+  display_order INTEGER NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at    TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at  TEXT,
+  deleted_at    TEXT
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_user_todos_user
+   ON user_todos(user_id, display_order) WHERE deleted_at IS NULL`,
+  // The "Today" filter reads a date range per member, which the order index
+  // above cannot serve.
+  `CREATE INDEX IF NOT EXISTS idx_user_todos_due
+   ON user_todos(user_id, due_date) WHERE deleted_at IS NULL`,
+
+  // A pomodoro row is written when a session ENDS, never when it starts, and
+  // the timer itself is entirely client-side. There is deliberately no server
+  // clock and no cron here: nothing has to be kept alive, nothing has to fire,
+  // and a session the browser abandoned simply leaves no row - which is the
+  // honest record of a session nobody finished.
+  //
+  // `todo_id` carries no ON DELETE clause on purpose. To-dos are soft-deleted,
+  // so the parent row never actually disappears, and the history of what the
+  // member focused on must outlive their tidying up of the list.
+  `CREATE TABLE IF NOT EXISTS pomodoro_sessions (
+  id                  TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+  user_id             TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  todo_id             TEXT REFERENCES user_todos(id),
+  label               TEXT,
+  planned_duration_min INTEGER NOT NULL DEFAULT 25,
+  actual_duration_min INTEGER,
+  started_at          TEXT NOT NULL DEFAULT (datetime('now')),
+  completed_at        TEXT,
+  interrupted         INTEGER NOT NULL DEFAULT 0,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+)`,
+  `CREATE INDEX IF NOT EXISTS idx_pomodoro_user
+   ON pomodoro_sessions(user_id, started_at DESC)`,
 ];
 
 // ─── SQLite runner (local dev) ────────────────────────────────────────────────

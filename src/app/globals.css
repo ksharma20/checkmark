@@ -1617,3 +1617,173 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 .form-status { margin-top: 10px; font-size: 13px; }
 .form-status.is-ok    { color: var(--brand); }
 .form-status.is-error { color: var(--danger); }
+
+/* ── personal space (/me/space) ───────────────────────────────────────────────
+   Notes, to-dos, focus and insights. Everything here obeys the same three rules
+   the rest of the app does: no shadow on an inline surface (a note card is
+   separated by `--border` and a tint, never by elevation), no gradient, and a
+   44px hit area on anything a thumb has to find. It lives in this file rather
+   than in the components for the reason invariant 15 gives - the reduced-motion
+   guard, the touch-target list and the elevation rule are selector lists in this
+   stylesheet, and a style declared anywhere else is silently exempt from all
+   three. It is APPENDED, not inserted, so the two breakpoint blocks above cannot
+   already be overriding a selector introduced here. */
+
+/* Spacing shims the primitives needed and the stylesheet did not name. Classes
+   rather than inline `style` objects for the same invariant-15 reason. */
+.space-mt-6  { margin-top: 6px; }
+.space-mt-10 { margin-top: 10px; }
+
+/* Four tabs in a 460px column. `.tabbar` is `inline-flex` and sized to its
+   content, which leaves the fourth label hanging off the right on a narrow
+   phone; this stretches the control to the column and lets the labels share it
+   evenly. Wrapping to a second row stays available below that. */
+.space-tabbar { display: flex; width: 100%; }
+.space-tabbar button { flex: 1 1 auto; padding: 0 8px; }
+
+/* Insight tiles: two across, one when there is genuinely no room for two.
+   `auto-fit` answers every width from one declaration - the `.stat-row` idiom,
+   with a floor low enough for the 420px `/me` column. */
+.space-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+/* ── notes ───────────────────────────────────────────────────────────────── */
+
+.note-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+/* A real <button>, so a card is keyboard-reachable and announces itself as the
+   control it is - the whole card opens the editor, and a <div> with an onClick
+   would be invisible to everything but a mouse.
+   `--note-bg` defaults to the plain surface and is replaced per colour below, so
+   one rule paints all five. */
+.note-card {
+  --note-bg: var(--surface-0);
+  position: relative;
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 116px; padding: 14px; text-align: left;
+  background: var(--note-bg);
+  border: 1px solid var(--border); border-radius: var(--radius-lg);
+  color: var(--text-primary); font: inherit; cursor: pointer;
+}
+.note-card[data-color="yellow"] { --note-bg: #FFFBEB; }
+.note-card[data-color="teal"]   { --note-bg: #ECFDF5; }
+.note-card[data-color="coral"]  { --note-bg: #FFF1F2; }
+.note-card[data-color="purple"] { --note-bg: #F5F3FF; }
+
+/* Both lines are clipped rather than allowed to grow, for the reason the org
+   chart's card states: a board of cards whose heights depend on their contents
+   has no rhythm, and one long note pushes every card beside it out of line. */
+.note-card-title {
+  font-weight: 700; font-size: 14px; line-height: 1.3;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.note-card-body {
+  color: var(--text-secondary); font-size: 12.5px; line-height: 1.45;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4;
+  overflow: hidden; white-space: pre-wrap;
+}
+.note-pin {
+  position: absolute; top: 10px; right: 10px;
+  display: flex; color: var(--brand);
+}
+/* The pin sits where the title's second line would run, so the title is kept
+   clear of it rather than reflowing underneath. */
+.note-card:has(.note-pin) .note-card-title { padding-right: 20px; }
+
+/* The colour picker. The painted circle stays 26px - a 44px dot reads as a
+   button, not a swatch - and the control carries the full hit area around it,
+   which is the `.toggle` exception's argument applied to a second control. */
+.swatch-row {
+  display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
+  border: 0; padding: 0; margin: 0;
+}
+.swatch {
+  --swatch-bg: var(--surface-0);
+  position: relative;
+  width: 44px; height: 44px; min-width: 44px;
+  background: none; border: 0; padding: 0; cursor: pointer;
+}
+.swatch::before {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%);
+  width: 26px; height: 26px; border-radius: 50%;
+  background: var(--swatch-bg); border: 1px solid var(--border);
+}
+.swatch[data-color="yellow"] { --swatch-bg: #FFFBEB; }
+.swatch[data-color="teal"]   { --swatch-bg: #ECFDF5; }
+.swatch[data-color="coral"]  { --swatch-bg: #FFF1F2; }
+.swatch[data-color="purple"] { --swatch-bg: #F5F3FF; }
+.swatch.is-active::before { border: 2px solid var(--brand); }
+
+/* ── to-dos ──────────────────────────────────────────────────────────────── */
+
+.todo-add { display: flex; flex-direction: column; gap: 8px; }
+/* The date, the priority and the button share one line and drop to their own
+   rather than squeezing - the same contract `.field-row-item` writes. */
+.todo-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.todo-add-row > * { flex: 1 1 130px; min-width: 130px; }
+.todo-add-row > .btn { flex: 0 0 auto; }
+
+.todo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+
+/* Priority is a left border, not a chip: it is an attribute of the whole row
+   rather than another thing to read in it, and a 3px rule carries at a glance
+   down a list where a fourth chip would not. `none` deliberately paints a
+   transparent border rather than dropping it, so no row shifts by 3px. */
+.todo-row {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 8px 10px 8px 7px;
+  background: var(--surface-0);
+  border: 1px solid var(--border); border-left: 3px solid transparent;
+  border-radius: var(--radius-md);
+}
+.todo-row[data-priority="high"]   { border-left-color: var(--danger); }
+.todo-row[data-priority="medium"] { border-left-color: var(--amber); }
+.todo-row[data-priority="low"]    { border-left-color: var(--teal); }
+
+.todo-line { display: flex; align-items: center; gap: 4px; }
+/* The tick box keeps its native 18px look and gets the 44px target from the
+   label around it - a checkbox scaled to 44px reads as a broken control. */
+.todo-check {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; min-width: 44px; cursor: pointer;
+}
+.todo-check input { width: 18px; height: 18px; accent-color: var(--brand); cursor: pointer; }
+.todo-text { flex: 1; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
+.todo-text.is-done { text-decoration: line-through; color: var(--text-muted); }
+
+/* The meta line carries the chips AND the actions, on a row of its own, because
+   five 44px controls beside the text would leave a 460px column nothing to put
+   the task in. */
+.todo-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding-left: 44px; }
+.todo-actions { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+
+/* ── focus ───────────────────────────────────────────────────────────────── */
+
+.focus-card { text-align: center; }
+/* Mono, like every other number in the system, and tabular so the digits do not
+   jostle as the countdown passes 10:00 - a clock that reflows every second is
+   the one thing on this screen nobody can look away from. */
+.focus-clock {
+  font-family: var(--font-mono); font-weight: 700;
+  font-size: clamp(48px, 14vw, 64px); line-height: 1.05;
+  letter-spacing: -0.02em; color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+.focus-mode { margin-top: 4px; }
+.focus-dots { display: flex; justify-content: center; gap: 6px; margin-top: 14px; }
+.focus-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--surface-2); border: 1px solid var(--border);
+}
+.focus-dot.is-done { background: var(--brand); border-color: var(--brand); }
+.focus-controls { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+.focus-stats { margin-top: 12px; }
