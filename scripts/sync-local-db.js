@@ -10,7 +10,9 @@
 // Blob tables are created locally but their rows are skipped - see
 // SYNC_EXCLUDED_TABLES below. Set SYNC_INCLUDE_BLOBS=1 to copy them anyway.
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path')
 
 const ROOT = path.join(__dirname, '..')
@@ -109,7 +111,9 @@ async function main() {
   const localDbPath = path.resolve(process.env.LOCAL_DATABASE_PATH || DEFAULT_LOCAL_DB)
   const tmpDbPath = `${localDbPath}.sync-tmp`
 
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { createClient } = require('@libsql/client')
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require('better-sqlite3')
 
   const turso = createClient({
