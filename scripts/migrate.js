@@ -1132,12 +1132,6 @@ async function runSQLite() {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const Database = require("better-sqlite3");
   const dbPath = path.join(__dirname, "../checkmark.db");
-  const oldPath = path.join(__dirname, "../checkmark.db");
-
-  if (!fs.existsSync(dbPath) && fs.existsSync(oldPath)) {
-    fs.copyFileSync(oldPath, dbPath);
-    console.log("✓ Copied checkmark.db → checkmark.db");
-  }
 
   const db = new Database(dbPath);
   db.pragma("journal_mode = WAL");

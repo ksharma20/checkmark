@@ -54,7 +54,11 @@ export const en = {
     tagline: "Presence Intelligence Platform",
     taglineLong: "Know where your team is. Own where you've been.",
     domain: "checkmark.kabirinnovations.com",
+    // Sender for transactional mail only; nobody reads replies to it.
     email: "noreply@kabirinnovations.com",
+    // The address a human answers: support, security reports, VAPID contact.
+    contactEmail: "kabir.innovate@gmail.com",
+    owner: "Kabir Innovations",
     description: `Presence Intelligence Platform - know where your team is, own where you've been.`,
   },
 
@@ -582,12 +586,6 @@ export const en = {
 
     // ── HTTP ──────────────────────────────────────────────────────────────────
     geoUserAgent: "CheckMark/1.0 (presence-platform)",
-
-    // ── Browser storage / notification tags (CheckinButtons) ─────────────────
-    staleNotifKey: "cm_stale_notif_count",
-    staleNotifEventKey: "cm_stale_notif_event",
-    notifTagStale: "cm-stale-checkin",
-    notifTagAutoCheckout: "cm-auto-checkout",
   },
 
   notifications: {

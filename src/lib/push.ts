@@ -5,7 +5,7 @@ import { en } from '@/locales/en'
 function getVapidConfig() {
   const publicKey = process.env.VAPID_PUBLIC_KEY
   const privateKey = process.env.VAPID_PRIVATE_KEY
-  const email = process.env.VAPID_EMAIL ?? `mailto:${en.brand.email}`
+  const email = process.env.VAPID_EMAIL ?? `mailto:${en.brand.contactEmail}`
   if (!publicKey || !privateKey) throw new Error('VAPID keys not configured')
   return { publicKey, privateKey, email }
 }
