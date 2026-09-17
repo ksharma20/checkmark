@@ -1,7 +1,6 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import Link from 'next/link'
 import { BarChart, Button, Card, Chip, Field, Input, Skeleton } from '@/components/ui'
 import type { BarChartBar } from '@/components/ui'
 import { wsAdmin } from '@/locales/en/ws-settings'
@@ -11,7 +10,7 @@ const t = wsAdmin.reports
 interface Props {
   slug: string
   timezone: string
-  /** From the plan: the XLSX export route 402s when this is false. */
+  /** From the plan limits: the XLSX export route 402s when this is false. Always true unless an operator reintroduces caps. */
   canExport: boolean
   canReadLeaves: boolean
   canReadMembers: boolean
@@ -162,7 +161,7 @@ function ReportsBody({
     return () => { cancelled = true }
   }, [slug, today, canReadAnalytics])
 
-  /** The XLSX month report. Plan gates arrive as 402 with a machine code. */
+  /** The XLSX month report. Operator-set caps arrive as 402 with a machine code. */
   const generateAttendance = useCallback(async () => {
     const [year, monthNo] = month.split('-')
     setBusy('attendance')
@@ -395,14 +394,7 @@ function ReportsBody({
         />
       </div>
 
-      {!canExport && (
-        <p className="t-muted" style={{ marginTop: '12px' }}>
-          {t.planGate}{' '}
-          <Link href="/pricing" style={{ color: 'var(--brand)', fontWeight: 600 }}>
-            {t.viewPricing}
-          </Link>
-        </p>
-      )}
+      {!canExport && <p className="t-muted mt-12">{t.planGate}</p>}
 
       {message && (
         <p

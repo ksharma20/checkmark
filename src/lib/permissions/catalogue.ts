@@ -59,7 +59,7 @@ export enum Resource {
   Announcements = 'announcements',
   Roles = 'roles',
 
-  // Transfer ownership, archive/restore, plan and billing.
+  // Transfer ownership and archive/restore.
   Ownership = 'ownership',
 }
 

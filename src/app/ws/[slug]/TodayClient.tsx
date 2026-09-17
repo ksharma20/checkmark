@@ -20,7 +20,6 @@ import { wsAdmin } from '@/locales/en/ws-overview'
 
 interface Props {
   slug: string
-  planLimitBanner?: React.ReactNode
   adminFirstName: string
   /** `approvals:write` - read-only roles see the queue without action buttons. */
   canAction: boolean
@@ -72,7 +71,7 @@ function hourLabel(key: string): string {
 
 type LocationRow = { label: string; count: number }
 
-export default function TodayClient({ slug, planLimitBanner, adminFirstName, canAction, todayIso }: Props) {
+export default function TodayClient({ slug, adminFirstName, canAction, todayIso }: Props) {
   const { show: showToast } = useToast()
 
   const [dash, setDash] = useState<DashboardResponse | null>(null)
@@ -321,8 +320,6 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
         </Button>
       </div>
 
-      {planLimitBanner}
-
       {/* ── Stat cards ── */}
       <div className="fx-spring-stagger stat-row">
         <Link href={`/ws/${slug}/people`}>
@@ -472,8 +469,8 @@ export default function TodayClient({ slug, planLimitBanner, adminFirstName, can
         <Card fixedHeight padded={false} style={{ flex: '1.3 1 380px', marginTop: 0, overflow: 'hidden' }}>
           {/* The day stepper lives in the HEADER, so the card's heading and its
               rows can never describe different days. Next is disabled on the
-              workspace's today; the plan's history floor is what stops Previous
-              running off the end, and it is enforced server-side. */}
+              workspace's today; any history floor that stops Previous running
+              off the end is enforced server-side. */}
           <div style={panelHeadStyle}>
             <p className="t-h2">{en.wsOverview.recentActivityTitle}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>

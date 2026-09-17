@@ -42,7 +42,7 @@ sequenceDiagram
    with no role rows grants *nobody* anything — its creator included. Never
    insert a workspace by any other path.
 2. **The creator is the `owner`, not an `admin`.** Only `owner` carries the
-   `ownership` resource (transfer, archive, billing), so a workspace whose
+   `ownership` resource (transfer, archive), so a workspace whose
    creator is an admin has nobody who can do those things.
 
 `scripts/migrate.js → seedRolesAndOwners()` repairs both for pre-existing
@@ -51,7 +51,7 @@ that has drifted from `system-roles.json`, and an owner backfilled from the
 oldest active admin. A workspace with no active admin is counted as `ownerless`
 and left alone.
 
-**Workspace limits:** Free plan allows 1 workspace per account. Attempting a second returns 403 `WORKSPACE_LIMIT_REACHED`.
+**Workspace limits:** an account may administer 1 active workspace, on every plan (a check in `POST /api/workspace`, not a plan limit). Attempting a second returns 403 `WORKSPACE_LIMIT_REACHED`.
 
 ---
 

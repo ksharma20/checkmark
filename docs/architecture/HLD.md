@@ -591,14 +591,14 @@ not in `WHERE`, so the join is not silently converted into an `INNER JOIN`.
 
 ### 4.6 Plan gates
 
-| Plan | Max users | History | Locations* | CSV |
-|------|-----------|---------|-----------|-----|
-| free | 10 | 3 months | 1 | No |
-| starter | unlimited | 12 months | 1 | Yes |
-| growth | unlimited | 84 months (7 y) | 5 | Yes |
+Every plan (`free`, `starter`, `growth`, or any unknown value) resolves to one
+`UNLIMITED` limits object in `src/lib/plans.ts`: no member cap, no history window,
+no location cap, export enabled.
 
-Applied inside `queryWorkspaceEvents()` before signal matching.
-\* `maxLocations` is displayed but **not enforced** anywhere in the signal routes.
+The checks are kept as no-ops inside `queryWorkspaceEvents()` (before signal
+matching) and the export/monthly routes, so an operator can reintroduce caps by
+giving a plan its own limits object. `maxLocations` has never been enforced
+anywhere in the signal routes.
 
 ### 4.7 API token O(1) lookup
 

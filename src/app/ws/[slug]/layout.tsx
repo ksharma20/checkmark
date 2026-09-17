@@ -70,7 +70,6 @@ export default async function WsSlugLayout({ children, params }: Props) {
         leavesEnabled={!!workspace.leaves_enabled}
         workspaceName={workspace.name}
         logoUpdatedAt={workspace.logo_updated_at}
-        plan={workspace.plan}
         pendingApprovalsCount={pendingLeaveCount + pendingRegularizationCount}
         userName={dbUser?.full_name?.trim() || user.email}
         userRoleName={role.name}

@@ -13,7 +13,6 @@ interface Workspace {
   id: string
   slug: string
   name: string
-  plan: string
   archived_at: string | null
   /** null when the workspace has no logo; also the image cache-buster. */
   logo_updated_at?: string | null
@@ -166,9 +165,7 @@ function WorkspaceRow({ workspace, archived }: { workspace: Workspace; archived?
       <span style={{ minWidth: 0 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 700, fontSize: '15px' }}>{workspace.name}</span>
-          {archived
-            ? <Chip tone="roadmap">{t.archivedBadge}</Chip>
-            : <Chip tone="leave" style={{ textTransform: 'capitalize' }}>{workspace.plan}</Chip>}
+          {archived && <Chip tone="roadmap">{t.archivedBadge}</Chip>}
         </span>
         <span className="mono t-muted" style={{ display: 'block', marginTop: '2px' }}>
           {t.slugPreview(workspace.slug)}

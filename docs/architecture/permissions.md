@@ -67,7 +67,7 @@ record but not restructure the org.
 | `settings` | Workspace settings | read, write |
 | `members.role` | Assign roles | write |
 | `roles` | Roles | read, write, delete |
-| `ownership` | Ownership & billing | write, delete |
+| `ownership` | Ownership | write, delete |
 
 `members.role` is split out from `members` deliberately: inviting someone and
 changing someone's role are wildly different risk levels, and keeping them on
@@ -138,7 +138,7 @@ path.
 **Invariant: the workspace creator is the `owner`, not an `admin`.**
 `createWorkspace()` inserts the creator with `role = 'owner'`. Only `owner`
 holds `ownership`, so a workspace whose creator is an admin has nobody who can
-transfer ownership, archive it, or change billing.
+transfer ownership or archive it.
 
 The migration's `seedRolesAndOwners()` also **refreshes** existing system-role
 rows whose `permissions` differ from the seed — when CheckMark adds a resource to

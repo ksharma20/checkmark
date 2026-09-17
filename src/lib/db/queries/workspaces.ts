@@ -83,7 +83,7 @@ export interface AdminOverride {
  * the UI, so it must never be able to exist.
  *
  * The creator is the OWNER, not an admin. Only the owner may transfer
- * ownership, archive the workspace, or manage billing; a workspace whose
+ * ownership or archive the workspace; a workspace whose
  * creator is merely an admin has nobody who can do any of those things.
  */
 export async function createWorkspace(params: {
@@ -434,7 +434,7 @@ export async function getAdminWorkspacesForUser(userId: string): Promise<Workspa
 /**
  * Returns active (non-archived) workspaces the user OWNS. Used to block
  * account deactivation - deactivating would leave those workspaces with nobody
- * who can transfer, archive, or manage billing. Having other admins does not
+ * who can transfer or archive. Having other admins does not
  * help: admins deliberately cannot do any of those things.
  *
  * Archived workspaces are excluded - a deactivated account is fine as the
@@ -490,7 +490,7 @@ export async function getMembershipsByEmail(email: string): Promise<WorkspaceMem
 
 export async function leaveWorkspace(workspaceId: string, userId: string): Promise<boolean> {
   // The owner can NEVER leave - a workspace without an owner has no one who can
-  // transfer it, archive it, or manage billing. They must transfer ownership
+  // transfer it or archive it. They must transfer ownership
   // first. Admins may leave freely; the owner is always still there.
   const self = await db.queryOne<{ role: string }>(
     `SELECT role FROM workspace_members WHERE workspace_id = ? AND user_id = ? AND status = 'active'`,

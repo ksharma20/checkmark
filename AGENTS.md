@@ -219,7 +219,7 @@ Permissions resolve by joining `workspace_members.role` → `workspace_roles`. A
 So `createWorkspace()` must, in a single transaction:
 1. insert the `workspaces` row,
 2. call `seedSystemRoles(id, tx)` to create owner/admin/member,
-3. insert the creator as **`owner`** (not `admin` — only `owner` holds the `ownership` resource, i.e. transfer, archive and billing).
+3. insert the creator as **`owner`** (not `admin` — only `owner` holds the `ownership` resource, i.e. transfer and archive).
 
 The seeded grids live in **`src/lib/permissions/system-roles.json`**, read by both `src/lib/permissions/system-roles.ts` and `scripts/migrate.js`. Do not create a second copy of them anywhere — the app and the migration holding separate definitions is what shipped every new workspace with no roles at all.
 

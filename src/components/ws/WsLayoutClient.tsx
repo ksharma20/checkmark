@@ -25,8 +25,6 @@ interface Props {
   workspaceName: string
   /** null when the workspace has no logo; also the image cache-buster. */
   logoUpdatedAt?: string | null
-  /** Plan key as stored on the workspace row - rendered as a chip. */
-  plan: string
   /** Leave + regularization, badged on the Approvals nav entry. */
   pendingApprovalsCount: number
   userName: string
@@ -64,7 +62,7 @@ const DESKTOP_QUERY = '(min-width: 861px)'
  * of the flow entirely as a fixed overlay.
  */
 export default function WsLayoutClient({
-  slug, workspaceId, logoUpdatedAt, leavesEnabled, workspaceName, plan, pendingApprovalsCount,
+  slug, workspaceId, logoUpdatedAt, leavesEnabled, workspaceName, pendingApprovalsCount,
   userName, userRoleName, readableResources, initialNavCollapsed, children,
 }: Props) {
   const [panelOpen, setPanelOpen] = useState(false)
@@ -177,9 +175,6 @@ export default function WsLayoutClient({
 
             <div className="topbar-actions">
               <Chip tone="owner" className="topbar-role-chip">{userRoleName}</Chip>
-              <Chip tone="verified" className="topbar-plan-chip">
-                {wsAdmin.shell.planChip(plan)}
-              </Chip>
 
               <div className="topbar-bell">
                 <NotificationBell

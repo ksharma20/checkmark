@@ -461,7 +461,7 @@ export const en = {
     roleAdminGains:
       "Can manage members, employee records, holidays, leave, approvals, signals, domains and workspace settings.",
     roleAdminLimits:
-      "Cannot transfer ownership, archive the workspace, change billing, or assign roles.",
+      "Cannot transfer ownership, archive the workspace, or assign roles.",
     roleMemberEffect:
       "Loses access to the workspace dashboard entirely. They keep their own timeline on /me.",
     roleAppliesImmediately:
@@ -481,7 +481,7 @@ export const en = {
     /** Destructive warning callout - step 1 of the transfer modal. */
     warningTitle: "This cannot be undone.",
     warningTheyGain:
-      "They get full control of this workspace, including billing, archiving it, and transferring ownership again.",
+      "They get full control of this workspace, including archiving it and transferring ownership again.",
     warningYouLose:
       "You immediately become a regular member and lose all admin access to this workspace.",
     warningNoUndo:

@@ -51,7 +51,6 @@ export const wsAdmin = {
     exportForbidden: 'You do not have permission to export this workspace.',
     exportFailed: 'The report could not be generated. Please try again.',
     exportDone: 'Report downloaded.',
-    viewPricing: 'View pricing',
   },
 
   // ── /ws/[slug]/settings ────────────────────────────────────────────────────

@@ -25,8 +25,6 @@ export const wsAdmin = {
     /** The ≤860px drawer toggle. */
     openNav: 'Open navigation',
     closeNav: 'Close navigation',
-    /** Rendered as a chip beside the role badge, e.g. "growth plan". */
-    planChip: (plan: string) => `${plan} plan`,
     menuSettings: 'Settings',
     menuWorkspaces: 'All workspaces',
     menuProfile: 'My profile',

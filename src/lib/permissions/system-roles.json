@@ -2,7 +2,7 @@
   {
     "key": "owner",
     "name": "Owner",
-    "description": "Full control, including ownership, billing and deleting the workspace.",
+    "description": "Full control, including transferring ownership, archiving and deleting the workspace.",
     "scope": "all",
     "permissions": {
       "dashboard": ["read"],
@@ -28,7 +28,7 @@
   {
     "key": "admin",
     "name": "Admin",
-    "description": "Runs the workspace day to day, including creating roles and assigning them. Cannot transfer ownership, archive the workspace, or change billing.",
+    "description": "Runs the workspace day to day, including creating roles and assigning them. Cannot transfer ownership or archive the workspace.",
     "scope": "all",
     "permissions": {
       "dashboard": ["read"],

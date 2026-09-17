@@ -890,7 +890,6 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
    is nothing to gain by shrinking them: the workspace pill beside them already
    carries the ellipsis and is what should absorb a squeeze. */
 .topbar-actions .chip { flex-shrink: 0; }
-.topbar-plan-chip { text-transform: capitalize; }
 
 /* ── check-in ──────────────────────────────────────────────────────────────── */
 .checkin-btn {
@@ -994,13 +993,12 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
   .sidebar-foot { display: none; }
   .topbar-account { display: block; }
 
-  /* The topbar carries five controls, and a 360px phone fits about three of
-     them beside the workspace name. Both chips go, and neither is lost: the
-     plan is a billing fact one tap away in Settings › Billing, and the role -
-     which is what tells an admin why their screen differs from a colleague's -
-     moves into the account menu's header, because `.sidebar-foot` is hidden at
-     this width too and that menu is the only place left that can carry it. */
-  .topbar-plan-chip, .topbar-role-chip { display: none; }
+  /* A 360px phone fits about three topbar controls beside the workspace name,
+     so the role chip goes - and is not lost: what tells an admin why their
+     screen differs from a colleague's moves into the account menu's header,
+     because `.sidebar-foot` is hidden at this width too and that menu is the
+     only place left that can carry it. */
+  .topbar-role-chip { display: none; }
 
   /* 28px of gutter either side is a desktop measure. On a phone it is 56px of
      the 360 the topbar has to lay out in. */

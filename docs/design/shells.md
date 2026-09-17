@@ -104,7 +104,7 @@ Top/left/right are handled once on `html`, so nothing in the app has to think ab
 
 `.ws-content` caps at 1180px and centres. Wide content that genuinely cannot wrap — `.datatable` — goes inside a `.dash-table-scroll` wrapper that scrolls horizontally on its own (`--table-min`, default 640px). **The page body must never scroll horizontally**; `html` and `body` both set `overflow-x: hidden` as a backstop.
 
-The topbar carries the workspace switcher pill (`.ws-pill`, linking to `/ws`), the role and plan chips, the notification bell, and — below 860px only — the account menu.
+The topbar carries the workspace switcher pill (`.ws-pill`, linking to `/ws`), the role chip, the notification bell, and — below 860px only — the account menu.
 
 #### `.stat-row` — the headline tiles
 
@@ -171,7 +171,7 @@ Closing holds `visible` for the length of the slide so it is not cut off at fram
 
 The **hamburger** (`.nav-drawer-toggle`) appears; the rail toggle hides. `.sidebar-foot` — which holds the account menu in the column — is hidden and `.topbar-account` takes over. One account menu, two positions, no duplicated component; `WsAccountMenu` takes a `variant` prop for this.
 
-The topbar also sheds the **plan** chip. Five controls do not fit beside a workspace name at 360px, and the plan is the one that changes least and is least actionable — it stays in Settings › Billing. The **role** chip stays: it is what tells an admin why their screen differs from a colleague's. `.topbar-actions .chip` is `flex-shrink: 0`, because `.chip` is `white-space: nowrap` — shrinking one does not reflow it, it clips the word.
+There is no **plan** chip: every plan is unlimited, so the plan key told nobody anything. At ≤860px the **role** chip moves into the account menu's header — it is what tells an admin why their screen differs from a colleague's. `.topbar-actions .chip` is `flex-shrink: 0`, because `.chip` is `white-space: nowrap` — shrinking one does not reflow it, it clips the word.
 
 #### The 64px rail
 

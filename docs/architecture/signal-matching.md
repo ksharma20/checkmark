@@ -140,7 +140,7 @@ sequenceDiagram
 
   Caller->>QWE: (workspaceId, plan, { startDate, endDate, userId?, eventType?, overrideGpsRadius? })
 
-  QWE->>QWE: historyStartDate(plan) - clamp effectiveStart\n(free 3mo · starter 12mo · growth 84mo)
+  QWE->>QWE: historyStartDate(plan) - clamp effectiveStart\n(null for every plan today - no clamp)
   QWE->>DB: getActiveMemberIds(workspaceId)
 
   alt options.userId given
@@ -205,7 +205,7 @@ if (signals.length === 0) {
 
 This mode is for:
 - New workspaces that haven't set up signal configs yet
-- Small teams on the free plan who trust their people without verification
+- Small teams who trust their people without verification
 
 ---
 
@@ -292,7 +292,7 @@ auto-detected.
 
 - **GPS + IP:** O(signals × events) Haversine - pure float maths, fast.
 - Removing WiFi removed the only bcrypt-per-event cost from the query path.
-- `plan.maxLocations` (free/starter = 1, growth = 5) is **advertised but not
-  enforced**: it appears only in `plans.ts` and the Billing tab. Nothing in
+- `plan.maxLocations` is `null` (unlimited) for every plan and was **never
+  enforced**: it appears only in `plans.ts`. Nothing in
   `POST /api/ws/[slug]/signals` counts existing rows before inserting, so the
   signal-count bound on query cost is a convention, not a guarantee.

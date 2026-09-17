@@ -170,7 +170,7 @@ src/
 │           ├── members/[memberId]/
 │           ├── insights/ monthly/ reports/
 │           ├── roles/            # Permission grid editor
-│           └── settings/         # Org · Leave · Balances · Signals · Domains · Billing
+│           └── settings/         # Org · Leave · Balances · Signals · Domains · Ownership
 ├── app/api/                      # ~92 route handlers - see API Reference
 ├── components/
 │   ├── ui/                       # The design system (barrel: index.ts)
@@ -373,7 +373,7 @@ resource declares which actions are meaningful for it - anything undeclared does
 | `settings`              | Workspace settings   | read, write          |
 | `members.role`          | Assign roles         | write                |
 | `roles`                 | Roles                | read, write, delete  |
-| `ownership`             | Ownership & billing  | write, delete        |
+| `ownership`             | Ownership            | write, delete        |
 
 `members.role` is split out from `members` on purpose: inviting someone and changing
 someone's role are different risk levels.
@@ -417,7 +417,7 @@ read by both the app (`system-roles.ts`) and `scripts/migrate.js`.
 | Key      | Scope  | Grid                                                                         |
 | -------- | ------ | ---------------------------------------------------------------------------- |
 | `owner`  | `all`  | Everything, including `ownership: [write, delete]`                            |
-| `admin`  | `all`  | Everything except `ownership` - cannot transfer, archive or change billing     |
+| `admin`  | `all`  | Everything except `ownership` - cannot transfer ownership or archive           |
 | `member` | `self` | Empty grid - no org surface at all                                            |
 
 System roles are immutable: `guardSystemRole()` rejects any edit or delete. If an owner could
@@ -703,15 +703,14 @@ People page; those are gone. Read-only listings elsewhere (the Applied-leaves ta
 (anything else is a 404). Rejection requires a `rejection_reason`. Document verification is a
 `PATCH` on the document itself.
 
-### Billing
+### Ownership
 
-`/ws/:slug/settings` → **Billing** tab, visible only to roles holding `ownership:write`
-(the resource has no `read` action, so `write` is what gates the tab).
+`/ws/:slug/settings` → **Ownership** tab, visible only to roles holding `ownership:write`
+(the resource has no `read` action, so `write` is what gates the tab). It holds archiving and
+restoring the workspace, because they are gated on the same resource.
 
-**There is no payment integration in this codebase.** The tab reads `workspaces.plan` and
-renders the plan's limits from `lib/plans.ts`. "Manage billing" is a deliberate no-op that
-opens a modal saying so. Archiving and restoring the workspace live in this tab because they
-are gated on the same resource.
+**There is no payment integration in this codebase.** CheckMark is free and open source, and
+nothing in the app prices a plan or asks anyone to upgrade.
 
 ### Scheduled reminders
 
@@ -778,15 +777,15 @@ push permission entirely - which would also cost them the approval notifications
 
 ## Plans
 
-| Plan      | Max users | History   | Locations | Export |
-| --------- | --------- | --------- | --------- | ------ |
-| `free`    | 10        | 3 months  | 1         | No     |
-| `starter` | Unlimited | 12 months | 1         | Yes    |
-| `growth`  | Unlimited | 7 years   | 5         | Yes    |
+Every plan is **unlimited**: `getPlanLimits()` in `src/lib/plans.ts` returns one `UNLIMITED`
+object (no member cap, no history window, no location cap, export on) for every
+`workspaces.plan` value.
 
-Defined in `src/lib/plans.ts`. The user cap and history window are enforced inside
-`queryWorkspaceEvents()` **before** signal matching; the export flag is checked in
-`GET /api/ws/:slug/export`.
+The enforcement points are kept as no-ops - the user cap and history window inside
+`queryWorkspaceEvents()` **before** signal matching, and the export flag and history window
+in `GET /api/ws/:slug/export` (`402 PLAN_GATE` / `PLAN_HISTORY_GATE`) - so an operator of a
+hosted instance can reintroduce caps by giving a plan its own limits object, with no
+migration.
 
 ---
 
@@ -868,7 +867,7 @@ restoring an archived workspace is blocked while another is active.
 | Balances | `leaves:read`           | Opening balances + CSV/XLSX import                              |
 | Signals  | `signals:read`          | GPS locations (radius, timezone auto-detected) and IP configs   |
 | Domains  | `domains:read`          | Add a domain, view its TXT record, run DNS verification         |
-| Billing  | `ownership:write`       | Read-only plan panel; archive / restore                         |
+| Ownership | `ownership:write`      | Archive / restore                                               |
 
 ### Domain verification
 
@@ -1192,10 +1191,10 @@ Static Server Components sharing `MarketingNav` and `MarketingFooter`.
 
 | Page        | Route          | Contents                                                                    |
 | ----------- | -------------- | --------------------------------------------------------------------------- |
-| Landing     | `/`            | Hero, industries, for-orgs / for-individuals, how it works, pricing preview  |
+| Landing     | `/`            | Hero, how it works, features, industries, comparison, for-who, FAQ          |
 | For Teams   | `/for-teams`   | Team types, multi-signal verification, setup walkthrough, CTA                |
 | For You     | `/for-you`     | Feature cards, "works with any employer", plain-language privacy             |
-| Pricing     | `/pricing`     | Three plan cards, comparison table, FAQ                                     |
+| Pricing     | `/pricing`     | Free and open source: self-host or hosted, FAQ, contact                     |
 | Open Source | `/open-source` | What's open, what's hosted, self-host guide                                 |
 | Privacy     | `/privacy`     | Data table, visibility, retention, consent model, rights, security          |
 | Terms       | `/terms`       | Acceptable use, admin responsibilities, signal-accuracy disclaimer, liability |
