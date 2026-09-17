@@ -36,14 +36,14 @@ const teamTypes = [
     icon: "🏢",
     title: "Hybrid office teams",
     subtitle: "Office attendance, simplified.",
-    body: `Employees tap once when they arrive. checkmark verifies presence using GPS and IP geofencing.
+    body: `Employees tap once when they arrive. CheckMark verifies presence using GPS and IP geofencing.
     The admin dashboard shows who's in right now, who visited today, and who worked remote.
     No clocking machines. No app installs. Works in any browser.`,
     points: [
       "Works in co-working spaces and private offices",
       "Multi-signal verification (GPS + IP)",
-      "Monthly attendance grid with CSV export",
-      "Allowance calculation (coming soon)",
+      "Monthly attendance grid with Excel export",
+      "Leave, holidays and approvals in the same workspace",
     ],
   },
   {
@@ -51,11 +51,11 @@ const teamTypes = [
     title: "Field force teams",
     subtitle: "Client visit verification, not WhatsApp.",
     body: `Insurance agents. Pharma medical representatives. FMCG distributors. If your team visits
-    clients in the field, checkmark gives you a structured, GPS-verified log of every visit —
+    clients in the field, CheckMark gives you a structured, GPS-stamped log of each visit -
     replacing informal WhatsApp check-ins with real data your organisation can act on.`,
     points: [
-      "GPS-verified client visits",
-      "See where every agent went, every day",
+      "GPS position and place name on each check-in",
+      "See the day's check-ins across your team",
       "Time-stamped visit log with location labels",
       "No dedicated device required",
     ],
@@ -66,12 +66,12 @@ const setupSteps = [
   {
     n: "01",
     title: "Create your workspace",
-    body: "Sign up and create a workspace with your organisation name and URL handle. Takes 2 minutes.",
+    body: "Sign up and create a workspace with your organisation name and URL handle.",
   },
   {
     n: "02",
     title: "Register your office location",
-    body: "Add GPS coordinates (we detect them automatically) or set a geofence radius. Mix and match signals.",
+    body: "Add your office by GPS with a 100-500 m radius, by the IP of the network you are on, or both. Configure both and a check-in has to match both.",
   },
   {
     n: "03",
@@ -81,19 +81,19 @@ const setupSteps = [
   {
     n: "04",
     title: "Team starts checking in",
-    body: "Members visit your checkmark link on any device. One tap to check in, one tap to check out.",
+    body: "Members open CheckMark on any device. One tap to check in, one tap to check out.",
   },
   {
     n: "05",
     title: "View the dashboard",
-    body: "See who's in today in real time. View monthly history. Filter by name, signal type, or attendance status. Export to CSV.",
+    body: "See who's in today. Review the monthly attendance grid and export it to Excel.",
   },
 ];
 
 const signals = [
-  { icon: '📍', name: 'GPS geofence', body: 'A GPS radius around your office. Members within the fence when they check in are verified. Configurable radius from 50m to 2km.' },
-  { icon: '🌐', name: 'IP geofencing', body: 'If the member\'s IP address resolves to a location near your office, it counts as a supporting signal.' },
-  { icon: '✍️', name: 'Manual override', body: 'Admin can mark any member present manually. Useful for guests, hardware failures, or mixed-signal environments.' },
+  { icon: '📍', name: 'GPS geofence', body: 'A radius of 100 to 500 metres around your office. A check-in from inside the fence matches.' },
+  { icon: '🌐', name: 'IP location', body: 'Register the network you are on. A check-in whose IP address resolves near that location matches.' },
+  { icon: '✍️', name: 'Admin corrections', body: 'Approve a member\'s correction request, or declare an office day. The correction is recorded beside the original check-in, never over it.' },
 ]
 
 export default function ForTeamsPage() {
@@ -114,8 +114,7 @@ export default function ForTeamsPage() {
           </h1>
           <p style={{ ...S.sub, maxWidth: "560px", marginBottom: "32px" }}>
             Works in co-working spaces, private offices, and in the field. No
-            hardware. No app installs. No IT department. Set up in under 10
-            minutes.
+            hardware. No app installs. No IT department. Free and open source.
           </p>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <Link href="/login" style={S.btnPrimary}>
@@ -217,11 +216,12 @@ export default function ForTeamsPage() {
           <div style={{ marginBottom: "48px" }}>
             <p style={S.label}>Signal verification</p>
             <h2 style={{ ...S.h2, marginTop: "12px" }}>
-              Triple-signal presence verification.
+              Two signals. Every configured one must match.
             </h2>
             <p style={{ ...S.sub, maxWidth: "520px", marginTop: "16px" }}>
-              If one signal is unavailable, the others pick it up. No single
-              point of failure.
+              Configure GPS, IP or both. With both, a check-in is verified only
+              if both match - matching one is marked partial. Configure none
+              and every check-in counts.
             </p>
           </div>
           <div
@@ -266,7 +266,7 @@ export default function ForTeamsPage() {
           <div style={{ marginBottom: "48px" }}>
             <p style={S.label}>Setup walkthrough</p>
             <h2 style={{ ...S.h2, marginTop: "12px" }}>
-              Under 10 minutes to get your team on checkmark.
+              Five steps to get your team on CheckMark.
             </h2>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
@@ -322,7 +322,7 @@ export default function ForTeamsPage() {
       <section style={{ background: "var(--navy)", padding: "80px 0" }}>
         <div style={{ ...S.section, textAlign: "center" }}>
           <h2 style={{ ...S.h2, color: "#fff", marginBottom: "16px" }}>
-            Ready to get your team on checkmark?
+            Ready to get your team on CheckMark?
           </h2>
           <p
             style={{
@@ -332,7 +332,8 @@ export default function ForTeamsPage() {
               margin: "0 auto 32px",
             }}
           >
-            Free for up to 10 members. No credit card. Takes 10 minutes.
+            Free for everyone. No credit card. Open source if you would rather
+            run it yourself.
           </p>
           <Link href="/login" style={{ ...S.btnPrimary, margin: "0 auto" }}>
             Create your workspace →

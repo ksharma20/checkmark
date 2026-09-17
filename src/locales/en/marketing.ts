@@ -9,7 +9,22 @@
  *
  * Long-form legal prose (/privacy, /terms) stays inline in its page: it is a
  * single document read top to bottom, not a set of reusable labels.
+ *
+ * Every claim here must be one the code can back. Two signal types exist - GPS
+ * and IP - and when both are configured both must match. Presence events are
+ * never edited or deleted. Nobody pays. Anything else is a promise, and a
+ * marketing page is not the place to make one.
  */
+
+/*
+ * Mirrors `en.brand.contactEmail` / `en.brand.owner`. They are repeated rather
+ * than imported because `src/locales/en.ts` imports THIS module, so importing
+ * it back would read `en` before it is initialised.
+ */
+const contactEmail = 'kabir.innovate@gmail.com'
+const owner = 'Kabir Innovations'
+const hostedDomain = 'checkmark.kabirinnovations.com'
+const repoUrl = 'https://github.com/ksharma20/checkmark'
 
 export const marketing = {
   nav: {
@@ -41,6 +56,7 @@ export const marketing = {
   },
 
   footer: {
+    brand: 'CheckMark',
     links: [
       { label: 'For Teams', href: '/for-teams' },
       { label: 'For You', href: '/for-you' },
@@ -50,17 +66,17 @@ export const marketing = {
       { label: 'Terms', href: '/terms' },
     ],
     tagline: (year: number) =>
-      `© ${year} checkmark. Presence intelligence for modern teams.`,
+      `© ${year} CheckMark · a ${owner} project · Apache 2.0`,
     label: 'Footer',
   },
 
   hero: {
-    badge: 'Presence Intelligence Platform',
+    badge: 'Free and open source',
     headingBefore: 'Know who’s ',
     headingEmphasis: 'actually',
     headingAfter: ' at work',
     subtitle:
-      'CheckMark replaces manual check-ins, WhatsApp selfies, and Zoho chaos with one tap, verified by GPS and IP.',
+      'CheckMark replaces manual check-ins, WhatsApp selfies and spreadsheet chaos with one tap, verified by GPS and IP. Know where your team is. Own where you’ve been.',
     primaryCta: 'Get Started - It’s Free',
     secondaryCta: 'See how it works',
     sceneAlt: 'CheckMark',
@@ -73,9 +89,9 @@ export const marketing = {
       'No app install required',
       'GPS + IP verification',
       'Works in coworking spaces',
-      '7-year immutable history',
-      'Self-serve under 10 minutes',
-      'Under Rs 100 / user / month',
+      'Check-ins are never edited or deleted',
+      'Open source · Apache 2.0',
+      'Free for everyone',
     ],
   },
 
@@ -85,34 +101,34 @@ export const marketing = {
     headingEmphasis: 'signals',
     headingAfter: '. Zero chaos.',
     description:
-      'CheckMark captures verified presence in seconds. Employees tap once, the system does the rest.',
+      'CheckMark records presence in a second. You tap once; the checking happens on the server.',
     steps: [
       {
         num: '01',
-        title: 'Employee taps "I’m at office"',
+        title: 'Tap "I’m at office"',
         description:
-          'A single tap on the PWA home-screen shortcut. No app store, no login friction. Works on any smartphone.',
+          'One tap from the home-screen shortcut. No app store. Works in the browser on any smartphone.',
         icon: 'location',
       },
       {
         num: '02',
-        title: 'Two signals captured silently',
+        title: 'Two signals, at that moment only',
         description:
-          'GPS coordinates and IP address are captured in the background and cross-validated for accuracy.',
-        icon: 'wifi',
+          'Your GPS position and IP address are captured when you tap - never in the background.',
+        icon: 'signal',
       },
       {
         num: '03',
-        title: 'Presence verified instantly',
+        title: 'Checked against your office',
         description:
-          'Both signals must match the registered office profile. No match, no credit. Tamper-proof by design.',
+          'Every signal your workspace has configured must match. Match only some and the check-in is marked partial, not verified.',
         icon: 'check',
       },
       {
         num: '04',
-        title: 'HR gets clean data automatically',
+        title: 'Attendance adds itself up',
         description:
-          'Month-end reports, allowance calculations, and attendance summaries are generated automatically.',
+          'Office, remote and leave days are counted per member in a monthly grid you can export to Excel.',
         icon: 'chart',
       },
     ],
@@ -123,41 +139,41 @@ export const marketing = {
     headingBefore: 'Built for the ',
     headingEmphasis: 'hybrid era',
     headingAfter: '',
-    description: 'One platform, two modes. Same architecture, different use cases.',
+    description: 'One platform, two ways to use it.',
     items: [
       {
         title: 'Hybrid Office Mode',
         description:
-          'Register your GPS and IP. CheckMark auto-filters presence events to verified office check-ins.',
+          'Register your office by GPS, by IP, or both. Check-ins that match every configured signal count as office days.',
         icon: 'grid',
       },
       {
         title: 'Field Force Mode',
         description:
-          'No location pre-registration needed. Every check-in is logged with full location for agents.',
+          'No office to register? Skip the signals. Check-ins are still recorded with a GPS position and a place name wherever location is allowed.',
         icon: 'map',
       },
       {
-        title: 'Immutable History',
+        title: 'History You Own',
         description:
-          'Companies cannot delete or alter user check-ins. Seven-year retention keeps a portable proof-of-work record.',
+          'Check-ins are never edited or deleted - not by you, not by an admin. A correction is recorded beside the original, never over it.',
         icon: 'lock',
       },
       {
         title: 'Zero Hardware',
-        description: 'No biometric devices. No IT setup. If you have a phone, setup is quick.',
+        description: 'No clocking machines. No IT setup. A phone and a browser are enough.',
         icon: 'phone',
       },
       {
         title: 'Coworking-Ready',
         description:
-          'Works where biometric systems fail. Multi-location support handles distributed teams.',
+          'Register more than one location, coworking spaces included. Members check in the same way wherever they are.',
         icon: 'building',
       },
       {
-        title: 'Payroll and HRMS Integration',
+        title: 'Leave, Holidays and People',
         description:
-          'Clean presence data feeds payroll, incentives, leave management, and compliance workflows.',
+          'Leave balances and approvals, a holiday calendar, a people directory and documents sit in the same workspace as attendance.',
         icon: 'integration',
       },
     ],
@@ -169,7 +185,7 @@ export const marketing = {
     headingEmphasis: 'India works',
     headingAfter: '',
     description:
-      'From pharma field reps to IT hybrid teams, CheckMark fits the way your industry actually operates.',
+      'From pharma field reps to IT hybrid teams, CheckMark fits the way your team actually operates.',
     tablistLabel: 'Industries',
     items: [
       {
@@ -177,11 +193,11 @@ export const marketing = {
         num: '01',
         title: 'IT and SaaS',
         description:
-          'Track hybrid attendance across offices and coworking hubs. CheckMark auto-reconciles allowance data directly into payroll.',
+          'Track hybrid attendance across offices and coworking hubs, with office and remote days counted for every member.',
         metrics: [
-          { value: '~5 hrs', label: 'HR time saved / month' },
-          { value: '4+', label: 'locations supported' },
-          { value: '<10 min', label: 'setup time' },
+          { value: 'GPS + IP', label: 'verification' },
+          { value: 'PWA', label: 'no app store needed' },
+          { value: 'Excel', label: 'monthly export' },
         ],
       },
       {
@@ -189,22 +205,22 @@ export const marketing = {
         num: '02',
         title: 'Pharma and Healthcare',
         description:
-          'Verified location diaries for field reps visiting clinics, hospitals, and stockists.',
+          'A GPS-stamped log of check-ins, with place names, for reps visiting clinics, hospitals and stockists.',
         metrics: [
-          { value: '0', label: 'disputes after go-live' },
-          { value: '100%', label: 'tamper-proof logs' },
+          { value: 'GPS', label: 'position at check-in' },
+          { value: 'Place', label: 'name per visit' },
           { value: 'Any', label: 'clinic / hospital' },
         ],
       },
       {
-        eyebrow: 'Compliance-ready',
+        eyebrow: 'Record-keeping',
         num: '03',
         title: 'BFSI and Insurance',
         description:
-          'Timestamped and immutable attendance logs that are always audit-accessible.',
+          'Timestamped check-ins that are never edited or deleted. Corrections sit beside the original, not over it.',
         metrics: [
-          { value: '7 yrs', label: 'log retention' },
-          { value: 'Instant', label: 'audit export' },
+          { value: 'Immutable', label: 'check-in events' },
+          { value: 'Excel', label: 'attendance export' },
           { value: '0', label: 'hardware required' },
         ],
       },
@@ -213,21 +229,21 @@ export const marketing = {
         num: '04',
         title: 'Retail and FMCG',
         description:
-          'Real-time visibility into field agent activity across hundreds of distributor and retail points.',
+          'See who has checked in today across your distributor and retail points.',
         metrics: [
-          { value: '500+', label: 'locations supported' },
-          { value: 'Real-time', label: 'field visibility' },
-          { value: 'Rs0', label: 'hardware cost' },
+          { value: 'Many', label: 'locations per workspace' },
+          { value: 'Today', label: 'live check-in view' },
+          { value: '0', label: 'hardware required' },
         ],
       },
       {
         eyebrow: 'Zero hardware',
         num: '05',
         title: 'Logistics and Supply Chain',
-        description: 'Verified presence at warehouses, docks, and delivery hubs with one tap.',
+        description: 'Verified presence at warehouses, docks and delivery hubs with one tap.',
         metrics: [
           { value: 'Any', label: 'warehouse / hub' },
-          { value: '2-signal', label: 'verification' },
+          { value: 'GPS + IP', label: 'verification' },
           { value: '1 tap', label: 'per check-in' },
         ],
       },
@@ -236,10 +252,10 @@ export const marketing = {
         num: '06',
         title: 'Education and EdTech',
         description:
-          'Faculty and staff presence verification across campuses and centers using GPS and IP signals.',
+          'Faculty and staff presence verification across campuses and centres using GPS and IP signals.',
         metrics: [
           { value: 'Any', label: 'campus / centre' },
-          { value: 'GPS+IP', label: 'Based' },
+          { value: 'GPS + IP', label: 'verification' },
           { value: 'PWA', label: 'no app store needed' },
         ],
       },
@@ -248,42 +264,34 @@ export const marketing = {
 
   comparison: {
     eyebrow: 'Why CheckMark',
-    headingBefore: 'How we stack up against the ',
-    headingEmphasis: 'rest',
+    headingBefore: 'How CheckMark ',
+    headingEmphasis: 'compares',
     headingAfter: '',
-    description: 'Traditional HRMS tools were not designed for hybrid work or field teams.',
+    description:
+      'Keka and Zoho are full HRMS suites and do far more than attendance. This compares only the part CheckMark is built for.',
     columns: {
       feature: 'Feature',
       checkmark: 'CheckMark',
       keka: 'Keka / Zoho',
       whatsapp: 'WhatsApp / Forms',
     },
-    /** Screen-reader text for the tick / dash / cross cells. */
-    cellLabels: { yes: 'Yes', partial: 'Partial', no: 'No' },
-    footnote: 'Partial = available only in higher tiers or with significant configuration.',
+    /** Screen-reader text for the tick / cross cells. */
+    cellLabels: { yes: 'Yes', no: 'No' },
+    footnote: 'Based on publicly listed features. Check each vendor for the current picture.',
     groups: [
       {
-        category: 'Setup and Access',
+        category: 'Openness',
         items: [
-          { feature: 'No app install (PWA)', checkmark: 'yes', keka: 'no', whatsapp: 'yes' },
-          { feature: 'Self-serve setup under 10 min', checkmark: 'yes', keka: 'no', whatsapp: 'yes' },
-          { feature: 'Zero hardware required', checkmark: 'yes', keka: 'no', whatsapp: 'yes' },
+          { feature: 'Open source / self-hostable', checkmark: 'yes', keka: 'no', whatsapp: 'no' },
+          { feature: 'Verification logic you can read', checkmark: 'yes', keka: 'no', whatsapp: 'no' },
         ],
       },
       {
-        category: 'Verification and Accuracy',
+        category: 'Check-in',
         items: [
-          { feature: 'GPS + IP cross-validation', checkmark: 'yes', keka: 'partial', whatsapp: 'no' },
-          { feature: 'Tamper-proof check-ins', checkmark: 'yes', keka: 'partial', whatsapp: 'no' },
-          { feature: 'Works in coworking spaces', checkmark: 'yes', keka: 'no', whatsapp: 'yes' },
-        ],
-      },
-      {
-        category: 'Data and Compliance',
-        items: [
-          { feature: 'Immutable 7-year history', checkmark: 'yes', keka: 'partial', whatsapp: 'no' },
-          { feature: 'User-owned portable data', checkmark: 'yes', keka: 'no', whatsapp: 'no' },
-          { feature: 'Automated month-end reports', checkmark: 'yes', keka: 'partial', whatsapp: 'no' },
+          { feature: 'Location and network checked at check-in', checkmark: 'yes', keka: 'yes', whatsapp: 'no' },
+          { feature: 'Attendance summarised automatically', checkmark: 'yes', keka: 'yes', whatsapp: 'no' },
+          { feature: 'No dedicated hardware', checkmark: 'yes', keka: 'yes', whatsapp: 'yes' },
         ],
       },
     ],
@@ -295,18 +303,18 @@ export const marketing = {
     headingEmphasis: 'Two perspectives.',
     headingAfter: '',
     description:
-      'Whether you are an employee who wants proof of effort or an org that needs verified data, CheckMark works for both sides.',
+      'A personal tool for the people checking in, and verified data for the organisation. Users own their data; organisations query it, they do not own it.',
     perspectives: [
       {
         label: 'For Individuals',
-        title: 'Your work, verified. Always.',
+        title: 'Your work, on your record.',
         description:
-          'Build a permanent, portable record of your professional presence, owned by you.',
+          'Your check-ins belong to your account, not to any one employer.',
         points: [
-          { title: 'Personal timeline', desc: 'See every day you showed up, for how long, and where.' },
-          { title: 'Dispute protection', desc: 'Verified proof if your allowance or incentive is disputed.' },
+          { title: 'Personal timeline', desc: 'Each check-in, how long you stayed, and where.' },
+          { title: 'Nothing hidden', desc: 'You see whether a check-in counted as verified - the same answer your admin sees.' },
           { title: 'Work streaks', desc: 'Track consistency and build sustainable work habits.' },
-          { title: 'Portable history', desc: 'Your presence log follows you across employers.' },
+          { title: 'One account, many workspaces', desc: 'A single check-in counts for every workspace you belong to.' },
           { title: 'Always free', desc: 'Individuals never pay.' },
         ],
       },
@@ -314,12 +322,12 @@ export const marketing = {
         label: 'For Organisations',
         title: 'Clean data. Zero drama.',
         description:
-          'Stop wasting HR time on manual reconciliation and plug verified data into payroll and compliance.',
+          'Stop reconciling attendance by hand. Get verified data you can export.',
         points: [
-          { title: 'Automated reports', desc: 'Month-end allowance calculations without manual work.' },
-          { title: 'Multi-location support', desc: 'Manage multiple offices and coworking hubs from one dashboard.' },
-          { title: 'Field force visibility', desc: 'Real-time location diaries for on-ground agents.' },
-          { title: 'Audit-ready logs', desc: 'Every check-in is timestamped and immutable.' },
+          { title: 'Automatic summaries', desc: 'Office, remote and leave days per member, in a monthly grid.' },
+          { title: 'Multi-location support', desc: 'Register several offices and coworking hubs in one workspace.' },
+          { title: 'Field force visibility', desc: 'Today’s check-ins, with a place name where one resolves.' },
+          { title: 'Audit-ready logs', desc: 'Every check-in is timestamped and never edited.' },
         ],
       },
     ],
@@ -334,7 +342,7 @@ export const marketing = {
     items: [
       {
         q: 'How does CheckMark verify I am actually at the office?',
-        a: 'When you tap check-in, CheckMark captures IP address and GPS coordinates and validates them against office profile data.',
+        a: 'When you tap check-in, CheckMark captures your GPS position and IP address and compares them with the locations your workspace has configured. If both GPS and IP are configured, both must match.',
       },
       {
         q: 'Do I need to install an app?',
@@ -346,80 +354,116 @@ export const marketing = {
       },
       {
         q: 'Who owns the check-in data?',
-        a: 'Users own their data. Organizations can query with consent but cannot alter immutable records.',
+        a: 'You do. A workspace you belong to can see your check-ins, but nobody - including its admins - can edit or delete them.',
       },
       {
         q: 'How long does setup take?',
-        a: 'Typically under 10 minutes for an organization with no hardware setup.',
+        a: 'Create a workspace, add your office location and invite your team. There is no hardware to install.',
       },
       {
         q: 'Does CheckMark track me continuously?',
-        a: 'No. Data is captured only when you tap check-in.',
+        a: 'No. Data is captured only when you tap check-in or check-out.',
       },
       {
-        q: 'Is CheckMark free for employees?',
-        a: 'Yes. Individuals do not pay. Organizations pay per enrolled user.',
+        q: 'Is CheckMark free?',
+        a: 'Yes, for everyone. CheckMark is open source under the Apache 2.0 licence: self-host it, or use the hosted instance at no cost.',
       },
     ],
-  },
-
-  comingSoon: {
-    eyebrow: 'What’s Next',
-    headingBefore: 'We’re Not Done ',
-    headingEmphasis: 'Yet.',
-    headingAfter: '',
-    description:
-      'Great platforms don’t stop evolving. AI verification is coming to CheckMark - empowering teams with the next frontier of presence intelligence, built on the same trusted foundation you rely on today.',
-    badge: 'Coming Soon',
-    title: 'AI Face Verification',
-    body: 'On check-in, CheckMark will capture a facial match - like unlocking your phone, but for your attendance record. Your face becomes the fifth signal: the one that proves it was really you, not a proxy or a script.',
-    signalStackLabel: 'Signal Stack',
-    signals: [
-      { label: 'GPS', active: true },
-      { label: 'IP', active: true },
-      { label: 'Device', active: true },
-      { label: 'Face ✦', active: false },
-    ],
-    bullets: [
-      {
-        icon: 'pin',
-        title: 'Next signal - biometric',
-        desc: 'Joins GPS, IP, and device. All must match for verified office presence.',
-      },
-      {
-        icon: 'eye',
-        title: 'Liveness detection',
-        desc: 'A photo won’t pass. The system detects a live face - same tech as your phone’s face unlock.',
-      },
-      {
-        icon: 'lock',
-        title: 'Privacy-first',
-        desc: 'No face images stored. A one-way mathematical hash is saved - the face cannot be reconstructed.',
-      },
-      {
-        icon: 'people',
-        title: 'Proxy-proof attendance',
-        desc: 'A colleague can’t check in for you. Your face is your signature - tied to your identity, not your device.',
-      },
-    ],
-    footnoteStrong: 'Built on the same foundation.',
-    footnote:
-      ' AI verification will be an optional additional signal - existing GPS + IP + device setups are unaffected. Orgs opt in when ready.',
   },
 
   ctaBand: {
     headingBefore: 'Stop chasing',
     headingEmphasis: 'presence data.',
     description:
-      'From one frustrated engineer’s allowance hack to a platform that makes presence tracking invisible.',
+      'Know where your team is. Own where you’ve been. Free and open source, for everyone.',
     primaryCta: 'Get Started - It’s Free',
     secondaryCta: 'Talk to us',
-    copyright: 'Copyright 2026 CheckMark. Presence Intelligence Platform.',
+    secondaryHref: `mailto:${contactEmail}`,
+    copyright: (year: number) =>
+      `© ${year} CheckMark · a ${owner} project · Apache 2.0`,
     links: [
       { label: 'Privacy', href: '/privacy' },
       { label: 'Terms', href: '/terms' },
-      { label: 'Contact', href: 'mailto:kabir.innovate@gmail.com' },
+      { label: 'Contact', href: `mailto:${contactEmail}` },
     ],
+  },
+
+  /** /pricing - there is no paid tier; the page explains what "free" covers. */
+  pricing: {
+    metaTitle: 'Pricing',
+    metaDescription:
+      'CheckMark is free and open source under the Apache 2.0 licence. Self-host it, or use the hosted instance - every feature is included either way.',
+    ogTitle: 'CheckMark Pricing - Free and open source',
+    ogDescription:
+      'Nobody pays. Self-host CheckMark under Apache 2.0, or use the hosted instance at no cost.',
+
+    eyebrow: 'Pricing',
+    heading: 'Free and open source. Nobody pays.',
+    subtitle:
+      `CheckMark is a simple open-source project by ${owner}. There are no paid plans and no premium tier - pick how you want to run it.`,
+
+    options: [
+      {
+        key: 'self-host',
+        name: 'Self-host',
+        price: 'Free',
+        per: 'Apache 2.0',
+        tagline: 'Run it on your own infrastructure. Your server, your database, your data.',
+        cta: 'View on GitHub',
+        href: repoUrl,
+        external: true,
+        highlight: false,
+        points: [
+          'The complete application - every screen and API route',
+          'SQLite out of the box, or a Turso / libSQL database',
+          'Use it, modify it and redistribute it under Apache 2.0',
+          'You operate the instance and control every setting',
+        ],
+      },
+      {
+        key: 'hosted',
+        name: 'Hosted instance',
+        price: 'Free',
+        per: 'no card required',
+        tagline: `Use the instance ${owner} runs, at ${hostedDomain}.`,
+        cta: 'Get started',
+        href: '/login',
+        external: false,
+        highlight: true,
+        points: [
+          'The same code as the public repository',
+          'Nothing to install - a PWA on any phone or browser',
+          'Run on a best-effort basis, with no uptime guarantee',
+          'Move to your own instance whenever you like',
+        ],
+      },
+    ],
+
+    includedEyebrow: 'What’s included',
+    includedHeading: 'Everything. There is no premium tier.',
+    included: [
+      'Multi-signal check-in verification (GPS + IP)',
+      'Personal timeline for every member',
+      'Workspaces with roles and permissions',
+      'Attendance, monthly grid and reports',
+      'Leave types, balances and approvals',
+      'Holiday calendar and office days',
+      'People directory and reporting hierarchy',
+      'Employee records with encrypted sensitive fields',
+      'Employee documents and asset register',
+      'Parental leave cases',
+      'Announcements with attachments',
+      'Push reminders and notifications',
+    ],
+
+    contactHeading: 'Questions?',
+    contactBody:
+      'CheckMark is maintained on a best-effort basis, so a reply may take a few days. For bugs and feature requests, a GitHub issue is the fastest route.',
+    contactCta: 'Email us',
+    contactHref: `mailto:${contactEmail}?subject=${encodeURIComponent('CheckMark question')}`,
+    issuesCta: 'Open an issue',
+    issuesHref: `${repoUrl}/issues`,
+    contactEmail,
   },
 } as const
 

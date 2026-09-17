@@ -14,7 +14,7 @@ const siteUrl = new URL(
 );
 const siteName = `${en.brand.name} - ${en.brand.tagline}`;
 const siteDescription =
-  "CheckMark is a presence intelligence platform for verified office attendance, hybrid teams, and field force visit logs.";
+  "CheckMark is a free, open-source presence platform for verified office attendance, hybrid teams, and field force visit logs.";
 
 export const metadata: Metadata = {
   metadataBase: siteUrl,
@@ -87,6 +87,7 @@ const organizationJsonLd = {
   operatingSystem: "Web",
   url: siteUrl.toString(),
   description: siteDescription,
+  license: "https://www.apache.org/licenses/LICENSE-2.0",
   offers: {
     "@type": "Offer",
     price: "0",
@@ -94,7 +95,7 @@ const organizationJsonLd = {
   },
   publisher: {
     "@type": "Organization",
-    name: en.brand.name,
+    name: en.brand.owner,
     url: siteUrl.toString(),
     logo: new URL("/icon-512.png", siteUrl).toString(),
   },

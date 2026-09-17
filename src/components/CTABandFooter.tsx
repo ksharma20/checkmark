@@ -29,7 +29,7 @@ export default function CTABandFooter() {
               {copy.primaryCta}
             </Link>
             <a
-              href="mailto:kabir.innovate@gmail.com"
+              href={copy.secondaryHref}
               className="rounded-lg border border-checkmark-border px-7 py-4 text-base font-medium text-checkmark-text no-underline transition-colors hover:border-checkmark-brand hover:text-checkmark-brand"
             >
               {copy.secondaryCta}
@@ -48,7 +48,7 @@ export default function CTABandFooter() {
             className="h-[66px] w-auto"
           />
         </Link>
-        <p className="m-0 text-xs text-checkmark-text-muted">{copy.copyright}</p>
+        <p className="m-0 text-xs text-checkmark-text-muted">{copy.copyright(new Date().getFullYear())}</p>
         <ul className="flex list-none gap-6">
           {copy.links.map((link) => (
             <li key={link.href}>

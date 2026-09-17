@@ -2,18 +2,19 @@ import Link from 'next/link'
 import MarketingNav from '@/components/marketing/MarketingNav'
 import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
+import { en } from '@/locales/en'
 
 export const metadata: Metadata = {
   title: "Open Source - CheckMark",
   description:
-    "CheckMark is open source. Audit the code, self-host, or contribute on GitHub.",
+    "CheckMark is open source under the Apache 2.0 licence. Audit the code, self-host, or contribute on GitHub.",
   alternates: {
     canonical: "/open-source",
   },
   openGraph: {
     title: "Open Source - CheckMark",
     description:
-      "Audit the CheckMark code, self-host, or contribute on GitHub.",
+      "Audit the CheckMark code, self-host it under Apache 2.0, or contribute on GitHub.",
     url: "/open-source",
   },
 };
@@ -27,6 +28,9 @@ const S = {
   sub: { fontSize: 'clamp(15px, 2vw, 18px)', color: 'var(--text-secondary)', lineHeight: 1.65, margin: 0 } as React.CSSProperties,
   card: { background: 'var(--surface-0)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '28px' } as React.CSSProperties,
 }
+
+const REPO_URL = "https://github.com/ksharma20/checkmark";
+const OWNER = en.brand.owner;
 
 const openItems = [
   {
@@ -47,16 +51,15 @@ const openItems = [
   {
     icon: "📖",
     title: "Self-hosting documentation",
-    body: "A full guide to running your own checkmark instance on any Node.js host. SQLite out of the box.",
+    body: "The README walks through running your own CheckMark instance on any Node.js host. SQLite out of the box.",
   },
 ];
 
-const managedItems = [
-  { icon: '🚀', title: 'Managed hosting', body: 'Reliable infrastructure with 99.5% uptime SLA. We handle scaling, backups, and deployments.' },
-  { icon: '🔐', title: 'Automated backups', body: 'Daily encrypted backups with 30-day point-in-time restore. Your data is never at risk.' },
-  { icon: '📦', title: '7-year data retention', body: 'Compliance-grade retention with automated purging. Required by many labour law jurisdictions.' },
-  { icon: '📧', title: 'Email and consent flows', body: 'Transactional email, OTP delivery, and the domain verification pipeline.' },
-  { icon: '💳', title: 'Billing and plan management', body: 'Subscription management, invoice generation, and plan enforcement for organisation workspaces.' },
+const hostedItems = [
+  { icon: '🆓', title: 'Free to use', body: 'No paid plans, no card, no payment integration. Sign in and create a workspace.' },
+  { icon: '🧾', title: 'The same code', body: 'The hosted instance runs the code in the public repository. There is no private edition.' },
+  { icon: '🛠️', title: 'Best effort', body: `Run by ${en.brand.owner} as a convenience, with no uptime guarantee or service level.` },
+  { icon: '📤', title: 'Leave any time', body: 'If you outgrow it or want full control, deploy your own instance from the same repository.' },
 ]
 
 const selfHostSteps = [
@@ -67,13 +70,13 @@ const selfHostSteps = [
   },
   {
     step: "2",
-    cmd: "npm install && cp .env.example .env",
-    desc: "Install dependencies and configure environment.",
+    cmd: "npm install && cp .env.example .env.local",
+    desc: "Install dependencies, then fill in .env.local - generate JWT_SECRET, CRON_SECRET and FIELD_ENCRYPTION_KEY with the commands in the file.",
   },
   {
     step: "3",
-    cmd: "npm run migrate",
-    desc: "Run database migrations to set up SQLite schema.",
+    cmd: "node scripts/migrate.js",
+    desc: "Create the database schema. With no Turso URL set, this is a local SQLite file.",
   },
   {
     step: "4",
@@ -99,7 +102,7 @@ export default function OpenSourcePage() {
               marginBottom: "20px",
             }}
           >
-            checkmark is open source.
+            CheckMark is open source.
           </h1>
           <p
             style={{
@@ -109,14 +112,15 @@ export default function OpenSourcePage() {
               marginBottom: "32px",
             }}
           >
-            The application code - everything you see at checkmark.kabirinnovations.com - is
-            available on GitHub. Anyone can run their own instance, audit the
-            code, or contribute. We believe presence data should be owned by
-            individuals, not locked in proprietary systems.
+            CheckMark is a simple open-source project by {OWNER}.
+            The whole application is on GitHub under the Apache 2.0 licence:
+            run your own instance, audit the code, or contribute. Presence data
+            should be owned by the people it describes, not locked in
+            proprietary systems.
           </p>
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             <a
-              href="https://github.com/ksharma20/checkmark"
+              href={REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -168,8 +172,8 @@ export default function OpenSourcePage() {
               The whole application. No black boxes.
             </h2>
             <p style={{ ...S.sub, maxWidth: "520px", marginTop: "16px" }}>
-              Licensed under MIT. Use it, fork it, run your own instance. No
-              strings attached.
+              Licensed under Apache 2.0. Use it, modify it, run your own
+              instance - just keep the licence and notices with your copy.
             </p>
           </div>
           <div
@@ -212,13 +216,13 @@ export default function OpenSourcePage() {
       <section style={{ background: "var(--surface-1)", padding: "80px 0" }}>
         <div style={S.section}>
           <div style={{ marginBottom: "48px" }}>
-            <p style={S.label}>What we run as a service</p>
+            <p style={S.label}>The hosted instance</p>
             <h2 style={{ ...S.h2, marginTop: "12px" }}>
-              The operational layer organisations pay for.
+              Don&apos;t want to run a server? Use ours.
             </h2>
             <p style={{ ...S.sub, maxWidth: "520px", marginTop: "16px" }}>
-              Running a reliable data platform is different from running an app.
-              This is what we monetise - not the code itself.
+              {OWNER} runs one instance at {en.brand.domain}. It is free, and
+              it is optional.
             </p>
           </div>
           <div
@@ -228,7 +232,7 @@ export default function OpenSourcePage() {
               gap: "16px",
             }}
           >
-            {managedItems.map((i) => (
+            {hostedItems.map((i) => (
               <div
                 key={i.title}
                 style={{
@@ -266,8 +270,8 @@ export default function OpenSourcePage() {
               Run it yourself in 4 steps.
             </h2>
             <p style={{ ...S.sub, maxWidth: "460px", marginTop: "16px" }}>
-              Requires Node.js 20+ and nothing else. SQLite is the default
-              database.
+              Requires Node.js 20+. SQLite is the default database; point it at
+              Turso / libSQL for production.
             </p>
           </div>
           <div
@@ -333,8 +337,8 @@ export default function OpenSourcePage() {
               margin: "0 auto 32px",
             }}
           >
-            Open an issue or submit a pull request on GitHub. We review all
-            contributions.
+            Open an issue or a pull request on GitHub - see CONTRIBUTING.md to
+            get set up. For anything else, email {en.brand.contactEmail}.
           </p>
           <div
             style={{
@@ -345,7 +349,7 @@ export default function OpenSourcePage() {
             }}
           >
             <a
-              href="https://github.com/ksharma20/checkmark/issues"
+              href={`${REPO_URL}/issues`}
               target="_blank"
               rel="noopener noreferrer"
               style={{
@@ -365,7 +369,7 @@ export default function OpenSourcePage() {
               Open an issue
             </a>
             <a
-              href="https://github.com/ksharma20/checkmark"
+              href={REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
               style={{

@@ -2,7 +2,7 @@ import { marketing } from '@/locales/en/marketing';
 
 const copy = marketing.comparison;
 
-type Cell = 'yes' | 'no' | 'partial';
+type Cell = 'yes' | 'no';
 
 export default function ComparisonTable() {
   const rows = copy.groups;
@@ -17,15 +17,6 @@ export default function ComparisonTable() {
       return (
         <div className={`${shell} bg-[color-mix(in_srgb,var(--checkmark-brand)_15%,transparent)] text-checkmark-brand`}>
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-          {label}
-        </div>
-      );
-    }
-
-    if (value === 'partial') {
-      return (
-        <div className={`${shell} bg-[color-mix(in_srgb,var(--amber)_12%,transparent)] text-amber`}>
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12" /></svg>
           {label}
         </div>
       );

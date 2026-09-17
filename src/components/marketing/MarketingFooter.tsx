@@ -10,7 +10,7 @@ export default function MarketingFooter() {
     >
       <div className="mx-auto flex w-full max-w-[1100px] flex-col items-center gap-5">
         <Link href="/" className="no-underline">
-          <span className="font-heading text-base font-bold text-brand">checkmark</span>
+          <span className="font-heading text-base font-bold text-brand">{marketing.footer.brand}</span>
         </Link>
 
         <ul className="flex list-none flex-wrap justify-center gap-x-6 gap-y-2">

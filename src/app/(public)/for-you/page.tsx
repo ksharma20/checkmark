@@ -4,16 +4,16 @@ import MarketingFooter from '@/components/marketing/MarketingFooter'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: "CheckMark for You - Your presence record, forever",
+  title: "CheckMark for You - Your presence record, owned by you",
   description:
-    "CheckMark is free for individuals, forever. Own your work history and consent to which organisations can see your presence data.",
+    "CheckMark is free and open source. Your check-ins belong to your account; workspaces you join can see them but never edit them.",
   alternates: {
     canonical: "/for-you",
   },
   openGraph: {
-    title: "CheckMark for You - Your presence record, forever",
+    title: "CheckMark for You - Your presence record, owned by you",
     description:
-      "Own your work history with CheckMark. Free for individuals, forever.",
+      "Own your work history with CheckMark. Free for everyone, and open source.",
     url: "/for-you",
   },
 };
@@ -37,36 +37,36 @@ const features = [
   },
   {
     icon: "📅",
-    title: "See your complete history",
-    body: "Every check-in, every location, every day. Month-by-month view. Search by date or location.",
+    title: "See your history",
+    body: "Every check-in, when it happened, how long you stayed and where. Filter by date.",
   },
   {
-    icon: "⏱️",
-    title: "Time at each location",
-    body: "See exactly how many hours you spent at each place. Your personal time log, always available.",
+    icon: "👀",
+    title: "The same answer your admin sees",
+    body: "Each check-in shows whether it counted as verified or partial for your workspace. Nothing is judged behind your back.",
   },
   {
     icon: "🔒",
-    title: "Your data, your rules",
-    body: "You control which organisations see your data. Revoke access at any time with one click from your settings.",
+    title: "History you own",
+    body: "Check-ins are never edited or deleted - not by you, not by an admin. A correction sits beside the original, never over it.",
   },
   {
-    icon: "📤",
-    title: "Export any time",
-    body: "Download your full history as a CSV whenever you need it. Your data is never locked in.",
+    icon: "🚪",
+    title: "Leave when you like",
+    body: "See every workspace you belong to or are invited to, and leave any of them from your organisations page.",
   },
   {
     icon: "💸",
-    title: "Free forever",
-    body: "No subscription. No trial period. checkmark is free for individuals, forever. Your employer pays for team features - not you.",
+    title: "Free for everyone",
+    body: "No subscription, no trial, no paid tier. CheckMark is open source, and nobody pays - not you, and not your employer.",
   },
 ];
 
 const privacyFacts = [
-  { q: 'What we store', a: 'Your check-in time, check-out time, GPS coordinates (if you share them), and IP address. That\'s it.' },
+  { q: 'What we store', a: 'Your check-in and check-out times, GPS coordinates (if you allow location), your IP address and basic device information. The privacy policy has the full list.' },
   { q: 'What we don\'t store', a: 'We don\'t track your location in the background. We don\'t read your contacts, calendar, or any other app data. We only record what you explicitly submit.' },
-  { q: 'Who can see your data', a: 'Only you - and any organisation you explicitly consent to share with. You can see every organisation that has access and revoke it instantly.' },
-  { q: 'How long we keep it', a: 'Your data is retained for 7 years from the date it was created, then permanently deleted. You can request deletion earlier from your account settings.' },
+  { q: 'Who can see your data', a: 'You, and the admins of the workspaces you belong to - what each admin sees depends on the role that workspace gives them. Your organisations page lists every workspace, and you can leave any of them.' },
+  { q: 'How long we keep it', a: 'Check-ins are a permanent record: they are never edited or deleted, and there is no automatic expiry. You can deactivate your account from settings; to ask for your data on the hosted instance to be erased, email us.' },
 ]
 
 export default function ForYouPage() {
@@ -86,8 +86,8 @@ export default function ForYouPage() {
             Owned by you.
           </h1>
           <p style={{ ...S.sub, maxWidth: "540px", marginBottom: "12px" }}>
-            checkmark records where you were and for how long. Free forever. No
-            employer required.
+            CheckMark records where you checked in and for how long - only when
+            you tap. A personal tool, not a surveillance system.
           </p>
           <p
             style={{
@@ -101,7 +101,7 @@ export default function ForYouPage() {
               marginBottom: "32px",
             }}
           >
-            Free forever - no credit card required
+            Free and open source - no credit card
           </p>
           <br />
           <Link href="/login" style={S.btnPrimary}>
@@ -169,7 +169,7 @@ export default function ForYouPage() {
             <div>
               <p style={S.label}>Works with any employer</p>
               <h2 style={{ ...S.h2, marginTop: "12px", marginBottom: "20px" }}>
-                Your data follows you, not your employer.
+                Your account is yours, not your employer&apos;s.
               </h2>
               <div
                 style={{
@@ -180,25 +180,24 @@ export default function ForYouPage() {
               >
                 <p style={S.body}>
                   <strong style={{ color: "var(--navy)" }}>
-                    If your company uses checkmark:
+                    If your company uses CheckMark:
                   </strong>{" "}
-                  your personal check-ins automatically count toward your
-                  organisation&apos;s attendance records. No double check-in.
+                  your check-ins count toward your organisation&apos;s
+                  attendance, judged against its own office signals.
                 </p>
                 <p style={S.body}>
                   <strong style={{ color: "var(--navy)" }}>
-                    If they don&apos;t:
+                    If you work with more than one organisation:
                   </strong>{" "}
-                  your data is still yours. Keep a personal presence log
-                  regardless of whether your employer ever adopts checkmark.
+                  one account holds every membership. A single check-in counts
+                  for each, and the switcher at the top moves between them.
                 </p>
                 <p style={S.body}>
                   <strong style={{ color: "var(--navy)" }}>
                     When you change jobs:
                   </strong>{" "}
-                  your history stays with you. Revoke your old employer&apos;s
-                  access instantly. Grant access to your new employer if you
-                  choose.
+                  your account stays with you. Leave your old workspace, and
+                  accept your new employer&apos;s invitation when it arrives.
                 </p>
               </div>
             </div>
@@ -208,15 +207,15 @@ export default function ForYouPage() {
               {[
                 {
                   label: "Your personal timeline",
-                  desc: "Complete history of every check-in, always accessible to you.",
+                  desc: "Every check-in for the workspace you are viewing, always open to you.",
                 },
                 {
-                  label: "Org consent management",
-                  desc: "See exactly which orgs can see your data. Revoke with one click.",
+                  label: "Your organisations",
+                  desc: "Every workspace you belong to or are invited to, in one list. Leave any of them.",
                 },
                 {
-                  label: "Data portability",
-                  desc: "Export your full history at any time. CSV format, no lock-in.",
+                  label: "Open source",
+                  desc: "The code that decides whether a check-in counts is public. Read it yourself.",
                 },
               ].map((item) => (
                 <div
@@ -331,7 +330,7 @@ export default function ForYouPage() {
               margin: "0 auto 32px",
             }}
           >
-            Free forever. No employer required. Takes 2 minutes.
+            Free for everyone. Open source. Yours.
           </p>
           <Link
             href="/login"

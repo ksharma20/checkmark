@@ -12,7 +12,6 @@ import Industries from '@/components/Industries';
 import Marquee from '@/components/Marquee';
 import MarketingNav from '@/components/marketing/MarketingNav';
 import SectionDivider from '@/components/SectionDivider';
-import ComingSoon from '@/components/ComingSoon';
 import { marketing } from '@/locales/en/marketing';
 
 export default function Home() {
@@ -80,10 +79,6 @@ export default function Home() {
       <div className="bg-checkmark-bg-card2">
         <FAQ />
       </div>
-      <SectionDivider />
-
-      {/* 9 - ComingSoon: base */}
-      <ComingSoon />
 
       <CTABandFooter />
     </main>
