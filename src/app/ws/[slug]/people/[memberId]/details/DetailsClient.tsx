@@ -391,15 +391,17 @@ function AccessPanel({
     member.role !== 'owner'
 
   /**
-   * Offer the invitation to anyone who is not already in or already asked.
+   * Offer the invitation to anyone who is not already in.
    *
-   * `POST /members` refuses `active` with ALREADY_MEMBER and `pending_consent`
-   * with INVITE_PENDING, so offering it there would be a button whose only
-   * outcome is an error. Everyone else - `no_access`, `declined`, `revoked` -
-   * is someone an invitation can actually reach.
+   * `POST /members` refuses only `active`, with ALREADY_MEMBER - offering it
+   * there would be a button whose only outcome is an error. Everyone else is
+   * someone an invitation can reach, INCLUDING a `pending_consent` row: the
+   * route no longer answers INVITE_PENDING, so re-sending is how a lost or
+   * expired link is repaired. It reads differently, so it is worded differently
+   * below.
    */
-  const canOfferInvite =
-    canInviteMembers && member.status !== 'active' && member.status !== 'pending_consent'
+  const canOfferInvite = canInviteMembers && member.status !== 'active'
+  const isResend = member.status === 'pending_consent'
 
   async function saveRole(next: string) {
     // Ownership is a TRANSFER, not an assignment: it swaps two rows and demotes
@@ -460,15 +462,20 @@ function AccessPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: member.email }),
       })
-      const data = await res.json().catch(() => ({})) as { error?: string; code?: string }
+      const data = await res.json().catch(() => ({})) as { error?: string; code?: string; resent?: boolean }
 
       if (res.ok) {
-        toast(wsPeopleUi.inviteSent(member.email), 'success')
+        // `resent` is the SERVER's answer, not this component's guess: the row
+        // may have been invited from another tab since this page was painted.
+        toast(
+          data.resent ? wsPeopleUi.inviteResent(member.email) : wsPeopleUi.inviteSent(member.email),
+          'success',
+        )
       } else if (data.code === 'DOMAIN_AUTO_ENROL') {
         // Not a failure. Their domain is verified, so they join on signup and an
         // invitation would be noise - say the good news rather than an error.
         toast(wsPeopleUi.inviteAutoEnrol, 'success')
-      } else if (data.code === 'ALREADY_MEMBER' || data.code === 'INVITE_PENDING') {
+      } else if (data.code === 'ALREADY_MEMBER') {
         toast(data.error ?? wsPeopleUi.inviteFailed, 'success')
       } else {
         toast(data.error ?? wsPeopleUi.inviteFailed, 'error')
@@ -511,16 +518,26 @@ function AccessPanel({
           not throw away what HR typed, and there is nothing here that expires. */}
       {canOfferInvite && (
         <div className="mb-12">
-          <p className="t-eyebrow mb-12">{wsPeopleUi.inviteTitle}</p>
-          <p className="t-secondary">{wsPeopleUi.inviteBody(member.email)}</p>
-          <p className="t-muted field-note">{wsPeopleUi.inviteNote}</p>
+          <p className="t-eyebrow mb-12">
+            {isResend ? wsPeopleUi.inviteResendTitle : wsPeopleUi.inviteTitle}
+          </p>
+          <p className="t-secondary">
+            {isResend ? wsPeopleUi.inviteResendBody(member.email) : wsPeopleUi.inviteBody(member.email)}
+          </p>
+          <p className="t-muted field-note">
+            {isResend ? wsPeopleUi.inviteResendNote : wsPeopleUi.inviteNote}
+          </p>
           <Button
             size="sm"
             className="mt-12"
             loading={inviting}
             onClick={() => void sendInvite()}
           >
-            {inviting ? wsPeopleUi.inviteSending : wsPeopleUi.inviteSend}
+            {inviting
+              ? wsPeopleUi.inviteSending
+              : isResend
+                ? wsPeopleUi.inviteResendSend
+                : wsPeopleUi.inviteSend}
           </Button>
         </div>
       )}

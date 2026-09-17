@@ -65,6 +65,23 @@ export const meSettings = {
     leaveConfirmAction: 'Leave',
     leaveBusy: 'Leaving…',
     leaveCancel: 'Cancel',
+
+    /**
+     * An invitation whose seven days have run out.
+     *
+     * It is shown rather than hidden, and Decline is still offered: the row is
+     * still on this person's list, and refusing something you no longer want
+     * must never fail. Only Accept goes, because only Accept would be refused -
+     * and the copy carries the remedy, since it is the admin's to apply and not
+     * the member's.
+     */
+    invitePendingExpiredBadge: 'Expired',
+    invitePendingExpiredBody:
+      'This invitation has expired. Ask an admin of this workspace to send you a new one.',
+    /** The 410 INVITE_EXPIRED answer, for an invite that expired since the page loaded. */
+    inviteExpiredError:
+      'That invitation expired before you accepted it. Ask an admin to send you a new one.',
+    inviteActionFailed: 'Could not answer that invitation. Please try again.',
   },
 
   // ── /me/settings ──────────────────────────────────────────────────────────

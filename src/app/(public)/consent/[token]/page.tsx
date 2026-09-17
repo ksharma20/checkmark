@@ -2,7 +2,7 @@ import Image from 'next/image'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getMemberByConsentToken, declineConsent, getWorkspaceById } from '@/lib/db/queries/workspaces'
-import { acceptMembership } from '@/lib/membership'
+import { acceptMembership, isInviteExpired } from '@/lib/membership'
 import { getSessionFromCookies } from '@/lib/auth'
 import { en } from '@/locales/en'
 
@@ -116,17 +116,18 @@ export default async function ConsentPage({ params, searchParams }: Props) {
       )
     }
 
-    // Check token expiry
-    const expiresAt = member.consent_token_expires_at
-    if (expiresAt && new Date(expiresAt) < new Date()) {
-      return (
-        <ResultCard
-          title="Link expired"
-          body="This invitation link has expired. Ask your workspace admin to resend the invite."
-          cta={<Link href="/login" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)' }}>Go to sign in</Link>}
-        />
-      )
-    }
+    // The RULE lives in `isInviteExpired`, which `acceptMembership` also uses -
+    // this is the same check, not a second one, so the two cannot drift. It is
+    // made here as well because it is worth answering BEFORE a logged-out
+    // visitor is sent round the login flow for a link that is already dead.
+    const expiredCard = (
+      <ResultCard
+        title="Link expired"
+        body="This invitation link has expired. Ask your workspace admin to resend the invite."
+        cta={<Link href="/login" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)' }}>Go to sign in</Link>}
+      />
+    )
+    if (isInviteExpired(member.consent_token_expires_at)) return expiredCard
 
     const session = await getSessionFromCookies()
     if (session) {
@@ -140,7 +141,20 @@ export default async function ConsentPage({ params, searchParams }: Props) {
           />
         )
       }
-      await acceptMembership(member.id, session.sub, session.email)
+      // The result is READ rather than discarded: the row is re-fetched inside,
+      // so the window between the checks above and the write is where an expiry
+      // or a second accept from another tab lands.
+      const result = await acceptMembership(member.id, session.sub, session.email)
+      if (!result.ok) {
+        if (result.code === 'EXPIRED') return expiredCard
+        return (
+          <ResultCard
+            title="Link already used"
+            body="This invitation link has already been accepted or declined."
+            cta={<Link href="/me" style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '14px', color: 'var(--brand)' }}>Go to dashboard</Link>}
+          />
+        )
+      }
       redirect('/me')
     }
     // Not logged in - redirect to login with invite param

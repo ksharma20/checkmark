@@ -6,13 +6,23 @@ import Link from 'next/link'
 import { ChevronRight } from 'lucide-react'
 import type { WorkspaceMember, Workspace } from '@/lib/db/queries/workspaces'
 import { isWorkspaceAdmin } from '@/lib/permissions/ranks'
-import { Button, Card, ConfirmDialog, EmptyState, WorkspaceAvatar } from '@/components/ui'
+import { Button, Card, Chip, ConfirmDialog, EmptyState, WorkspaceAvatar } from '@/components/ui'
 import { en } from '@/locales/en'
 import { meSettings } from '@/locales/en/me-settings'
 
+/**
+ * A pending invitation with the server's verdict on its age attached.
+ *
+ * `expired` is computed on the server, not from `consent_token_expires_at`
+ * here: a comparison against `Date.now()` made once during SSR and again on
+ * hydration can land either side of the deadline, and the row would flip under
+ * the reader.
+ */
+export type PendingInvite = WorkspaceMember & { expired: boolean }
+
 interface Props {
   activeMemberships: WorkspaceMember[]
-  pendingMemberships: WorkspaceMember[]
+  pendingMemberships: PendingInvite[]
   wsMap: Record<string, Workspace>
   /** Role display name per workspace id. */
   roleNames: Record<string, string>
@@ -26,6 +36,8 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
   const [counts, setCounts] = useState<Record<string, { present: number; visited: number; notIn: number }>>({})
   const [pendingLeave, setPendingLeave] = useState<{ workspaceId: string; name: string } | null>(null)
   const [leaveError, setLeaveError] = useState<string | null>(null)
+  // Keyed by member id: two invitations can be on screen and only one can fail.
+  const [inviteErrors, setInviteErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     activeList.forEach((m) => {
@@ -66,6 +78,11 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
 
   async function handleConsent(memberId: string, action: 'accept' | 'decline') {
     setLoadingId(memberId)
+    setInviteErrors((prev) => {
+      const next = { ...prev }
+      delete next[memberId]
+      return next
+    })
     try {
       const res = await fetch('/api/me/consent', {
         method: 'POST',
@@ -75,7 +92,24 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
       if (res.ok) {
         setPendingList((prev) => prev.filter((m) => m.id !== memberId))
         if (action === 'accept') router.refresh()
+        return
       }
+      // `410 INVITE_EXPIRED` is the one refusal with a remedy, and the one that
+      // can arrive on a row this page painted as live - the deadline can pass
+      // while the tab is open. The row STAYS, re-marked as expired, so Decline
+      // still works and the reader is told what to ask for.
+      const data = await res.json().catch(() => ({})) as { code?: string; error?: string }
+      if (data.code === 'INVITE_EXPIRED') {
+        setPendingList((prev) =>
+          prev.map((m) => (m.id === memberId ? { ...m, expired: true } : m)),
+        )
+        setInviteErrors((prev) => ({ ...prev, [memberId]: meSettings.orgs.inviteExpiredError }))
+        return
+      }
+      setInviteErrors((prev) => ({
+        ...prev,
+        [memberId]: data.error ?? meSettings.orgs.inviteActionFailed,
+      }))
     } finally {
       setLoadingId(null)
     }
@@ -94,19 +128,28 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
             const ws = wsMap[m.workspace_id]
             const name = ws?.name ?? m.workspace_id
             return (
-              <Card key={m.id} style={{ borderColor: 'var(--amber)' }}>
-                <p className="t-h2" style={{ margin: 0, color: 'var(--navy)' }}>{name}</p>
+              <Card key={m.id} style={{ borderColor: m.expired ? 'var(--danger)' : 'var(--amber)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <p className="t-h2" style={{ margin: 0, color: 'var(--navy)' }}>{name}</p>
+                  {m.expired && <Chip tone="none">{meSettings.orgs.invitePendingExpiredBadge}</Chip>}
+                </div>
                 <p className="t-secondary" style={{ margin: '4px 0 14px' }}>
-                  {en.meOrgs.pendingInviteBody}
+                  {m.expired ? meSettings.orgs.invitePendingExpiredBody : en.meOrgs.pendingInviteBody}
                 </p>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <Button
-                    size="sm"
-                    disabled={loadingId === m.id}
-                    onClick={() => handleConsent(m.id, 'accept')}
-                  >
-                    {en.meOrgs.acceptBtn}
-                  </Button>
+                  {/* No Accept on an expired invitation - the server answers
+                      410, so the button's only outcome is a refusal. Decline
+                      stays: refusing something you no longer want must never
+                      fail, and it is how this row leaves the list. */}
+                  {!m.expired && (
+                    <Button
+                      size="sm"
+                      disabled={loadingId === m.id}
+                      onClick={() => handleConsent(m.id, 'accept')}
+                    >
+                      {en.meOrgs.acceptBtn}
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
                     size="sm"
@@ -116,6 +159,7 @@ export default function OrgsClient({ activeMemberships, pendingMemberships, wsMa
                     {en.meOrgs.declineBtn}
                   </Button>
                 </div>
+                {inviteErrors[m.id] && <p className="field-error">{inviteErrors[m.id]}</p>}
               </Card>
             )
           })}

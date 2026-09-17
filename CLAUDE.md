@@ -286,15 +286,59 @@ dialog must not throw a five-step form away. "Send invite" posts to the existing
 an error. Where an employee record already exists for that address, the consent
 email greets them by the name on it.
 
+### Sending an invitation IS `pending_consent`
+
+`upsertInvitedMember()` sets `status = 'pending_consent'` with every new token,
+on the update branch as well as the insert. It used to refresh the token and
+leave the status alone, which is why *the main admin flow did not work*: a row
+created by **Add employee** is `no_access`, a re-invited leaver is `declined` or
+`revoked`, and a valid seven-day link went out while every accept path read the
+status, found it was not `pending_consent`, and answered "Link already used".
+`user_id` is deliberately untouched — an existing account keeps its link, a
+stranger stays NULL until they accept.
+
+**Re-sending is the ordinary repair, not an error.** `POST
+/api/ws/[slug]/members` no longer answers `409 INVITE_PENDING`; every send mints
+a fresh 7-day token, so the previous link dies the moment the new one is issued.
+It returns `{ resent }` — keyed on whether the row already had a `consent_token`,
+which is the only thing that says an invitation was ever sent — and the Access
+tab says which of the two happened. `409 ALREADY_MEMBER` and
+`409 DOMAIN_AUTO_ENROL` are unchanged.
+
+### Expiry is enforced in `acceptMembership()`, once
+
+`isInviteExpired()` is the rule; `acceptMembership()` is the only place it gates
+a write, returning `EXPIRED` → `410 INVITE_EXPIRED`. It used to live on the
+emailed consent page alone, so `/api/me/consent`, `/join/[slug]` and `/me/orgs`
+all accepted invitations that had expired weeks earlier. The consent page still
+asks the question before sending a logged-out visitor round the login flow, but
+it asks it through the same function — one rule, two call sites, nothing to
+drift. Expiry is checked **after** the email match, so a hijacker is told
+`WRONG_ACCOUNT` and learns nothing about the invitation.
+
+**`declineMembership()` is deliberately not expiry-checked.** Refusing something
+you no longer want must never fail. `/me/orgs` therefore renders an expired
+invitation as **Expired** with "ask an admin to send you a new one" — the row
+stays on the list with Decline still live, and only Accept goes.
+
 ### Linking the record to the account
 
 An employee record can exist before its person has an account, so
-`employees.user_id` stays NULL for the length of an open invitation. The moment
-an account appears, `claimEmployeeForUser()` attaches it. `src/lib/membership.ts`
-is the shell that owns this: it spans two domains, and `employees.ts` already
-imports `workspaces.ts`, so putting it in a query file would close an import
-cycle. Every accept path goes through it — consent page, `/api/me/consent`,
-registration, verified-domain auto-enrol.
+`employees.user_id` stays NULL for the length of an open invitation.
+`claimEmployeeForUser()` attaches it **at consent, not at sign-up**:
+`acceptMembership()` claims it after the status flips to active, and
+`autoEnrolIntoWorkspace()` claims it because *that path is the consent* — a
+verified domain has already declared everyone on it staff and the member lands
+`active` in one step. `claimPendingMemberships()`, which runs on registration,
+links `user_id` and **nothing else**; it used to claim the record too, attaching
+payroll, documents and encrypted PAN and bank details to an account that had
+agreed to nothing. Registering with an invited email leaves the invitation
+pending: signing up is not consent.
+
+`src/lib/membership.ts` is the shell that owns all of this: it spans two
+domains, and `employees.ts` already imports `workspaces.ts`, so putting it in a
+query file would close an import cycle. Every accept path goes through it —
+consent page, `/api/me/consent`, registration, verified-domain auto-enrol.
 
 `POST /api/me/consent` now checks the member row's email against the session
 email before acting. It previously accepted any `memberId` from any signed-in
@@ -1163,8 +1207,11 @@ Do not re-add upgrade prompts, pricing links or plan badges to the app.
 19. **An employee record may exist before its account does** - so `employees.user_id`
     is NULL for the length of an open invitation and the directory finds the row by
     work email. Every accept path must go through `src/lib/membership.ts`, which
-    claims the record. A new accept path that skips it leaves a permanently
-    unlinked record.
+    claims the record **at consent**, never at sign-up: registering with an invited
+    email links `user_id` on the membership and no more. A new accept path that
+    skips the shell leaves a permanently unlinked record; one that claims on
+    registration hands an account that has agreed to nothing somebody's payroll,
+    documents and encrypted PAN and bank details.
 20. **Secret-authenticated endpoints must be in `PUBLIC_API_ROUTES`** - `proxy.ts`
     cookie-gates every other `/api/*` route and `getSessionFromRequest` never reads
     `Authorization`, so a Bearer caller is refused before its own auth check runs.

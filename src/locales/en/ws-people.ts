@@ -303,6 +303,22 @@ export const wsPeopleUi = {
   inviteAutoEnrol:
     'No invite needed - their email domain is verified, so they join automatically when they sign up.',
   inviteFailed: 'Could not send the invitation.',
+
+  /**
+   * Re-sending, for a row that is already `pending_consent`.
+   *
+   * Sending used to be refused there, so the only repair for a lost or expired
+   * link was to delete the membership and start again. It is now the ordinary
+   * fix, and the copy has to say the one thing that is not obvious: the old
+   * link dies the moment the new one is issued.
+   */
+  inviteResendTitle: 'Invitation pending',
+  inviteResendBody: (email: string) =>
+    `${email} has been invited but has not accepted yet. Sending again issues a new link, valid for seven days.`,
+  inviteResendNote: 'The link already in their inbox stops working as soon as the new one is sent.',
+  inviteResendSend: 'Re-send invite',
+  inviteResent: (email: string) =>
+    `Invitation re-sent to ${email} - any earlier link has stopped working.`,
 } as const
 
 // ─── Organisation (reporting tree) ────────────────────────────────────────────

@@ -72,10 +72,11 @@ export async function POST(request: NextRequest) {
   const passwordHash = await hashPassword(password)
   const user = await createUser({ email, passwordHash, fullName: full_name })
 
-  // Link any pending invited memberships for this email to the new user account,
-  // and claim any HR record that was filed under that address before they had
-  // one - an admin can add an employee and invite them afterwards, so the record
-  // routinely exists first.
+  // Link any pending invited memberships for this email to the new user account
+  // - and NOTHING more. The invitations stay pending: signing up is not consent,
+  // and joining an employer's workspace stays an explicit click. The HR record
+  // filed under that address is claimed when they accept, in
+  // `acceptMembership()`, not here.
   await claimPendingMemberships(email, user.id)
 
   // Auto-enrol based on verified domain

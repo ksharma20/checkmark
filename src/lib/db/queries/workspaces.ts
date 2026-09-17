@@ -646,9 +646,19 @@ export async function upsertInvitedMember(params: {
   )
 
   if (existing && existing.status !== 'active') {
+    // SENDING AN INVITATION IS WHAT `pending_consent` MEANS, so the status is
+    // reset with the token rather than left alone. The row reaching here is
+    // routinely `no_access` (created by Add employee, never invited) or
+    // `declined` / `revoked` (invited in a previous life); leaving it as it was
+    // put a valid 7-day link in somebody's inbox while every accept path read
+    // the status, found it was not `pending_consent`, and answered "Link
+    // already used".
+    //
+    // `user_id` is deliberately untouched: an existing account keeps its link,
+    // and a stranger stays NULL until they accept.
     await db.execute(
       `UPDATE workspace_members
-       SET consent_token = ?, consent_token_expires_at = ?
+       SET status = 'pending_consent', consent_token = ?, consent_token_expires_at = ?
        WHERE id = ?`,
       [params.consentToken, params.consentTokenExpiresAt, existing.id]
     )

@@ -12,6 +12,11 @@ export default function JoinClient({ memberId, workspaceName }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState<'accept' | 'decline' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Set by a `410 INVITE_EXPIRED`. The seven days can run out between this page
+  // being served and the button being pressed, and re-offering Accept after the
+  // server has refused it is offering a second refusal. Decline stays - it is
+  // never expiry-checked, and it is how the row leaves this person's list.
+  const [expired, setExpired] = useState(false)
 
   async function handle(action: 'accept' | 'decline') {
     setLoading(action)
@@ -26,6 +31,7 @@ export default function JoinClient({ memberId, workspaceName }: Props) {
         router.push('/me')
       } else {
         const data = await res.json()
+        if (data.code === 'INVITE_EXPIRED') setExpired(true)
         setError(data.error || 'Something went wrong')
         setLoading(null)
       }
@@ -61,6 +67,7 @@ export default function JoinClient({ memberId, workspaceName }: Props) {
       </p>
 
       <div style={{ display: 'flex', gap: '10px' }}>
+        {!expired && (
         <button
           onClick={() => handle('accept')}
           disabled={!!loading}
@@ -80,6 +87,7 @@ export default function JoinClient({ memberId, workspaceName }: Props) {
         >
           {loading === 'accept' ? 'Accepting…' : 'Accept'}
         </button>
+        )}
         <button
           onClick={() => handle('decline')}
           disabled={!!loading}

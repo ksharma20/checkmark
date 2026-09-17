@@ -31,6 +31,17 @@ export async function POST(request: NextRequest) {
     : await declineMembership(body.memberId, userEmail)
 
   if (!result.ok) {
+    // EXPIRED is a 410, not a 409: the invitation was real and is now gone,
+    // which is exactly what Gone means - and it is the one refusal with a
+    // remedy, so the client renders it differently and says "ask an admin to
+    // re-send". It can only come back from accept; declining an expired
+    // invitation still succeeds.
+    if (result.code === 'EXPIRED') {
+      return NextResponse.json(
+        { error: 'That invitation has expired. Ask an admin to send you a new one.', code: 'INVITE_EXPIRED' },
+        { status: 410 },
+      )
+    }
     const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'WRONG_ACCOUNT' ? 403 : 409
     const error =
       result.code === 'NOT_FOUND' ? 'That invitation no longer exists'
