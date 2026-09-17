@@ -6,35 +6,45 @@
 
 ## 1. Login / Registration State Machine
 
-The login page (`/login`) is a single client-side state machine with 8 states:
+The login page (`/login`) is a single client-side state machine with 7 states:
 
 ```mermaid
 stateDiagram-v2
   [*] --> email : page load
 
   email --> password : email exists
+  email --> deactivated : account exists but soft-deleted
   email --> otp : new email
 
   password --> redirect : credentials valid
   password --> forgotPassword : "Forgot password?" clicked
 
-  otp --> accountType : OTP verified (new user)
+  deactivated --> redirect : password valid, account reactivated
+
+  otp --> createAccount : OTP verified (new user)
   otp --> resetPassword : OTP verified (reset flow)
   otp --> forgotPassword : Back (reset flow)
   otp --> email : Back (new user)
 
   forgotPassword --> otp : code sent
 
-  accountType --> personal : Personal
-  accountType --> org : Organisation
-
-  personal --> redirect : account created
-  org --> redirect : account + workspace created
+  createAccount --> redirect : account created
 
   resetPassword --> redirect : password set + session issued
 
   redirect --> [*]
 ```
+
+**The `accountType` fork is gone.** A new account used to pick Personal or
+Organisation before it had seen the product, and the answer was never stored - it
+only decided whether `POST /api/auth/register` created a workspace in the same
+request. Sign-up now ends at `createAccount` (name + password) for everyone, and
+a workspace is created deliberately at `/ws/new`.
+
+`redirect` is `getRedirectAfterLogin()` from `src/lib/permissions/ranks.ts` -
+none - `/me`, one - `/ws/<slug>`, several - `/ws` - except when the URL carries
+`?invite=<slug>`, which sends them to `/join/<slug>` instead. That also applies to
+a visitor who arrives already signed in.
 
 ---
 
@@ -67,18 +77,15 @@ sequenceDiagram
   A->>A: setOtpVerifiedCookie(email) - 15-min httpOnly JWT
   A-->>U: { verified: true } + Set-Cookie: cm_otp_ok
 
-  Note over U: Chooses Personal or Organisation
+  Note over U: Enters name + password
 
-  U->>A: POST /api/auth/register { email, fullName, password, accountType, ... }
+  U->>A: POST /api/auth/register { email, full_name, password }
   A->>A: verifyOtpCookie(email) - validates cm_otp_ok server-side
   A->>A: hashPassword(password) - bcrypt cost 12
   A->>DB: createUser(email, hash, name)
-  A->>DB: linkUserToMemberRecord(email, userId) - claims pending invites
+  A->>DB: linkUserToMemberRecord(email, userId) - links user_id on pending invites ONLY
+  Note over DB: Invitations stay pending_consent.<br/>Signing up is not consent; the HR record<br/>is claimed in acceptMembership().
   A->>DB: getVerifiedDomainsForEmail(email) - auto-enrol as role='member'
-  alt accountType === 'org'
-    A->>DB: createWorkspace({ slug, name, creatorUserId, creatorEmail, domains })
-    Note over DB: ONE transaction:<br/>INSERT workspaces → seedSystemRoles() → INSERT member role='owner'
-  end
   A->>A: createJwt(userId, email) - 30-day, unique jti
   A->>A: setSessionCookie(token) - httpOnly; SameSite=Lax; Secure
   A->>A: clearOtpCookie()

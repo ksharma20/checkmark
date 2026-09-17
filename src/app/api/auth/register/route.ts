@@ -4,14 +4,34 @@ import {
   getVerifiedDomainsForEmail,
   getWorkspaceMemberByEmail,
   getAdminWorkspacesForUser,
-  createWorkspace,
-  getWorkspaceBySlug,
 } from '@/lib/db/queries/workspaces'
 import { autoEnrolIntoWorkspace, claimPendingMemberships } from '@/lib/membership'
 import { hashPassword, createJwt, setSessionCookie, verifyOtpCookie, clearOtpCookie } from '@/lib/auth'
-import { validateSlug } from '@/lib/slug'
 import { validatePassword } from '@/lib/password'
 import { getRedirectAfterLogin } from '@/lib/permissions/ranks'
+
+/**
+ * Create an account. An ACCOUNT - nothing else.
+ *
+ * This route used to take `accountType`, `orgName`, `orgSlug` and `orgDomain`
+ * and, for `accountType === 'org'`, create a workspace in the same request. The
+ * type was never stored; it only decided whether that block ran. Sign-up now
+ * asks a new user for the two things an account needs, and creating a workspace
+ * is a separate, deliberate act at `/ws/new` (`POST /api/workspace`), which is
+ * also the only path that can be reached by someone who already has one.
+ *
+ * What stays, in order, because each step guards the next:
+ *
+ *  1. the `cm_otp_ok` cookie must prove this email (invariant 3) - never a flag
+ *     from the body;
+ *  2. `EMAIL_TAKEN` before any write;
+ *  3. `claimPendingMemberships()` links `user_id` on invitations addressed to
+ *     this email and NOTHING more - signing up is not consent, and the HR record
+ *     is claimed in `acceptMembership()` when they actually accept;
+ *  4. verified-domain auto-enrol, which IS consent (the workspace has declared
+ *     everyone on that domain staff), so it lands `active` in one step;
+ *  5. the session cookie, and only then a redirect.
+ */
 
 function apiError(message: string, code: string, status: number) {
   return NextResponse.json({ error: message, code }, { status })
@@ -22,13 +42,6 @@ export async function POST(request: NextRequest) {
     email?: string
     full_name?: string
     password?: string
-    accountType?: 'personal' | 'org'
-    // org-only fields
-    orgName?: string
-    orgSlug?: string
-    orgDomain?: string
-    // legacy fallback
-    invite?: string
   }
   try {
     body = await request.json()
@@ -39,7 +52,6 @@ export async function POST(request: NextRequest) {
   const email = (body.email ?? '').toLowerCase().trim()
   const full_name = (body.full_name ?? '').trim()
   const password = body.password ?? ''
-  const accountType = body.accountType ?? 'personal'
 
   if (!email) return apiError('Email is required', 'MISSING_EMAIL', 400)
   if (!full_name) return apiError('Full name is required', 'MISSING_NAME', 400)
@@ -56,17 +68,6 @@ export async function POST(request: NextRequest) {
   const existing = await getUserByEmail(email)
   if (existing) {
     return apiError('An account with this email already exists', 'EMAIL_TAKEN', 409)
-  }
-
-  // Org registration validations
-  if (accountType === 'org') {
-    const orgName = (body.orgName ?? '').trim()
-    const orgSlug = (body.orgSlug ?? '').toLowerCase().trim()
-    if (!orgName) return apiError('Organisation name is required', 'MISSING_ORG_NAME', 400)
-    const slugCheck = validateSlug(orgSlug)
-    if (!slugCheck.valid) return apiError(slugCheck.error, 'INVALID_SLUG', 400)
-    const slugTaken = await getWorkspaceBySlug(orgSlug)
-    if (slugTaken) return apiError('That URL handle is already taken', 'SLUG_TAKEN', 409)
   }
 
   const passwordHash = await hashPassword(password)
@@ -92,25 +93,12 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  // Create workspace for org accounts
-  if (accountType === 'org') {
-    const orgName = (body.orgName ?? '').trim()
-    const orgSlug = (body.orgSlug ?? '').toLowerCase().trim()
-    const orgDomain = (body.orgDomain ?? '').toLowerCase().trim()
-    const domains = orgDomain ? [orgDomain] : []
-    await createWorkspace({
-      slug: orgSlug,
-      name: orgName,
-      creatorUserId: user.id,
-      creatorEmail: email,
-      domains,
-    })
-  }
-
   await clearOtpCookie()
   const token = await createJwt(user.id, user.email)
   await setSessionCookie(token)
 
+  // Usually `/me` - a brand-new account holds no org access. It can still be a
+  // workspace: an auto-enrol above may have landed them somewhere that grants it.
   const adminWorkspaces = await getAdminWorkspacesForUser(user.id)
   const redirect = getRedirectAfterLogin(adminWorkspaces)
 

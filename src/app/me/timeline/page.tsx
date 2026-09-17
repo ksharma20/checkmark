@@ -3,13 +3,24 @@
 /**
  * `/me/timeline` - the member's own check-in history.
  *
- * Always scoped to one workspace. This screen used to carry a second
- * workspace selector of its own (plus an "All workspaces" option reading the
- * unscoped `/api/events`), which meant the shell's pill and this dropdown could
- * disagree, and the "All" reading had no `matched_by` at all - the verification
- * chip silently disappeared. Now it reads `useWorkspaceScope()` like every
- * other `/me` screen and always calls `/api/me/ws/[slug]/events`, so what the
- * member sees is exactly the AND-semantics evaluation their admin sees.
+ * Scoped to the workspace the top-bar pill names, whenever there is one. This
+ * screen used to carry a second workspace selector of its own (plus an "All
+ * workspaces" option reading the unscoped `/api/events`), which meant the
+ * shell's pill and this dropdown could disagree. Now it reads
+ * `useWorkspaceScope()` like every other `/me` screen and calls
+ * `/api/me/ws/[slug]/events`, so what the member sees is exactly the
+ * AND-semantics evaluation their admin sees.
+ *
+ * WITH NO WORKSPACE AT ALL it falls back to `/api/events`, the member's own
+ * unscoped history. `/me` is a product on its own - a person can record their
+ * presence and read it back without any organisation - and an empty screen was
+ * the old answer to that. **This is not the retired "All workspaces" option
+ * coming back:** that was a THIRD reading offered alongside two real ones, so a
+ * member with workspaces could choose a view whose chips had quietly vanished.
+ * The fallback is reachable only when there is nothing to scope to, is never a
+ * choice, and adds no picker. Its rows carry no `matched_by` because there is
+ * nothing to verify against, and `personalOnlyNote` says so rather than leaving
+ * a column of missing chips to be read as a bug.
  *
  * Loaded data carries the slug it was fetched for, so switching workspace
  * invalidates it by construction rather than by a reset effect - one
@@ -23,20 +34,35 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import type { PresenceEventWithMatch } from '@/lib/signals'
+import type { PresenceEvent } from '@/lib/db/queries/events'
+import type { MatchedBy } from '@/lib/signals'
 import EventCard from '@/components/user/EventCard'
 import { Button, Card, EmptyState, Field, Input, Skeleton } from '@/components/ui'
 import { en } from '@/locales/en'
-import { meScreens } from '@/locales/en/me-screens'
 import { meSettings } from '@/locales/en/me-settings'
 import { useWorkspaceScope } from '../workspace-scope'
 
-/** Workspace-scoped, so `matched_by` / `matched_signals` are always present. */
-type TimelineEvent = PresenceEventWithMatch
+/**
+ * The match fields are OPTIONAL rather than required, because the two readings
+ * differ in exactly that: the workspace-scoped endpoint always returns them and
+ * the personal one never does. `EventCard` already renders the chip on
+ * `matched_by != null`, so absence is the whole mechanism - no flag is threaded
+ * down to tell it to hide anything.
+ */
+type TimelineEvent = PresenceEvent & {
+  matched_by?: MatchedBy
+  matched_signals?: string[]
+}
 
-/** A loaded page of events, tagged with the workspace it was fetched for. */
+/**
+ * A loaded page of events, tagged with the scope it was fetched for.
+ *
+ * `null` is the personal reading, and it is a real value rather than a missing
+ * one: it has to compare equal to the current scope, or the page would never
+ * count as fresh and the skeleton would never clear.
+ */
 interface TimelineData {
-  slug: string
+  slug: string | null
   events: TimelineEvent[]
   total: number
 }
@@ -115,7 +141,6 @@ export default function TimelinePage() {
 
   const fetchEvents = useCallback(
     async (opts?: { append?: boolean }) => {
-      if (!slug) return
       const append = !!opts?.append
       if (append) setLoadingMore(true)
       else {
@@ -125,7 +150,14 @@ export default function TimelinePage() {
       const reqOffset = append ? nextOffsetRef.current : 0
       try {
         const qs = `start=${startDate}T00:00:00Z&end=${endDate}T23:59:59Z&limit=10&offset=${reqOffset}`
-        const res = await fetch(`/api/me/ws/${encodeURIComponent(slug)}/events?${qs}`)
+        // Both endpoints take the same query string and answer the same
+        // `{ events, total }`; only the workspace-scoped one adds the match
+        // fields. `/api/events` resolves the user from `x-user-id` and filters
+        // on it, so it can only ever return the caller's own rows.
+        const url = slug
+          ? `/api/me/ws/${encodeURIComponent(slug)}/events?${qs}`
+          : `/api/events?${qs}`
+        const res = await fetch(url)
         const json = await res.json()
         const nextEvents = (json.events ?? []) as TimelineEvent[]
         setData((prev) => ({
@@ -164,19 +196,7 @@ export default function TimelinePage() {
     </h1>
   )
 
-  if (!slug) {
-    return (
-      <div className="stack">
-        {title}
-        <EmptyState
-          title={meScreens.common.noWorkspaceTitle}
-          hint={meScreens.common.noWorkspaceBody}
-        />
-      </div>
-    )
-  }
-
-  const fresh = data?.slug === slug ? data : null
+  const fresh = data !== null && data.slug === slug ? data : null
   const loading = fresh === null
   const events = fresh?.events ?? []
   const total = fresh?.total ?? 0
@@ -216,6 +236,13 @@ export default function TimelinePage() {
       {!loading && (
         <p className="t-muted" style={{ margin: 0 }}>
           {meSettings.timeline.summary(total, sortedDates.length)}
+        </p>
+      )}
+
+      {/* Only in the personal reading, and only once - not per row. */}
+      {!slug && (
+        <p className="t-muted" style={{ margin: 0 }}>
+          {meSettings.timeline.personalOnlyNote}
         </p>
       )}
 

@@ -50,9 +50,44 @@ export const me = {
     workspaceEyebrow: 'Workspace',
     inOfficeNow: (n: number) => `${n} in office right now`,
     openWorkspace: 'Open workspace presence',
-    noWorkspaceTitle: 'No workspace yet',
-    noWorkspaceBody:
-      'Once you join a workspace your attendance summary shows up here.',
+  },
+
+  /**
+   * The create-or-join card, shown on `/me` home in place of the attendance
+   * stat grid when the account holds no active membership.
+   *
+   * It replaced a dead end. The old card said "No workspace yet / Once you join
+   * a workspace your attendance summary shows up here" and offered no way to
+   * join one - it named the missing thing and then stopped. This one carries
+   * the three routes in that actually exist: create one, accept an invitation
+   * already addressed to this email, or walk into a workspace that has verified
+   * the email's domain.
+   *
+   * `/me` is NOT blocked behind it. Check-in still works, the timeline still
+   * reads back, and the copy says so - a person can record their own presence
+   * without any organisation, and this is an offer rather than a gate.
+   *
+   * Workspace NAMES are printed here on purpose, against the `/me` rule that
+   * content under the pill must not repeat it: this is the one place on the
+   * surface where the reader is CHOOSING BETWEEN workspaces, so the name is the
+   * information rather than decoration. The pill above says "No workspace".
+   */
+  joinCard: {
+    title: 'Set up your workspace',
+    body:
+      'You can keep checking in without one - your presence and history are already yours. A workspace adds verification, leave and your team.',
+
+    createCta: 'Create a workspace',
+    createHint: "You'll be its owner, and you can create more than one.",
+
+    invitesTitle: 'Waiting for you',
+    /** Follows the workspace name on an invitation row. */
+    inviteBody: 'invited you to share your presence with them.',
+
+    domainTitle: 'Open to you',
+    /** Follows the workspace name on a verified-domain row. */
+    domainBody: 'has verified your email domain, so you can join without an invitation.',
+    domainCta: 'Join',
   },
 
   // ── check-in card ────────────────────────────────────────────────────────

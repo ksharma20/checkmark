@@ -13,15 +13,15 @@
 ```mermaid
 sequenceDiagram
   participant U as Admin Browser
-  participant API as /api/auth/register or /api/workspace
+  participant API as /api/workspace
   participant DB as Database
 
-  Note over U: During registration (org type)
+  Note over U: /ws/new — always a signed-in user, never part of sign-up
 
-  U->>API: POST /api/auth/register\n{ accountType: 'org', orgName, orgSlug, orgDomain, ... }
-  API->>API: verifyOtpCookie(email)
-  API->>DB: createUser(email, passwordHash, name)
-  API->>DB: createWorkspace({ slug, name, creatorUserId, creatorEmail, domains })
+  U->>API: POST /api/workspace\n{ name, slug }
+  API->>API: x-user-id / x-user-email from the session (never the body)
+  API->>API: validateSlug(slug) → 409 SLUG_TAKEN if it exists
+  API->>DB: createWorkspace({ slug, name, creatorUserId, creatorEmail })
 
   rect rgb(240,244,255)
     Note over DB: ONE db.transaction()
@@ -31,9 +31,14 @@ sequenceDiagram
     DB->>DB: INSERT workspace_domains per domain
   end
 
-  API->>API: createJwt + setSessionCookie
-  API-->>U: { redirect: '/ws/:slug' }
+  API-->>U: { workspace: { id, slug, name } }
 ```
+
+**Creation is no longer part of sign-up.** `POST /api/auth/register` used to
+create a workspace in the same request when `accountType === 'org'`; it does not
+any more, and the account-type question is gone from `/login` entirely. There is
+one creation path, and it belongs to someone who already has a session and has
+decided they want a workspace.
 
 **Two invariants live in this transaction:**
 
@@ -51,7 +56,7 @@ that has drifted from `system-roles.json`, and an owner backfilled from the
 oldest active admin. A workspace with no active admin is counted as `ownerless`
 and left alone.
 
-**Workspace limits:** an account may administer 1 active workspace, on every plan (a check in `POST /api/workspace`, not a plan limit). Attempting a second returns 403 `WORKSPACE_LIMIT_REACHED`.
+**Workspace limits:** there are none. `POST /api/workspace` used to refuse a second one with 403 `WORKSPACE_LIMIT_REACHED`, keyed on holding org access *anywhere* — so it also blocked someone who merely administers a workspace they did not create. That check is gone; multi-workspace membership is supported across the rest of the product. `maxLocations` in `src/lib/plans.ts` remains advisory and unenforced.
 
 ---
 

@@ -19,6 +19,7 @@ import { wsAnnouncements } from './en/ws-announcements'
 import { wsPerson } from './en/ws-person'
 import { wsReminders } from './en/ws-reminders'
 import { meAnnouncements } from './en/me-announcements'
+import { auth } from './en/auth'
 
 export const en = {
   // ── Per-area copy modules (src/locales/en/*.ts) ───────────────────────────
@@ -31,6 +32,7 @@ export const en = {
   meScreens,
   meSettings,
   meAnnouncements,
+  auth,
   marketing,
   documents,
   assets,
@@ -86,11 +88,6 @@ export const en = {
     ],
   },
 
-  auth: {
-    welcomeHeading: `Welcome to ${brand}`,
-    accountTypeHeading: `How will you use ${brand}?`,
-    sessionLogoutText: `Sign out of your ${brand} account on this device.`,
-  },
 
   consent: {
     // Used on the /consent/[token] page

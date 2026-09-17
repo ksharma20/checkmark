@@ -45,14 +45,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Slug is already taken', code: 'SLUG_TAKEN' }, { status: 409 })
   }
 
-  // Max 1 active workspace per admin
-  const activeWorkspaces = await getAdminWorkspacesForUser(userId)
-  if (activeWorkspaces.length >= 1) {
-    return NextResponse.json(
-      { error: 'You already have a workspace. Contact us to create additional workspaces.', code: 'WORKSPACE_LIMIT_REACHED' },
-      { status: 403 }
-    )
-  }
+  // No cap on how many workspaces one account may create.
+  //
+  // This used to answer `403 WORKSPACE_LIMIT_REACHED` to anybody whose account
+  // already held org access ANYWHERE - including in somebody else's workspace,
+  // which they did not create and cannot leave. Multi-workspace membership is
+  // supported by the whole rest of the product (`/me`'s workspace pill exists
+  // for exactly that), so the refusal only blocked the one person who wanted a
+  // second one of their own. `createWorkspace` still seeds the system roles in
+  // the same transaction as the workspace row (invariant 10), so every one of
+  // them has an owner who can actually run it.
 
   // Get user record to use email
   const user = await getUserByEmail(userEmail)

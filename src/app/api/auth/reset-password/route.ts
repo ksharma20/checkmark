@@ -3,6 +3,7 @@ import { getUserByEmail, updateUserPassword } from '@/lib/db/queries/users'
 import { verifyOtpCookie, createJwt, setSessionCookie, hashPassword } from '@/lib/auth'
 import { validatePassword } from '@/lib/password'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
+import { getRedirectAfterLogin } from '@/lib/permissions/ranks'
 
 export async function POST(request: NextRequest) {
   let body: { email?: string; newPassword?: string }
@@ -39,13 +40,11 @@ export async function POST(request: NextRequest) {
   const token = await createJwt(user.id, user.email)
   await setSessionCookie(token)
 
+  // One spelling of "where does this person land", shared with login, register
+  // and reactivate. Three hand-written copies of the same ladder is three places
+  // for it to drift.
   const adminWorkspaces = await getAdminWorkspacesForUser(user.id)
-  const redirect =
-    adminWorkspaces.length === 1
-      ? `/ws/${adminWorkspaces[0].slug}`
-      : adminWorkspaces.length > 1
-        ? '/ws'
-        : '/me'
+  const redirect = getRedirectAfterLogin(adminWorkspaces)
 
   return NextResponse.json({ success: true, redirect })
 }

@@ -48,8 +48,14 @@ export default function MeTopbar({ workspaces, userName, userEmail }: Props) {
 
   // The bell follows the active workspace so it only counts what is in scope.
   // With no workspace at all there is no slug to scope by, so it falls back to
-  // the global feed - that is where a pending invitation shows up, which is
-  // exactly the notification a workspace-less user needs.
+  // the unified feed across every workspace.
+  //
+  // That feed does NOT contain pending invitations. An invitation is a
+  // `workspace_members` row, not a `notifications` row, and nothing fans one out
+  // - this comment used to claim otherwise, which made the empty bell look like
+  // a bug rather than the truth. Invitations are answered on `/me` home's
+  // create-or-join card and on `/me/orgs`; putting them in the feed is its own
+  // piece of work.
   const bellPollUrl = active
     ? `/api/me/ws/${active.slug}/notifications/unread-count`
     : '/api/me/notifications/unread-count'
@@ -126,7 +132,12 @@ export default function MeTopbar({ workspaces, userName, userEmail }: Props) {
             <span aria-hidden="true" style={{ opacity: 0.6 }}>▾</span>
           </button>
         ) : (
-          <Link href="/me/orgs" className="ws-pill pressable" style={{ textDecoration: 'none' }}>
+          /* No workspace: the pill is still a way IN, not a label. It points at
+             the create-or-join card on `/me` home - the one surface that offers
+             all three routes (create, accept an invitation, walk in on a
+             verified domain) - rather than at `/me/orgs`, which lists
+             invitations but cannot create anything. */
+          <Link href="/me#join" className="ws-pill pressable" style={{ textDecoration: 'none' }}>
             <span className="swatch" style={{ background: 'var(--text-muted)' }} aria-hidden="true">
               +
             </span>

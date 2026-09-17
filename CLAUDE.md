@@ -8,7 +8,9 @@ CheckMark is a **presence intelligence platform**. Two PWA surfaces:
 
 **Core USP:** Multi-signal presence verification (AND, not OR). When a workspace has GPS + WiFi + IP signals configured, ALL must match for a check-in to count as verified. This makes faking presence extremely difficult.
 
-**Multi-workspace users:** One account can hold multiple active workspace memberships. `presence_events` rows do not store `workspace_id`; verification is always computed for a chosen workspace. On `/me` that workspace is the **active workspace** (see below), and **`/me/timeline`** is always scoped to it: it calls `GET /api/me/ws/[slug]/events`, which runs `queryWorkspaceEvents()` for that workspace and the current user so transparency matches admin-side AND semantics. The timeline's old **All workspaces** view is gone; `GET /api/events` (unscoped global history, no per-workspace `matched_by`) still exists as an endpoint but has no UI consumer.
+**Multi-workspace users:** One account can hold multiple active workspace memberships, and **an account may create as many workspaces as it likes** — `POST /api/workspace` no longer answers `403 WORKSPACE_LIMIT_REACHED`, which refused anyone who merely held org access in somebody else's workspace. `presence_events` rows do not store `workspace_id`; verification is always computed for a chosen workspace. On `/me` that workspace is the **active workspace** (see below), and **`/me/timeline`** is scoped to it whenever there is one: it calls `GET /api/me/ws/[slug]/events`, which runs `queryWorkspaceEvents()` for that workspace and the current user so transparency matches admin-side AND semantics.
+
+**And a user with NO workspace is not blocked.** `/me` is a product on its own: a person records their own presence and reads their own history with no organisation at all. With no active membership, `/me/timeline` falls back to `GET /api/events` — the unscoped personal history, which carries no `matched_by` because there is nothing to verify against — and says so in one line (`meSettings.timeline.personalOnlyNote`) rather than showing a column of chips that silently vanished. **This is not the retired "All workspaces" view coming back.** That was a *third* reading offered beside two real ones, chosen from a second picker this surface no longer has; the fallback is reachable only when there is nothing to scope to, is never a choice, and adds no picker.
 
 ---
 
@@ -23,6 +25,39 @@ It is backed by the `cm_ws` cookie (`en.constants.cookieWorkspace`), written fro
 Resolution order, everywhere: **`?ws=` → cookie → first active membership.** The server validates the value against the memberships it just loaded before seeding the provider, and the provider only ever resolves to a slug in that server-supplied list — a stale or forged value falls back to a real membership rather than naming someone else's workspace. This is UI hygiene, not access control: every `/api/me/ws/[slug]/*` route re-resolves the slug through `requireWsMember()` regardless.
 
 **No screen may add its own workspace picker.** `/me/timeline` used to have one — a second dropdown under the pill, which could disagree with it — and no longer does.
+
+### With no workspace, `/me` still works
+
+The pill reads **No workspace** and links to `/me#join`, and the home screen puts
+a **create-or-join card** (`src/app/me/JoinWorkspaceCard.tsx`) where the
+attendance stat grid would be. It is a normal card on a normal page — check-in
+still works, the timeline still reads back, and nothing is gated behind it. The
+card it replaced said "No workspace yet / once you join one your summary shows up
+here" and offered no way to join one: it named the missing thing and stopped.
+
+Three routes in, all of them already in the codebase; **no join-request table and
+no new endpoint were added**:
+
+| Offer | How |
+|---|---|
+| Create a workspace | a link to `/ws/new` |
+| A pending invitation for this email | `POST /api/me/consent`, the same call `/me/orgs` and `/join/[slug]` make — including the `410 INVITE_EXPIRED` handling, where the row stays and re-marks itself Expired so Decline still works |
+| A workspace whose **verified domain** matches the email | a link to `/join/[slug]`, which runs `autoEnrolIntoWorkspace()` server-side |
+
+Everything the card renders is resolved in `src/app/me/page.tsx` — a Server
+Component — and only when there is no workspace, so a member of one never pays
+for those queries and a new account's first screen is one render rather than
+three client waterfalls.
+
+The **workspace name is printed on every row**, which is the exception the rule
+below names: this is the one place on `/me` where the reader is *choosing
+between* workspaces, so the name is the information. The pill above says "No
+workspace", so it is not repeating anything either.
+
+**Pending invitations do NOT appear in the notification bell.** An invitation is
+a `workspace_members` row, not a `notifications` row, and nothing fans one out.
+`MeTopbar.tsx` claimed otherwise in a comment, which made the empty bell read as
+a bug. Answering an invitation happens on this card or on `/me/orgs`.
 
 ### Workspace naming
 
@@ -1041,6 +1076,52 @@ Run: `npm run migrate`.
 ---
 
 ## Auth System
+
+### There is one login, and it asks nothing about an organisation
+
+`src/app/(public)/login/page.tsx` is a single state machine:
+
+```
+email ─┬─ existing account ──── password ──────────────────┐
+       ├─ deactivated account ─ deactivated (reactivate) ──┤
+       └─ new email ─────────── otp ─── create account ────┤
+                                                           ├─▶ redirect
+password ─ "Forgot password?" ─ forgotPassword ─ otp ─ resetPassword ──┘
+```
+
+`otp` is shared by the two flows that need a code; `isResetFlow` is what tells
+them apart on the way out.
+
+**The Personal / Organisation question is gone**, along with `OrgSetupStep`, the
+live slug checker, and the `accountType` / `orgName` / `orgSlug` / `orgDomain`
+half of `POST /api/auth/register`. The answer was never stored: it only decided
+whether that route created a workspace in the same request, which is a question
+nobody can answer before they have seen the product. Creating a workspace is now
+its own act at `/ws/new` → `POST /api/workspace`, which is also the only path
+reachable by someone who already has one. Do not re-add an account type; there is
+nowhere to store it and nothing that would read it.
+
+`POST /api/auth/register` now does exactly five things, in an order where each
+step guards the next: the `cm_otp_ok` cookie must prove the email (invariant 3),
+`EMAIL_TAKEN` before any write, `claimPendingMemberships()` (which links
+`user_id` and **nothing else** — signing up is not consent, and the HR record is
+claimed in `acceptMembership()`), verified-domain auto-enrol, then the session
+cookie.
+
+**Where a session lands is one function.** `getRedirectAfterLogin()` in
+`src/lib/permissions/ranks.ts` — none → `/me`, one → `/ws/<slug>`, several →
+`/ws` — and login, register, `reset-password`, `/api/me/reactivate` and
+`/app/dashboard` all call it. Four of them used to spell the ladder out inline,
+and `/dashboard` disagreed: it sent everyone with org access to the `/ws` picker,
+which for the common case of one workspace was a list of one to click through.
+
+`/login?invite=<slug>` carries the invitation through **both** exits — after a
+successful sign-in or sign-up, *and* when the visitor already has a session. The
+second case used to redirect to `/me` and drop the invitation on the floor,
+landing the person on a screen that said nothing about the workspace that asked
+for them.
+
+All login copy lives in `src/locales/en/auth.ts` (invariant 16).
 
 | Cookie | Purpose | Expiry |
 |--------|---------|--------|

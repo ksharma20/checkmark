@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { getSessionFromCookies } from '@/lib/auth'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
+import { getRedirectAfterLogin } from '@/lib/permissions/ranks'
 
 /**
  * "Take me to my dashboard" — resolved on the server, because only the server
@@ -23,6 +24,11 @@ export default async function DashboardPage() {
 
   // Any workspace where they hold org access. Empty means they are a plain
   // member everywhere, and `/me` is their whole product.
+  //
+  // Resolved by the SAME helper login, register, reset-password and reactivate
+  // use, so "my dashboard" is the place signing in would have taken them. This
+  // used to send everyone with org access to the `/ws` picker, which for the
+  // common case - exactly one workspace - was a list of one to click through.
   const orgWorkspaces = await getAdminWorkspacesForUser(session.sub)
-  redirect(orgWorkspaces.length > 0 ? '/ws' : '/me')
+  redirect(getRedirectAfterLogin(orgWorkspaces))
 }

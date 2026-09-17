@@ -1,21 +1,59 @@
 'use client'
 
-import { useState, useEffect, useRef, Suspense } from 'react'
+/**
+ * The one login.
+ *
+ * There is a single door into the product and a single state machine behind it:
+ *
+ *   email ─┬─ existing account ──── password ──────────────────┐
+ *          ├─ deactivated account ─ deactivated (reactivate) ──┤
+ *          └─ new email ─────────── otp ─── createAccount ─────┤
+ *                                                              ├─▶ handleSuccess
+ *   password ─ "Forgot password?" ─ forgotPassword ─ otp ─ resetPassword ──┘
+ *
+ * `otp` is shared by the two flows that need a code, and `isResetFlow` is what
+ * tells them apart on the way out - reset goes to `resetPassword`, a new email
+ * goes to `createAccount`.
+ *
+ * **Sign-up no longer asks what KIND of account this is.** The Personal /
+ * Organisation cards, the whole `OrgSetupStep` with its live slug checker, and
+ * the `accountType` / `orgName` / `orgSlug` / `orgDomain` half of
+ * `POST /api/auth/register` are gone. The answer was never stored: it only
+ * decided whether a workspace was created in the same request, which is a
+ * question nobody can answer before they have seen the product. Creating a
+ * workspace is now its own act at `/ws/new`, and `/me` stands on its own without
+ * one - a person can record their own presence and read their own history with
+ * no organisation at all.
+ *
+ * All copy lives in `src/locales/en/auth.ts` (invariant 16).
+ */
+
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useIsLoggedIn } from '@/hooks/useIsLoggedIn';
 
 import Image from 'next/image'
 import { en } from '@/locales/en'
+import { auth } from '@/locales/en/auth'
 import { startProgress, stopProgress } from '@/components/shared/TopProgressBar'
 import { Button, Card, Field, Input } from '@/components/ui'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Step = 'email' | 'password' | 'otp' | 'accountType' | 'personal' | 'org' | 'deactivated' | 'forgotPassword' | 'resetPassword'
+type Step =
+  | 'email'
+  | 'password'
+  | 'otp'
+  | 'createAccount'
+  | 'deactivated'
+  | 'forgotPassword'
+  | 'resetPassword'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 // ─── Shared primitives ────────────────────────────────────────────────────────
 //
-// These are thin adapters over src/components/ui. They exist so the eight step
+// These are thin adapters over src/components/ui. They exist so the step
 // components below keep the prop shapes they were written against - `onChange`
 // takes a string, not an event - while the actual markup, focus ring, invalid
 // border and label wiring all come from the design system.
@@ -103,7 +141,7 @@ function PrimaryBtn({
 }) {
   return (
     <Button block loading={loading} onClick={onClick} className="min-h-11">
-      {loading ? 'Please wait…' : children}
+      {loading ? auth.common.pleaseWait : children}
     </Button>
   )
 }
@@ -111,7 +149,7 @@ function PrimaryBtn({
 function BackLink({ onClick }: { onClick: () => void }) {
   return (
     <Button variant="ghost" size="sm" onClick={onClick} className="-ml-3 mb-5 min-h-11">
-      ← Back
+      {auth.common.back}
     </Button>
   )
 }
@@ -142,11 +180,11 @@ function EmailStep({
   const [error, setError] = useState<string | null>(null)
   const [emailTouched, setEmailTouched] = useState(false)
 
-  const emailInvalid = emailTouched && email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  const emailInvalid = emailTouched && email.trim() !== '' && !EMAIL_RE.test(email.trim())
 
   async function proceed() {
     const e = email.toLowerCase().trim()
-    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
+    if (!e || !EMAIL_RE.test(e)) {
       setEmailTouched(true)
       return
     }
@@ -174,11 +212,11 @@ function EmailStep({
           onNew(e)
         } else {
           const otpData = await otpRes.json()
-          setError(otpData.error || 'Failed to send verification code')
+          setError(otpData.error || auth.email.otpSendFailed)
         }
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(auth.common.genericError)
     } finally {
       setLoading(false)
       stopProgress()
@@ -188,7 +226,7 @@ function EmailStep({
   return (
     <div>
       <h1 className="mb-2 flex items-center gap-2 font-heading text-[26px] font-bold text-navy">
-        Welcome to{' '}
+        {auth.email.headingPrefix}{' '}
         <Image
           src="/logo.png"
           alt={en.brand.name}
@@ -198,13 +236,11 @@ function EmailStep({
           priority
         />
       </h1>
-      <p className="mb-7 text-sm text-text-secondary">
-        Enter your email to sign in or create an account.
-      </p>
+      <p className="mb-7 text-sm text-text-secondary">{auth.email.subtitle}</p>
       <FieldGroup
-        label="Email address"
+        label={auth.email.label}
         htmlFor="login-email"
-        error={emailInvalid ? 'Please enter a valid email address.' : null}
+        error={emailInvalid ? auth.email.invalid : null}
       >
         <TextInput
           id="login-email"
@@ -212,7 +248,7 @@ function EmailStep({
           value={email}
           onChange={(v) => { setEmail(v); if (error) setError(null) }}
           onBlur={() => setEmailTouched(true)}
-          placeholder="you@company.com"
+          placeholder={auth.email.placeholder}
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && proceed()}
           hasError={emailInvalid}
@@ -220,7 +256,7 @@ function EmailStep({
         />
       </FieldGroup>
       <PrimaryBtn onClick={proceed} loading={loading}>
-        Continue
+        {auth.email.submit}
       </PrimaryBtn>
       <ErrorMsg text={error} />
     </div>
@@ -246,7 +282,7 @@ function PasswordStep({
 
   async function signIn() {
     if (!password) {
-      setError('Please enter your password')
+      setError(auth.password.required)
       return
     }
     setLoading(true)
@@ -262,10 +298,10 @@ function PasswordStep({
       if (res.ok) {
         onSuccess(data.redirect ?? '/me')
       } else {
-        setError(data.error || 'Incorrect password')
+        setError(data.error || auth.password.incorrect)
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(auth.common.genericError)
     } finally {
       setLoading(false)
       stopProgress()
@@ -275,15 +311,15 @@ function PasswordStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Sign in</h1>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">{auth.password.heading}</h1>
       <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
-      <FieldGroup label="Password" htmlFor="login-password" error={error}>
+      <FieldGroup label={auth.password.label} htmlFor="login-password" error={error}>
         <TextInput
           id="login-password"
           type="password"
           value={password}
           onChange={(v) => { setPassword(v); if (error) setError(null) }}
-          placeholder="Your password"
+          placeholder={auth.password.placeholder}
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && signIn()}
           hasError={!!error}
@@ -291,7 +327,7 @@ function PasswordStep({
         />
       </FieldGroup>
       <PrimaryBtn onClick={signIn} loading={loading}>
-        Sign in
+        {auth.password.submit}
       </PrimaryBtn>
       <Button
         variant="ghost"
@@ -299,7 +335,7 @@ function PasswordStep({
         onClick={onForgotPassword}
         className="-ml-3 mt-1 min-h-11 underline"
       >
-        Forgot password?
+        {auth.password.forgot}
       </Button>
     </div>
   )
@@ -321,7 +357,7 @@ function DeactivatedStep({
   const [error, setError] = useState<string | null>(null)
 
   async function reactivate() {
-    if (!password) { setError('Please enter your password'); return }
+    if (!password) { setError(auth.deactivated.required); return }
     setLoading(true)
     setError(null)
     startProgress()
@@ -335,10 +371,10 @@ function DeactivatedStep({
       if (res.ok) {
         onSuccess(data.redirect ?? '/me')
       } else {
-        setError(data.error || 'Reactivation failed')
+        setError(data.error || auth.deactivated.failed)
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(auth.common.genericError)
     } finally {
       setLoading(false)
       stopProgress()
@@ -348,18 +384,20 @@ function DeactivatedStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Account deactivated</h1>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">
+        {auth.deactivated.heading}
+      </h1>
       <p className="mb-5 text-[13px] text-text-secondary">{email}</p>
       <p className="mb-5 rounded-md border border-amber bg-[color-mix(in_srgb,var(--amber)_10%,transparent)] px-3.5 py-3 text-[13px] leading-relaxed text-text-secondary">
-        This account was deactivated. Your data is intact - enter your password to reactivate and sign in.
+        {auth.deactivated.notice}
       </p>
-      <FieldGroup label="Password" htmlFor="reactivate-password" error={error}>
+      <FieldGroup label={auth.deactivated.label} htmlFor="reactivate-password" error={error}>
         <TextInput
           id="reactivate-password"
           type="password"
           value={password}
           onChange={(v) => { setPassword(v); if (error) setError(null) }}
-          placeholder="Your password"
+          placeholder={auth.deactivated.placeholder}
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && reactivate()}
           hasError={!!error}
@@ -367,13 +405,13 @@ function DeactivatedStep({
         />
       </FieldGroup>
       <PrimaryBtn onClick={reactivate} loading={loading}>
-        Reactivate account
+        {auth.deactivated.submit}
       </PrimaryBtn>
     </div>
   )
 }
 
-// ─── OTP step (new user) ──────────────────────────────────────────────────────
+// ─── OTP step (new user, and the reset flow) ──────────────────────────────────
 
 function OtpStep({
   email,
@@ -393,7 +431,7 @@ function OtpStep({
   async function verify() {
     const c = code.trim()
     if (c.length !== 6) {
-      setError('Please enter the 6-digit code')
+      setError(auth.otp.lengthError)
       return
     }
     setLoading(true)
@@ -409,10 +447,10 @@ function OtpStep({
         onVerified()
       } else {
         const data = await res.json()
-        setError(data.error || 'Invalid code')
+        setError(data.error || auth.otp.invalid)
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(auth.common.genericError)
     } finally {
       setLoading(false)
       stopProgress()
@@ -431,10 +469,10 @@ function OtpStep({
         body: JSON.stringify({ email }),
       })
       if (res.ok) {
-        setResendMsg('New code sent')
+        setResendMsg(auth.otp.resent)
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to resend')
+        setError(data.error || auth.otp.resendFailed)
       }
     } finally {
       setResending(false)
@@ -445,17 +483,17 @@ function OtpStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Check your inbox</h1>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">{auth.otp.heading}</h1>
       <p className="mb-6 text-[13px] text-text-secondary">
-        We sent a 6-digit code to <strong>{email}</strong>
+        {auth.otp.body} <strong>{email}</strong>
       </p>
-      <FieldGroup label="Verification code" htmlFor="otp-code" error={error}>
+      <FieldGroup label={auth.otp.label} htmlFor="otp-code" error={error}>
         <TextInput
           id="otp-code"
           type="text"
           value={code}
           onChange={(v) => { setCode(v.replace(/\D/g, '').slice(0, 6)); if (error) setError(null) }}
-          placeholder="123456"
+          placeholder={auth.otp.placeholder}
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && verify()}
           hasError={!!error}
@@ -463,7 +501,7 @@ function OtpStep({
         />
       </FieldGroup>
       <PrimaryBtn onClick={verify} loading={loading}>
-        Verify
+        {auth.otp.submit}
       </PrimaryBtn>
       {resendMsg && (
         <p role="status" className="mt-2.5 text-[13px] text-brand">
@@ -477,7 +515,7 @@ function OtpStep({
         loading={resending}
         className="-ml-3 mt-3 min-h-11"
       >
-        {resending ? 'Sending…' : 'Resend code'}
+        {resending ? auth.otp.resending : auth.otp.resend}
       </Button>
     </div>
   )
@@ -500,8 +538,8 @@ function ForgotPasswordStep({
 
   async function sendResetCode() {
     const e = email.toLowerCase().trim()
-    if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) {
-      setError('Please enter a valid email address')
+    if (!e || !EMAIL_RE.test(e)) {
+      setError(auth.forgotPassword.invalid)
       return
     }
     setLoading(true)
@@ -516,10 +554,10 @@ function ForgotPasswordStep({
         onCodeSent(e)
       } else {
         const data = await res.json()
-        setError(data.error || 'Failed to send reset code')
+        setError(data.error || auth.forgotPassword.failed)
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(auth.common.genericError)
     } finally {
       setLoading(false)
     }
@@ -528,17 +566,17 @@ function ForgotPasswordStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Reset your password</h1>
-      <p className="mb-6 text-sm text-text-secondary">
-        Enter your email and we&apos;ll send a reset code.
-      </p>
-      <FieldGroup label="Email address" htmlFor="reset-email" error={error}>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">
+        {auth.forgotPassword.heading}
+      </h1>
+      <p className="mb-6 text-sm text-text-secondary">{auth.forgotPassword.body}</p>
+      <FieldGroup label={auth.forgotPassword.label} htmlFor="reset-email" error={error}>
         <TextInput
           id="reset-email"
           type="email"
           value={email}
           onChange={(v) => { setEmail(v); if (error) setError(null) }}
-          placeholder="your@email.com"
+          placeholder={auth.forgotPassword.placeholder}
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && sendResetCode()}
           hasError={!!error}
@@ -546,7 +584,7 @@ function ForgotPasswordStep({
         />
       </FieldGroup>
       <PrimaryBtn onClick={sendResetCode} loading={loading}>
-        Send reset code
+        {auth.forgotPassword.submit}
       </PrimaryBtn>
     </div>
   )
@@ -567,7 +605,7 @@ function ResetPasswordStep({
 
   async function resetPassword() {
     if (password.length < 8) {
-      setError('Password must be at least 8 characters')
+      setError(auth.resetPassword.tooShort)
       return
     }
     setLoading(true)
@@ -582,10 +620,10 @@ function ResetPasswordStep({
       if (res.ok) {
         onSuccess(data.redirect ?? '/me')
       } else {
-        setError(data.error ?? 'Reset failed')
+        setError(data.error ?? auth.resetPassword.failed)
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(auth.common.genericError)
     } finally {
       setLoading(false)
     }
@@ -593,18 +631,18 @@ function ResetPasswordStep({
 
   return (
     <div>
-      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Set new password</h1>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">
+        {auth.resetPassword.heading}
+      </h1>
       <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
-      <p className="mb-4 text-sm text-text-secondary">
-        Choose a new password (min 8 characters).
-      </p>
-      <FieldGroup label="New password" htmlFor="new-password" error={error}>
+      <p className="mb-4 text-sm text-text-secondary">{auth.resetPassword.body}</p>
+      <FieldGroup label={auth.resetPassword.label} htmlFor="new-password" error={error}>
         <TextInput
           id="new-password"
           type="password"
           value={password}
           onChange={(v) => { setPassword(v); if (error) setError(null) }}
-          placeholder="New password"
+          placeholder={auth.resetPassword.placeholder}
           autoFocus
           onKeyDown={(e) => e.key === 'Enter' && resetPassword()}
           hasError={!!error}
@@ -612,74 +650,20 @@ function ResetPasswordStep({
         />
       </FieldGroup>
       <PrimaryBtn onClick={resetPassword} loading={loading}>
-        Set new password
+        {auth.resetPassword.submit}
       </PrimaryBtn>
     </div>
   )
 }
 
-// ─── Account type selection ───────────────────────────────────────────────────
-
-function AccountTypeStep({
-  onPersonal,
-  onOrg,
-}: {
-  onPersonal: () => void
-  onOrg: () => void
-}) {
-  return (
-    <div>
-      <h1 className="mb-2 font-heading text-[22px] font-bold text-navy">
-        How will you use {en.brand.name}?
-      </h1>
-      <p className="mb-7 text-sm text-text-secondary">
-        Choose the type of account to set up.
-      </p>
-
-      <div className="stack">
-        <AccountTypeCard
-          title="Personal"
-          description="Track your own presence. Join workspaces when invited by your org."
-          onClick={onPersonal}
-        />
-        <AccountTypeCard
-          title="Organisation"
-          description="Set up a workspace for your team. See who is in the office, when."
-          onClick={onOrg}
-        />
-      </div>
-    </div>
-  )
-}
+// ─── Create account ───────────────────────────────────────────────────────────
 
 /**
- * A `.card` that is also a button. The hover border used to be tracked in React
- * state; `.hoverlift` does it in CSS, and only on devices that actually hover.
+ * The last step of sign-up, and the only one. It asks for a name and a password
+ * and nothing about an organisation: `POST /api/auth/register` no longer creates
+ * a workspace, and a person who wants one goes to `/ws/new` once they are in.
  */
-function AccountTypeCard({
-  title,
-  description,
-  onClick,
-}: {
-  title: string
-  description: string
-  onClick: () => void
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="card hoverlift pressable w-full cursor-pointer text-left"
-    >
-      <p className="mb-1 font-heading text-[15px] font-semibold text-navy">{title}</p>
-      <p className="text-[13px] text-text-secondary">{description}</p>
-    </button>
-  )
-}
-
-// ─── Personal setup ───────────────────────────────────────────────────────────
-
-function PersonalSetupStep({
+function CreateAccountStep({
   email,
   onBack,
   onSuccess,
@@ -695,9 +679,9 @@ function PersonalSetupStep({
   const [error, setError] = useState<string | null>(null)
 
   async function register() {
-    if (!fullName.trim()) { setError('Please enter your name'); return }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
-    if (password !== confirm) { setError('Passwords do not match'); return }
+    if (!fullName.trim()) { setError(auth.createAccount.nameRequired); return }
+    if (password.length < 8) { setError(auth.createAccount.passwordTooShort); return }
+    if (password !== confirm) { setError(auth.createAccount.mismatch); return }
     setLoading(true)
     setError(null)
     startProgress()
@@ -709,17 +693,16 @@ function PersonalSetupStep({
           email,
           full_name: fullName.trim(),
           password,
-          accountType: 'personal',
         }),
       })
       const data = await res.json()
       if (res.ok) {
         onSuccess(data.redirect ?? '/me')
       } else {
-        setError(data.error || 'Registration failed')
+        setError(data.error || auth.createAccount.failed)
       }
     } catch {
-      setError('Something went wrong. Please try again.')
+      setError(auth.common.genericError)
     } finally {
       setLoading(false)
       stopProgress()
@@ -729,24 +712,32 @@ function PersonalSetupStep({
   return (
     <div>
       <BackLink onClick={onBack} />
-      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Create your account</h1>
+      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">
+        {auth.createAccount.heading}
+      </h1>
       <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
 
-      <FieldGroup label="Your name" htmlFor="personal-name">
-        <TextInput id="personal-name" value={fullName} onChange={setFullName} placeholder="Jane Doe" autoFocus />
-      </FieldGroup>
-      <FieldGroup label="Password" htmlFor="personal-password">
+      <FieldGroup label={auth.createAccount.nameLabel} htmlFor="signup-name">
         <TextInput
-          id="personal-password"
+          id="signup-name"
+          value={fullName}
+          onChange={setFullName}
+          placeholder={auth.createAccount.namePlaceholder}
+          autoFocus
+        />
+      </FieldGroup>
+      <FieldGroup label={auth.createAccount.passwordLabel} htmlFor="signup-password">
+        <TextInput
+          id="signup-password"
           type="password"
           value={password}
           onChange={setPassword}
-          placeholder="At least 8 characters"
+          placeholder={auth.createAccount.passwordPlaceholder}
         />
       </FieldGroup>
-      <FieldGroup label="Confirm password" htmlFor="personal-confirm">
+      <FieldGroup label={auth.createAccount.confirmLabel} htmlFor="signup-confirm">
         <TextInput
-          id="personal-confirm"
+          id="signup-confirm"
           type="password"
           value={confirm}
           onChange={setConfirm}
@@ -755,221 +746,7 @@ function PersonalSetupStep({
       </FieldGroup>
 
       <PrimaryBtn onClick={register} loading={loading}>
-        Create account
-      </PrimaryBtn>
-      <ErrorMsg text={error} />
-    </div>
-  )
-}
-
-// ─── Org setup ────────────────────────────────────────────────────────────────
-
-type SlugStatus = 'idle' | 'checking' | 'available' | 'taken' | 'invalid'
-
-function useSlugCheck(slug: string): SlugStatus {
-  const [status, setStatus] = useState<SlugStatus>('idle')
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  useEffect(() => {
-    if (timerRef.current) clearTimeout(timerRef.current)
-    if (!slug || slug.length < 2) {
-      setStatus('idle')
-      return
-    }
-    if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]{2}$/.test(slug)) {
-      setStatus('invalid')
-      return
-    }
-    setStatus('checking')
-    timerRef.current = setTimeout(async () => {
-      try {
-        const res = await fetch('/api/workspace/check-slug', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ slug }),
-        })
-        const data = await res.json()
-        setStatus(data.available ? 'available' : 'taken')
-      } catch {
-        setStatus('idle')
-      }
-    }, 400)
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
-  }, [slug])
-
-  return status
-}
-
-function SlugHint({ status }: { status: SlugStatus }) {
-  const hints: Record<SlugStatus, { text: string; className: string }> = {
-    idle: { text: 'Lowercase letters, numbers, hyphens', className: 'text-text-muted' },
-    checking: { text: 'Checking availability…', className: 'text-text-secondary' },
-    available: { text: '✓ Available', className: 'text-brand' },
-    taken: { text: '✗ Already taken', className: 'text-danger' },
-    invalid: { text: 'Only lowercase letters, numbers and hyphens', className: 'text-amber' },
-  }
-  const hint = hints[status]
-  return (
-    <p
-      id="org-slug-hint"
-      /* Availability arrives after a debounce, so it has to be announced. */
-      aria-live="polite"
-      className={`mt-1.5 text-[12.5px] ${hint.className}`}
-    >
-      {hint.text}
-    </p>
-  )
-}
-
-function OrgSetupStep({
-  email,
-  onBack,
-  onSuccess,
-}: {
-  email: string
-  onBack: () => void
-  onSuccess: (redirect: string) => void
-}) {
-  const [orgName, setOrgName] = useState('')
-  const [orgSlug, setOrgSlug] = useState('')
-  const [orgDomain, setOrgDomain] = useState('')
-  const [fullName, setFullName] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirm, setConfirm] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const slugStatus = useSlugCheck(orgSlug)
-
-  function handleOrgName(name: string) {
-    setOrgName(name)
-    const auto = name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .slice(0, 48)
-    setOrgSlug(auto)
-  }
-
-  async function register() {
-    if (!orgName.trim()) { setError('Organisation name is required'); return }
-    if (!orgSlug || slugStatus !== 'available') {
-      setError('Please choose a valid, available URL handle')
-      return
-    }
-    if (!fullName.trim()) { setError('Your name is required'); return }
-    if (password.length < 8) { setError('Password must be at least 8 characters'); return }
-    if (password !== confirm) { setError('Passwords do not match'); return }
-    setLoading(true)
-    setError(null)
-    startProgress()
-    try {
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          full_name: fullName.trim(),
-          password,
-          accountType: 'org',
-          orgName: orgName.trim(),
-          orgSlug,
-          orgDomain: orgDomain.trim() || undefined,
-        }),
-      })
-      const data = await res.json()
-      if (res.ok) {
-        onSuccess(data.redirect ?? '/ws')
-      } else {
-        setError(data.error || 'Registration failed')
-      }
-    } catch {
-      setError('Something went wrong. Please try again.')
-    } finally {
-      setLoading(false)
-      stopProgress()
-    }
-  }
-
-  return (
-    <div>
-      <BackLink onClick={onBack} />
-      <h1 className="mb-1 font-heading text-[22px] font-bold text-navy">Set up your organisation</h1>
-      <p className="mb-6 text-[13px] text-text-secondary">{email}</p>
-
-      {/* Org section */}
-      <h2 className="t-eyebrow mb-3">Organisation</h2>
-
-      <FieldGroup label="Organisation name" htmlFor="org-name">
-        <TextInput id="org-name" value={orgName} onChange={handleOrgName} placeholder="Acme Corp" autoFocus />
-      </FieldGroup>
-
-      <div className="mb-4">
-        <label className="field-label" htmlFor="org-slug">
-          URL handle
-        </label>
-        {/* A composite control, so it borrows `.input`'s border and fill rather
-            than being one: the `/ws/` prefix sits inside the same frame. */}
-        <div className="flex h-12 items-center overflow-hidden rounded-md border border-border bg-surface-2 focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--ring)]">
-          <span className="flex h-full shrink-0 items-center whitespace-nowrap border-r border-border bg-surface-1 px-2.5 text-[13px] text-text-secondary">
-            /ws/
-          </span>
-          <input
-            id="org-slug"
-            type="text"
-            value={orgSlug}
-            onChange={(e) =>
-              setOrgSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))
-            }
-            placeholder="acme-corp"
-            aria-describedby="org-slug-hint"
-            className="h-full min-w-0 flex-1 border-none bg-transparent px-3 font-mono text-sm text-text-primary outline-none"
-          />
-        </div>
-        <SlugHint status={slugStatus} />
-      </div>
-
-      <FieldGroup
-        label="Company email domain (optional)"
-        htmlFor="org-domain"
-        hint="Employees with this domain are auto-enrolled when they sign up."
-      >
-        <TextInput id="org-domain" value={orgDomain} onChange={setOrgDomain} placeholder="acme.com" />
-      </FieldGroup>
-
-      <div className="divider" role="separator" />
-
-      {/* Personal section */}
-      <h2 className="t-eyebrow mb-3">Your account</h2>
-
-      <FieldGroup label="Your name" htmlFor="org-owner-name">
-        <TextInput id="org-owner-name" value={fullName} onChange={setFullName} placeholder="Jane Doe" />
-      </FieldGroup>
-      <FieldGroup label="Password" htmlFor="org-owner-password">
-        <TextInput
-          id="org-owner-password"
-          type="password"
-          value={password}
-          onChange={setPassword}
-          placeholder="At least 8 characters"
-        />
-      </FieldGroup>
-      <FieldGroup label="Confirm password" htmlFor="org-owner-confirm">
-        <TextInput
-          id="org-owner-confirm"
-          type="password"
-          value={confirm}
-          onChange={setConfirm}
-          onKeyDown={(e) => e.key === 'Enter' && register()}
-        />
-      </FieldGroup>
-
-      <PrimaryBtn onClick={register} loading={loading}>
-        Create organisation
+        {auth.createAccount.submit}
       </PrimaryBtn>
       <ErrorMsg text={error} />
     </div>
@@ -985,16 +762,20 @@ function LoginFlow() {
   const [email, setEmail] = useState('')
   const [isResetFlow, setIsResetFlow] = useState(false)
 
+  // `?invite=<slug>` is the whole reason somebody signed in, so it outranks the
+  // redirect the API suggests - both here and for a session that already exists.
+  const invite = searchParams.get('invite')
+
   const isLoggedIn = useIsLoggedIn();
   useEffect(() => {
-     if (isLoggedIn) {
-      router.replace('/me');
-      return;
-    }
-  },[isLoggedIn, router])
+    if (!isLoggedIn) return
+    // Landing here already signed in with an invitation in hand used to drop the
+    // invitation on the floor and go to `/me`, leaving the person on a screen
+    // that says nothing about the workspace that asked for them.
+    router.replace(invite ? `/join/${invite}` : '/me');
+  }, [isLoggedIn, invite, router])
 
   function handleSuccess(redirect: string) {
-    const invite = searchParams.get('invite')
     if (invite) {
       router.push(`/join/${invite}`)
     } else {
@@ -1042,32 +823,13 @@ function LoginFlow() {
           <OtpStep
             email={email}
             onBack={() => setStep(isResetFlow ? 'forgotPassword' : 'email')}
-            onVerified={() => {
-              if (isResetFlow) {
-                setStep('resetPassword')
-              } else {
-                setStep('accountType')
-              }
-            }}
+            onVerified={() => setStep(isResetFlow ? 'resetPassword' : 'createAccount')}
           />
         )}
-        {step === 'accountType' && (
-          <AccountTypeStep
-            onPersonal={() => setStep('personal')}
-            onOrg={() => setStep('org')}
-          />
-        )}
-        {step === 'personal' && (
-          <PersonalSetupStep
+        {step === 'createAccount' && (
+          <CreateAccountStep
             email={email}
-            onBack={() => setStep('accountType')}
-            onSuccess={handleSuccess}
-          />
-        )}
-        {step === 'org' && (
-          <OrgSetupStep
-            email={email}
-            onBack={() => setStep('accountType')}
+            onBack={() => setStep('email')}
             onSuccess={handleSuccess}
           />
         )}

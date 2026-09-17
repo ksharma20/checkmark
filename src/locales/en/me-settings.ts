@@ -24,6 +24,17 @@ export const meSettings = {
     /** "12 check-ins · 8 days" - the line under the range pickers. */
     summary: (checkins: number, days: number) =>
       `${checkins} check-in${checkins === 1 ? '' : 's'} · ${days} day${days === 1 ? '' : 's'}`,
+    /**
+     * Shown ONLY in the no-workspace fallback, where the rows come from the
+     * unscoped `/api/events` and carry no `matched_by`.
+     *
+     * The verification chip is missing from every row on that reading, and an
+     * unexplained absence reads as a bug. It says what is true - there is
+     * nothing to verify against until a workspace has configured signals - in
+     * one line, rather than leaving the reader to work it out.
+     */
+    personalOnlyNote:
+      'This is your own record. Verification starts once you join a workspace - there is nothing to check these against yet.',
   },
 
   // ── the row rendered per presence event ───────────────────────────────────

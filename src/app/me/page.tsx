@@ -4,7 +4,10 @@ import { getOpenEventToday, getUserEvents } from "@/lib/db/queries/events";
 import {
   getUserWorkspaces,
   getWorkspacesByIds,
+  getMembershipsByEmail,
+  getVerifiedDomainsForEmail,
 } from "@/lib/db/queries/workspaces";
+import { isInviteExpired } from "@/lib/membership";
 import { getUserById } from "@/lib/db/queries/users";
 import { getUserStats } from "@/lib/db/queries/stats";
 import { getLeaveTypesWithBalance } from "@/lib/db/queries/leaves";
@@ -21,6 +24,10 @@ import CheckinButtons, {
 } from "@/components/user/CheckinButtons";
 import { me } from "@/locales/en/me";
 import { resolveActiveWorkspaceSlug } from "./active-workspace";
+import JoinWorkspaceCard, {
+  type JoinCardDomainWorkspace,
+  type JoinCardInvite,
+} from "./JoinWorkspaceCard";
 
 /** Day after `YYYY-MM-DD`, used to close the workspace-local "today" window. */
 function nextDay(dateStr: string): string {
@@ -167,6 +174,65 @@ export default async function MePage() {
     ).size;
   }
 
+  // With no workspace, the stat grid has nothing to count, so the create-or-join
+  // card takes its place. Everything it needs is resolved HERE, in the Server
+  // Component, rather than by the card fetching three things after it mounts -
+  // this page is already awaiting a batch of queries, and a card that appears
+  // empty and then fills in reads as a loading bug on the one screen a new
+  // account lands on.
+  //
+  // Only fetched when there is no workspace: a member of one never sees the card
+  // and must not pay for its queries on every home render.
+  let joinInvites: JoinCardInvite[] = [];
+  let joinDomainWorkspaces: JoinCardDomainWorkspace[] = [];
+
+  if (!primaryWorkspace) {
+    const [emailMemberships, domainWorkspaceIds] = await Promise.all([
+      getMembershipsByEmail(user.email),
+      getVerifiedDomainsForEmail(user.email),
+    ]);
+
+    const pending = emailMemberships.filter((m) => m.status === "pending_consent");
+    const pendingWorkspaceIds = new Set(pending.map((m) => m.workspace_id));
+    // A membership in ANY non-pending state - active, declined, revoked,
+    // no_access - is a decision this workspace has already recorded, so the
+    // domain offer would be re-offering something the row already answers.
+    const knownWorkspaceIds = new Set(
+      emailMemberships
+        .filter((m) => m.status !== "pending_consent")
+        .map((m) => m.workspace_id),
+    );
+
+    const domainOnlyIds = domainWorkspaceIds.filter(
+      (id) => !pendingWorkspaceIds.has(id) && !knownWorkspaceIds.has(id),
+    );
+
+    const joinRows = await getWorkspacesByIds([
+      ...pendingWorkspaceIds,
+      ...domainOnlyIds,
+    ]);
+    const joinMap = new Map(joinRows.map((w) => [w.id, w]));
+
+    // An archived workspace is not joinable, so neither row type may name one.
+    joinInvites = pending.flatMap((m) => {
+      const ws = joinMap.get(m.workspace_id);
+      if (!ws || ws.archived_at) return [];
+      return [{
+        memberId: m.id,
+        workspaceName: ws.name,
+        // Decided on the server so SSR and hydration cannot land either side of
+        // the deadline and flip the row under the reader.
+        expired: isInviteExpired(m.consent_token_expires_at),
+      }];
+    });
+
+    joinDomainWorkspaces = domainOnlyIds.flatMap((id) => {
+      const ws = joinMap.get(id);
+      if (!ws || ws.archived_at) return [];
+      return [{ slug: ws.slug, name: ws.name }];
+    });
+  }
+
   // Prefer workspace-matched rows for today so the session list can show the
   // verified/partial badge; fall back to the raw events when there is no
   // workspace to match against.
@@ -223,11 +289,13 @@ export default async function MePage() {
           />
         </div>
       ) : (
-        <div className="card fx-spring" style={{ marginTop: "14px" }}>
-          <p className="t-h2">{me.home.noWorkspaceTitle}</p>
-          <p className="t-secondary" style={{ marginTop: "6px" }}>
-            {me.home.noWorkspaceBody}
-          </p>
+        /* `id` is the anchor the top bar's "+ No workspace" pill points at, so
+           the pill has somewhere to go from any `/me` screen. */
+        <div id="join">
+          <JoinWorkspaceCard
+            invites={joinInvites}
+            domainWorkspaces={joinDomainWorkspaces}
+          />
         </div>
       )}
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserByEmailIncludeDeleted, reactivateUser } from '@/lib/db/queries/users'
 import { getAdminWorkspacesForUser } from '@/lib/db/queries/workspaces'
+import { getRedirectAfterLogin } from '@/lib/permissions/ranks'
 import { verifyPassword, createJwt, setSessionCookie } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
@@ -34,10 +35,10 @@ export async function POST(request: NextRequest) {
   const token = await createJwt(user.id, user.email)
   await setSessionCookie(token)
 
+  // Same ladder as login, register and reset-password - see
+  // `getRedirectAfterLogin()`.
   const adminWorkspaces = await getAdminWorkspacesForUser(user.id)
-  const redirect =
-    adminWorkspaces.length === 0 ? '/me' :
-    adminWorkspaces.length === 1 ? `/ws/${adminWorkspaces[0].slug}` : '/ws'
+  const redirect = getRedirectAfterLogin(adminWorkspaces)
 
   return NextResponse.json({
     user: { id: user.id, email: user.email, full_name: user.full_name },
