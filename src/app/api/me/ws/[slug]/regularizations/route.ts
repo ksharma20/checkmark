@@ -115,7 +115,7 @@ export async function POST(req: NextRequest, { params }: Props) {
   const historyGate = historyStartDate(workspace.plan)
   if (historyGate && localMidnightToUtc(targetDate, workspace.display_timezone) < historyGate) {
     return NextResponse.json(
-      { error: 'This date is outside your plan’s history window.', code: 'OUTSIDE_HISTORY' },
+      { error: 'This date is outside this workspace’s history window.', code: 'OUTSIDE_HISTORY' },
       { status: 400 },
     )
   }

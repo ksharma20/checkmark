@@ -57,7 +57,8 @@ export async function queryWorkspaceEvents(
 ): Promise<PresenceEventWithMatch[]> {
   const planLimits = getPlanLimits(workspacePlan)
 
-  // Apply plan history gate
+  // Apply plan history gate and member cap. Both are no-ops while every plan is
+  // unlimited (src/lib/plans.ts); they stay so an operator can reintroduce caps.
   let effectiveStart = options.startDate
   const historyGate = historyStartDate(workspacePlan)
   if (historyGate && effectiveStart < historyGate) {
@@ -67,7 +68,7 @@ export async function queryWorkspaceEvents(
   // Get active member user IDs (only status='active' members)
   let memberIds = await getActiveMemberIds(workspaceId)
 
-  // Filter to a single member if requested (skip free-plan cap so that member always sees their own rows)
+  // Filter to a single member if requested (skip any plan member cap so that member always sees their own rows)
   if (options.userId) {
     if (!memberIds.includes(options.userId)) return []
     memberIds = [options.userId]

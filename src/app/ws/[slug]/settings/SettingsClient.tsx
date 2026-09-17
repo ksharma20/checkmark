@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { TabBar } from '@/components/ui'
 import type { Tab } from '@/components/ui'
-import type { PlanLimits } from '@/lib/plans'
 import { en } from '@/locales/en'
 import { wsAdmin } from '@/locales/en/ws-settings'
 import { wsAnnouncements } from '@/locales/en/ws-announcements'
@@ -13,7 +12,7 @@ import LeaveTypesSection from './LeaveTypesSection'
 import OpeningBalancesSection from './OpeningBalancesSection'
 import SignalsTab from './SignalsTab'
 import DomainsTab from './DomainsTab'
-import BillingTab from './BillingTab'
+import OwnershipTab from './OwnershipTab'
 import AnnouncementsSection from './AnnouncementsSection'
 
 const s = wsAdmin.settings
@@ -26,12 +25,10 @@ type TabKey =
   | 'announcements'
   | 'signals'
   | 'domains'
-  | 'billing'
+  | 'ownership'
 
 interface Props {
   slug: string
-  plan: string
-  planLimits: PlanLimits
   leavesEnabled: boolean
   canWriteSettings: boolean
   canReadLeaves: boolean
@@ -45,7 +42,7 @@ interface Props {
   canDeleteDomains: boolean
   /**
    * `ownership` has no read action in the catalogue - it is write/delete only -
-   * so write is what gates the Billing tab.
+   * so write is what gates the Ownership tab.
    */
   canManageOwnership: boolean
   /** `announcements:read` - workspace-wide comms, gated on its own resource. */
@@ -71,7 +68,7 @@ export default function SettingsClient(props: Props) {
       : []),
     ...(props.canReadSignals ? [{ key: 'signals', label: s.tabSignals }] : []),
     ...(props.canReadDomains ? [{ key: 'domains', label: s.tabDomains }] : []),
-    ...(props.canManageOwnership ? [{ key: 'billing', label: s.tabBilling }] : []),
+    ...(props.canManageOwnership ? [{ key: 'ownership', label: s.tabOwnership }] : []),
   ]
 
   const [tab, setTab] = useState<TabKey>('org')
@@ -128,9 +125,7 @@ export default function SettingsClient(props: Props) {
         />
       )}
 
-      {active === 'billing' && (
-        <BillingTab slug={props.slug} plan={props.plan} planLimits={props.planLimits} />
-      )}
+      {active === 'ownership' && <OwnershipTab slug={props.slug} />}
     </>
   )
 }

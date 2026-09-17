@@ -72,7 +72,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     return NextResponse.json({ error: "Invalid year/month" }, { status: 400 });
   }
 
-  // Plan history gate check
+  // Plan history gate - a no-op while every plan is unlimited (src/lib/plans.ts)
   const planLimits = getPlanLimits(workspace.plan);
   if (planLimits.historyMonths !== null) {
     const gateDate = new Date();
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest, { params }: Props) {
     if (requestDate < gateDate) {
       return NextResponse.json(
         {
-          error: "Date range outside plan history window",
+          error: "Date range outside this workspace’s history window",
           code: "PLAN_HISTORY_GATE",
         },
         { status: 402 },

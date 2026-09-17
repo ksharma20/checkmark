@@ -4,7 +4,6 @@ import { getWorkspaceBySlug } from '@/lib/db/queries/workspaces'
 import { getWsRole } from '@/lib/ws-access'
 import { can } from '@/lib/permissions/can'
 import { Action, Resource } from '@/lib/permissions/catalogue'
-import { getPlanLimits } from '@/lib/plans'
 import SettingsClient from './SettingsClient'
 
 interface Props { params: Promise<{ slug: string }> }
@@ -12,10 +11,8 @@ interface Props { params: Promise<{ slug: string }> }
 /**
  * Settings, as its tabs.
  *
- * A server component so the plan and the caller's permissions are known on
- * first paint: the Billing tab needs `workspace.plan`, which GET /api/ws/[slug]
- * deliberately does not return, and every tab is gated on its OWN resource
- * rather than on "is this an admin". Each route re-checks - these flags only
+ * A server component so the caller's permissions are known on first paint:
+ * every tab is gated on its OWN resource rather than on "is this an admin". Each route re-checks - these flags only
  * stop us rendering a control that would immediately 403.
  */
 export default async function SettingsPage({ params }: Props) {
@@ -32,8 +29,6 @@ export default async function SettingsPage({ params }: Props) {
   return (
     <SettingsClient
       slug={slug}
-      plan={workspace.plan}
-      planLimits={getPlanLimits(workspace.plan)}
       leavesEnabled={!!workspace.leaves_enabled}
       canWriteSettings={can(role.permissions, Resource.Settings, Action.Write)}
       canReadLeaves={can(role.permissions, Resource.Leaves, Action.Read)}

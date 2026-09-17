@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
 import { getServerUser } from '@/lib/auth'
 import { getWorkspaceBySlug } from '@/lib/db/queries/workspaces'
@@ -6,7 +5,6 @@ import { getWsRole } from '@/lib/ws-access'
 import { can } from '@/lib/permissions/can'
 import { Action, Resource } from '@/lib/permissions/catalogue'
 import { getPlanLimits } from '@/lib/plans'
-import { Card, Chip } from '@/components/ui'
 import { wsAdmin } from '@/locales/en/ws-settings'
 import MonthlyClient from './MonthlyClient'
 
@@ -29,7 +27,6 @@ export default async function MonthlyPage({ params }: Props) {
     <>
       <div className="fx-snap" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '14px' }}>
         <h1 className="t-h1">{wsAdmin.monthly.pageTitle}</h1>
-        <Chip tone="verified" style={{ textTransform: 'capitalize' }}>{workspace.plan}</Chip>
       </div>
 
       <MonthlyClient
@@ -38,17 +35,6 @@ export default async function MonthlyPage({ params }: Props) {
         canExport={planLimits.csvExport}
         historyMonths={planLimits.historyMonths}
       />
-
-      {!planLimits.csvExport && (
-        <Card style={{ marginTop: '16px' }}>
-          <div className="row-between" style={{ flexWrap: 'wrap' }}>
-            <p className="t-secondary">{wsAdmin.monthly.csvGateNote}</p>
-            <Link href="/pricing" style={{ color: 'var(--brand)', fontWeight: 600, fontSize: '13.5px' }}>
-              {wsAdmin.reports.viewPricing}
-            </Link>
-          </div>
-        </Card>
-      )}
     </>
   )
 }

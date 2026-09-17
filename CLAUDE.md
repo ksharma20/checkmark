@@ -523,9 +523,9 @@ Stages: `requested → approved → onleave → returned`. Forward-only, one ste
 
 ## Billing
 
-There is **no payment integration in this codebase and none is being added.** The plan is a column on the workspace row; "Manage billing" in `src/app/ws/[slug]/settings/BillingTab.tsx` is a deliberate no-op that says so.
+There is **no payment integration in this codebase and none is being added.** CheckMark is free and open source, and every plan is unlimited (see Plan Limits). The plan is still a column on the workspace row, but nothing in the app prices it or asks anyone to upgrade. (The `/ws` topbar chip in `src/components/ws/WsLayoutClient.tsx` and the workspace picker in `src/app/ws/WsClient.tsx` still print the raw plan key; they should go the same way.)
 
-Archive and restore live in the same tab because they are gated on the same resource — `Resource.Ownership`, labelled "Ownership & billing" in the catalogue — and it is the only Settings tab shown to owners alone.
+The Settings tab that used to be **Billing** is now **Ownership** (`src/app/ws/[slug]/settings/OwnershipTab.tsx`). It holds archive and restore and nothing else: the plan card, its limits list and the "Manage billing" no-op are gone, because a tab describing a plan that caps nothing was describing nothing. Archive and restore live there because they are gated on `Resource.Ownership`, labelled "Ownership" in the catalogue, and it is the only Settings tab shown to owners alone. The resource key, the permission keys and `system-roles.json` did not change (invariant 12) — only the visible label did.
 
 ---
 
@@ -1106,15 +1106,28 @@ Rules:
 
 ## Plan Limits (lib/plans.ts)
 
-| Plan | Max Users | History | Locations | CSV |
-|------|-----------|---------|-----------|-----|
-| `free` | 10 | 3 months | 1 | No |
-| `starter` | unlimited | 12 months | 1 | Yes |
-| `growth` | unlimited | 7 years | 5 | Yes |
+**Every plan is unlimited by default.** Users are never blocked: self-hosted and hosted instances alike get
 
-`maxUsers` and `historyMonths` are enforced in `queryWorkspaceEvents()` - the plan gate is applied before signal matching.
+| Limit | Value |
+|-------|-------|
+| `maxUsers` | `null` — no member cap |
+| `historyMonths` | `null` — no history window |
+| `maxLocations` | `null` — no cap (advisory; never enforced anyway) |
+| `csvExport` | `true` |
 
-**`maxLocations` is advisory today, not enforced.** It exists in `src/lib/plans.ts` and is displayed by `src/app/ws/[slug]/settings/BillingTab.tsx`, but `POST /api/ws/[slug]/signals` never counts existing rows, so any workspace can add any number of location signals. Treat the column as a marketing figure until that route grows a count check.
+`getPlanLimits()` returns one `UNLIMITED` object for `free`, `starter`, `growth` and any unknown value, so `historyStartDate()` always returns `null`. There are no tier numbers left in the file, deliberately — a figure nothing enforces reads like a promise.
+
+**The `workspaces.plan` column, the `Plan` type and every enforcement point are kept**, and while the limits are unlimited each one is a no-op:
+- `queryWorkspaceEvents()` in `src/lib/signals.ts` — history floor and member cap, applied before signal matching
+- `GET /api/ws/[slug]/export` — `PLAN_GATE` / `PLAN_HISTORY_GATE` (402)
+- `GET /api/ws/[slug]/monthly` — `PLAN_HISTORY_GATE`
+- the regularization and office-day `OUTSIDE_HISTORY` refusals, and `getCorrectableDates()`
+
+That is the seam for an operator of a hosted instance who wants caps back: give a plan its own limits object in `PLAN_LIMITS`, and the checks above start enforcing it with no migration. Two things that operator must also handle:
+- **A member cap is silent.** `queryWorkspaceEvents()` just slices the member list; the overview's member-limit banner is gone. Reintroducing `maxUsers` without a visible notice makes people vanish from every dashboard with no explanation.
+- **`maxLocations` was never enforced** — `POST /api/ws/[slug]/signals` never counts existing rows. It needs a count check before it means anything.
+
+Do not re-add upgrade prompts, pricing links or plan badges to the app.
 
 ---
 

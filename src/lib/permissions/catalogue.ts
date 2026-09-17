@@ -98,7 +98,7 @@ const RESOURCE_DEFS: Record<Resource, ResourceDef> = {
   [Resource.Announcements]: { key: Resource.Announcements, label: 'Announcements', actions: [Read, Write, Delete] },
   [Resource.Roles]:       { key: Resource.Roles,       label: 'Roles',            actions: [Read, Write, Delete] },
 
-  [Resource.Ownership]: { key: Resource.Ownership, label: 'Ownership & billing',  actions: [Write, Delete] },
+  [Resource.Ownership]: { key: Resource.Ownership, label: 'Ownership',            actions: [Write, Delete] },
 }
 
 /** Catalogue order - drives the row order of the Roles grid. */

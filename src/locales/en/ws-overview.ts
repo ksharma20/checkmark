@@ -71,10 +71,6 @@ export const wsAdmin = {
     nextMonth: 'Next month',
     recentActivityEmptyDay: 'No check-ins recorded on this day.',
 
-    planLimitReached: (used: number, max: number, plan: string) =>
-      `Member limit reached - ${used}/${max} on the ${plan} plan. Upgrade to add more members.`,
-    planLimitNear: (used: number, max: number, plan: string) =>
-      `Approaching member limit - ${used}/${max} on the ${plan} plan.`,
     departmentChartLabel: 'Headcount by department',
     /** The bar covering members with no department on file. */
     departmentUnknown: 'No HR details',
@@ -210,7 +206,7 @@ export const wsAdmin = {
     errBadBody: 'Invalid JSON body',
     errDateFormat: 'date must be in YYYY-MM-DD format',
     errFutureDate: 'Cannot declare a future date an office day.',
-    errOutsideHistory: 'This date is outside your plan’s history window.',
+    errOutsideHistory: 'This date is outside this workspace’s history window.',
     errWeekOff:
       'That date is not a working day, so an office day on it would count for nothing.',
     errHoliday: (date: string, name: string) =>

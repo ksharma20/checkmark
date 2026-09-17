@@ -113,7 +113,8 @@ interface Resolved extends OfficeDayCounts {
  *   downgrade their chip from "verified" to "override" and hide the fact that
  *   their GPS really did match.
  *
- * An event missing from the second read (free-plan `maxUsers` cap) falls back to
+ * An event missing from the second read (a plan `maxUsers` cap, should an
+ * operator reintroduce one - every plan is unlimited by default) falls back to
  * "not office unless it already has an override" — the declaring admin's stated
  * intent, rather than a silent skip.
  *

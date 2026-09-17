@@ -79,13 +79,13 @@ export async function GET(request: NextRequest, { params }: Props) {
 
   const planLimits = getPlanLimits(workspace.plan)
   if (!planLimits.csvExport) {
-    return NextResponse.json({ error: 'CSV export requires Starter or Growth plan', code: 'PLAN_GATE' }, { status: 402 })
+    return NextResponse.json({ error: 'Spreadsheet export is not enabled for this workspace', code: 'PLAN_GATE' }, { status: 402 })
   }
   if (planLimits.historyMonths !== null) {
     const gateDate = new Date()
     gateDate.setMonth(gateDate.getMonth() - planLimits.historyMonths)
     if (new Date(year, month - 1, 1) < gateDate) {
-      return NextResponse.json({ error: 'Date range outside plan history window', code: 'PLAN_HISTORY_GATE' }, { status: 402 })
+      return NextResponse.json({ error: 'Date range outside this workspace’s history window', code: 'PLAN_HISTORY_GATE' }, { status: 402 })
     }
   }
 

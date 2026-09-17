@@ -1,6 +1,6 @@
 /**
  * Copy for the `/ws` admin screens re-skinned onto the app design system:
- * Reports, Settings (six tabs incl. Leave policies, Balances and Billing),
+ * Reports, Settings (tabs incl. Leave policies, Balances and Ownership),
  * Holidays, Roles, Monthly activity, the Insights member table and the
  * workspace picker.
  *
@@ -43,9 +43,11 @@ export const wsAdmin = {
     trendTitleFor: (label: string, value: number) =>
       `${label}: ${value} ${value === 1 ? 'person' : 'people'}`,
 
-    // Plan / permission responses from GET /api/ws/[slug]/export
-    planGate: 'Spreadsheet export is available on the Starter and Growth plans.',
-    planHistoryGate: 'That month is outside your plan’s history window. Pick a more recent month or upgrade.',
+    // Plan / permission responses from GET /api/ws/[slug]/export. Every plan is
+    // unlimited by default (src/lib/plans.ts), so the two plan codes only fire
+    // on an instance whose operator has reintroduced caps.
+    planGate: 'Spreadsheet export is not enabled for this workspace.',
+    planHistoryGate: 'That month is outside this workspace’s history window. Pick a more recent month.',
     exportForbidden: 'You do not have permission to export this workspace.',
     exportFailed: 'The report could not be generated. Please try again.',
     exportDone: 'Report downloaded.',
@@ -60,7 +62,7 @@ export const wsAdmin = {
     tabNotifications: 'Notifications',
     tabSignals: 'Signals',
     tabDomains: 'Domains',
-    tabBilling: 'Billing',
+    tabOwnership: 'Ownership',
 
     orgSectionTitle: 'Organisation details',
     leaveReadOnlyNote: 'Your role can view this configuration but not change it.',
@@ -206,25 +208,6 @@ export const wsAdmin = {
     logoFailed: 'Could not update the logo. Please try again.',
   },
 
-  // ── Settings › Billing (read-only) ─────────────────────────────────────────
-  billing: {
-    currentPlanLabel: 'Current plan',
-    limitsLabel: 'What this plan includes',
-    maxUsers: (n: number | null) => (n === null ? 'Unlimited members' : `Up to ${n} members`),
-    history: (months: number | null) =>
-      months === null
-        ? 'Unlimited history'
-        : months % 12 === 0
-          ? `${months / 12} year${months / 12 === 1 ? '' : 's'} of history`
-          : `${months} months of history`,
-    locations: (n: number) => `${n} signal location${n === 1 ? '' : 's'}`,
-    csvYes: 'Spreadsheet export included',
-    csvNo: 'No spreadsheet export',
-    manageBtn: 'Manage billing',
-    manageNote: 'Billing is not yet self-serve. Nothing happens when you press this — email us and we will move your workspace onto another plan by hand.',
-    comparePlans: 'Compare plans',
-  },
-
   // ── /ws/[slug]/holidays ────────────────────────────────────────────────────
   holidays: {
     pageTitle: 'Holiday calendar',
@@ -317,14 +300,13 @@ export const wsAdmin = {
     legendWeekend: 'Weekend',
 
     noSignalsBanner: 'No location signals configured — every check-in counts as present. Add a GPS or IP signal in Settings to tell office from remote.',
-    planGatedTitle: 'That month is outside your plan’s history window',
-    planGatedHint: 'Upgrade to reach further back.',
+    planGatedTitle: 'That month is outside this workspace’s history window',
+    planGatedHint: 'Pick a more recent month.',
     emptyTitle: 'No active members to show',
     emptyHint: 'Members appear here once they join and start checking in.',
 
     cellPreJoin: (date: string) => `${date}: not yet a member`,
     cellStatus: (date: string, status: string) => `${date}: ${status}`,
-    csvGateNote: 'Spreadsheet export is available on the Starter and Growth plans.',
   },
 
   // ── The per-member range table under /ws/[slug]/insights ───────────────────
