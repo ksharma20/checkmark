@@ -149,6 +149,28 @@ export const wsAdmin = {
          */
         hint: 'Workspace-wide notices posted from this Settings screen. Switched off, a notice is still posted and still readable in each member’s announcements list — it just arrives silently, with no notification and no push. Members can never mute this one.',
       },
+      /**
+       * NOT RENDERED, and deliberately kept anyway.
+       *
+       * `membership` is `workspaceSwitchable: false`, and this screen filters on
+       * exactly that flag, so no row for it ever reaches the DOM. The entry
+       * exists because the `satisfies Record<NotificationCategory, …>` below is
+       * TOTAL, and totality is the whole point of it: a category added to
+       * `CATEGORY_DEFS` with no copy here must be a compile error, and a
+       * `Partial` would let a *switchable* one arrive unlabelled. The price of
+       * that guarantee is one entry for a switch that does not exist.
+       *
+       * Same precedent as `notifLockedReasons` below - copy kept against the
+       * flag being flipped, so a switch reintroduced arrives with words already
+       * beside it rather than a key and a shrug. If `membership` is ever made
+       * switchable, read `CATEGORY_DEFS.membership` first: the reason it is not
+       * is that `notify()` would then let the workspace SENDING an invitation
+       * silence the recipient's copy of it.
+       */
+      membership: {
+        label: 'Workspace invitations',
+        hint: 'An invitation to join a workspace, shown in the invited person’s own notification feed so they can accept or decline it there. This one cannot be switched off from here: the invitation is addressed to somebody who is not a member yet, and this is how they are told about it at all.',
+      },
     } as const satisfies Record<NotificationCategory, { label: string; hint: string }>,
 
     /**

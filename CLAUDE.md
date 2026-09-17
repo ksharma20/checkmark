@@ -80,12 +80,25 @@ Both entry points land on `/me/notifications`; the `?ws=` query param is what di
 
 | Entry point | URL | Shows |
 |---|---|---|
-| Top-bar bell | `/me/notifications?ws=<active slug>` | The active workspace only, no per-row badges — the heading already names it. Polls `GET /api/me/ws/[slug]/notifications/unread-count` |
+| Top-bar bell | `/me/notifications?ws=<active slug>` | The active workspace **plus this account's own workspace invitations**, no per-row badges — the heading already names it. Polls `GET /api/me/ws/[slug]/notifications/unread-count` |
 | Avatar sheet → Notifications | `/me/notifications` | Every workspace, each row badged with its workspace colour. Polls `GET /api/me/notifications/unread-count` |
+
+**An `invitation` row is in scope everywhere, and that is the one hole in the
+scoping.** It is not a hole in the *access* check — `user_id = ?` still decides
+every row, and the scoped endpoints keep resolving the slug through
+`requireWsMember()`. But an invitation is addressed to a **person**, not to a
+membership, and it is by definition from a workspace they are not in yet, so
+filtering it by the active workspace would hide the only notification that
+cannot arrive through any other feed from exactly the people it is for: anybody
+who already belongs to one workspace. `SCOPED_WHERE` in
+`src/lib/db/queries/notifications.ts` is the one spelling of it, and the list,
+the count and the mark-read endpoints all pass the same flag — a count that
+included it while the list did not would badge the bell for a row the screen
+never shows.
 
 **`/me/announcements`** is the member's policy archive — every notice posted to the active workspace, with any attached policy document. It is reached from the avatar sheet, not the bottom nav, which carries four tabs — Timeline, Home, Space, Leave — and grows one only for a surface used daily (`/me/space` earned the fourth; an archive read a few times a year did not); and it is where an `announcement` notification now lands, because a notification row has nowhere to put a file.
 
-`?ws=` is validated server-side in `src/app/me/notifications/page.tsx` against real memberships; a bogus slug falls back to the unified view. The client never reads `?ws=` itself. With no workspace at all the bell falls back to the global feed — that is where a pending invitation shows up.
+`?ws=` is validated server-side in `src/app/me/notifications/page.tsx` against real memberships; a bogus slug falls back to the unified view. The client never reads `?ws=` itself. With no workspace at all the bell falls back to the global feed — which, like the scoped one, carries pending invitations.
 
 ### What a member configures, and where it is scoped
 
@@ -657,7 +670,7 @@ not two halves of one switchboard — they are different kinds of thing, stored
 differently, configured on different screens, and delivered down different
 channels. The rest of this section is why.
 
-### The organisation broadcasts categories. There are exactly two.
+### The organisation broadcasts categories. There are three, and two have a switch.
 
 `src/lib/notifications/categories.ts` is the catalogue and the contract. Every
 `NotificationType` maps to exactly one category, and `CATEGORY_OF` is a **total
@@ -668,11 +681,34 @@ compile error, not a notification that silently bypasses everyone's settings.
 |---|---|---|---|---|---|---|
 | `approvals` | `leave_submitted`, `regularization_submitted`, `extension_submitted` **and** every leave / regularization / document / parental-extension outcome | workspace | yes | **no** | feed + push | `/ws/:slug/settings` |
 | `announcements` | `announcement` | workspace | yes | **no** | feed + push | `/ws/:slug/settings` |
+| `membership` | `invitation` | workspace | **no** | **no** | feed + push | **nowhere** |
 
-Both are workspace-switchable and neither is member-mutable, so the **whole
-catalogue is configured on one screen** and `/me/settings` renders no category at
-all. There is no diagonal to keep in step and no second column that can disagree
-with the first.
+The two switchable categories are member-immutable, so **every switch that
+exists is on one screen** and `/me/settings` renders no category at all. There is
+no diagonal to keep in step and no second column that can disagree with the
+first.
+
+**`membership` is the row with no switch anywhere, and that is the answer rather
+than an omission.** `workspaceSwitchable: false` is the load-bearing half:
+`notify()` returns at step 2 for a workspace-disabled category — no row, no push,
+nothing — so a switchable `membership` would let a workspace send an invitation
+by email and silently drop the in-app half of *its own invitation*. That is not
+what a workspace switch means anywhere else in the catalogue: `approvals` and
+`announcements` silence messages a workspace produces for people already inside
+it, whereas here the recipient is **not inside it yet and this row is how they
+get in**. `memberMutable: false` for the reason the flag exists at all — an
+invitation expires in seven days and the only remedy for a missed one is asking
+an admin to send another.
+
+Because both flags are `false`, **neither settings screen renders it** — each
+resolves what it draws from exactly those flags — so invariant 29 reaches its
+logical end rather than being bent: a switch nobody may throw is not drawn. The
+catalogue entry still exists because `CATEGORY_OF` is total and `notify()`
+resolves every type through it. `notifCategories` in
+`src/locales/en/ws-settings.ts` carries copy for it anyway, deliberately unread,
+for the same reason `notifLockedReasons` is kept: the `satisfies Record<…>` is
+what makes a *switchable* category with no label a compile error, and totality is
+the price of that guarantee.
 
 **`approvals` is one switch over both halves of an approval.** It was two —
 `approvals_inbox` (a request reaching an approver) and `approvals_outcome` (the
@@ -690,6 +726,59 @@ flag exists to prevent — and one category holds one answer.
 cannot afford to be missed — a policy change, a closure, an office day. Handing
 out a per-member switch for it rebuilds the exact problem the feature exists to
 solve.
+
+### An invitation is an OFFER, so its row is never the truth
+
+Every other notification is a **record** of something that already happened, and
+invariant 22 — a notification is never unsent — costs nothing: "Leave approved"
+is as true a year later. An `invitation` row is the exception. It says "Acme
+invited you to join" for as long as it exists, while the membership it points at
+can be accepted, declined, revoked (a hard delete) or simply expire underneath
+it.
+
+So **every read of an invitation row joins the membership back on.**
+`getNotificationsForUser()` LEFT JOINs `workspace_members` on `ref_id` — only
+where `type = 'invitation'`, so no other family pays for it — and returns
+`invite_status`, `invite_expires_at` and `invite_email_match`. The email match is
+resolved **in SQL** against `users.email`: the client must not be the thing that
+decides an invitation is addressed to it. `inviteRowState()` in
+`src/lib/client/invite-state.ts` reduces those three to one word —
+`open · expired · accepted · declined · withdrawn · notYours` — and it is
+**pure**, in `lib/client/` beside `notification-href.ts`, for the usual reason: a
+client component importing anything under `lib/db/**` drags better-sqlite3 and
+libSQL into the browser bundle.
+
+Accept and Decline live **in the row**, posting `{ memberId, action }` to the
+existing `POST /api/me/consent` — the same endpoint `/me/orgs` and the
+create-or-join card on `/me` home use. Nothing new is invented; an invitation
+simply became answerable in one more place. The join decides what is **drawn**;
+`acceptMembership()` still decides what is **true**, re-checking existence,
+`pending_consent`, the session email and the expiry on every call. A row painted
+open can still be refused — the deadline can pass with the tab open — and
+`410 INVITE_EXPIRED` / `409 NOT_PENDING` re-render it closed rather than showing
+an error beside a button the reader will only press again. **Decline survives
+expiry**, exactly as it does in `declineMembership()`: refusing something you no
+longer want must never fail.
+
+Re-sending an invitation **supersedes** rather than accumulates —
+`deleteNotificationsByRef()` drops this user's prior `invitation` rows for the
+same `ref_id` before the new one is written. That is not an un-send: the same
+offer is being replaced by the same offer with a longer deadline, in one breath,
+and leaving the old row would show one invitation twice while two of the three
+described a token that is already dead. No unique index backs it, and adding one
+would need a partial index that still could not express "one row per
+`(user, ref_id)`, invitations only".
+
+`notificationHref` resolves `invitation` to the **unscoped** `/me/notifications`
+and never to `/consent/[token]`: the token is a credential issued to an inbox,
+and it rotates on every re-send. `NotificationRow` is a container with a button
+plus an actions strip, not one `<button>` — a button inside a button is invalid
+HTML and the outer click swallowed Accept.
+
+An invitation to an address with **no account** still reaches the person by email
+alone; there is no `user_id` to write a row for. `POST /api/auth/register` writes
+the in-app rows for whatever is still `pending_consent` after the verified-domain
+auto-enrol has run, which is the first moment one can exist.
 
 Neither is **rendered** on `/me/settings`. They used to be, disabled and
 captioned with their reason, on the argument that a member should see the
@@ -1355,11 +1444,17 @@ Do not re-add upgrade prompts, pricing links or plan badges to the app.
     spelling whose outcome is observable. This is why the one-open-case index is
     now `idx_parental_cases_one_open`.
 29. **The two settings screens do not divide a catalogue; they configure
-    different KINDS of thing.** `/ws/:slug/settings` holds the whole category
-    catalogue - `approvals` and `announcements`, both workspace-switchable,
-    neither member-mutable. `/me/settings` holds no category at all: what a member
-    configures there are SCHEDULES, their reminder times per workspace and their
-    session ladder per account. A category is a class of MESSAGE and a schedule is
+    different KINDS of thing.** `/ws/:slug/settings` holds every switch there is
+    - `approvals` and `announcements`, both workspace-switchable, neither
+    member-mutable. `membership` (the workspace invitation) is on **neither**
+    screen, because it is switchable by nobody: a workspace able to switch it off
+    would silence the in-app half of an invitation it is itself sending, and
+    `notify()` returns at step 2 for a disabled category, so nothing would be
+    written at all. Both screens resolve what they draw from
+    `workspaceSwitchable` / `memberMutable`, so a category carrying `false` for
+    both appears on neither by construction. `/me/settings` holds no category at
+    all: what a member configures there are SCHEDULES, their reminder times per
+    workspace and their session ladder per account. A category is a class of MESSAGE and a schedule is
     a TIME, and the reason they are not the same control is that a boolean beside
     a stored time is a second source of truth for one fact - `muted = 0` with no
     time set is on by one and off by the other, and nothing can arbitrate.
@@ -1386,6 +1481,23 @@ Do not re-add upgrade prompts, pricing links or plan badges to the app.
     having done something: the UPDATE carries `AND checkout_at IS NULL`, so a
     member who checked out by hand is not told we closed a session we did not
     close. The key is claimed either way.
+32. **An `invitation` row's TRUTH is the membership, never the row** - it is the
+    one notification that is an OFFER rather than a record, so every read LEFT
+    JOINs `workspace_members` on `ref_id` and renders `invite_status`,
+    `invite_expires_at` and `invite_email_match` (resolved in SQL against
+    `users.email`, never compared in the browser). Accept is drawn only while the
+    membership still exists, is `pending_consent`, is unexpired and is addressed
+    to the session's own email; every other state renders resolved. Invariant 22
+    is untouched - the row is never unsent, it is re-read. The join decides what
+    is DRAWN; `acceptMembership()` decides what is TRUE and re-checks all four
+    facts on every `POST /api/me/consent`, so `410 INVITE_EXPIRED` and
+    `409 NOT_PENDING` must re-render the row closed rather than surface an error
+    beside a button whose only outcome is another refusal. Decline survives
+    expiry. Never key an invitation row on `consent_token` - that is a credential
+    issued to an inbox and it rotates on every re-send; `ref_id` is the
+    `workspace_members` id. And an invitation is in scope on EVERY `/me` feed,
+    scoped or not: it is addressed to a person, not to a membership, and the
+    workspace it names is one they are not in yet.
 
 ---
 
@@ -1412,6 +1524,11 @@ Do not re-add upgrade prompts, pricing links or plan badges to the app.
 - Never return document bytes (or base64) in a JSON response body
 - Never trust `otpVerified: true` from client
 - Never use spinners - use skeleton loaders
+- Never scope an `invitation` notification to the active workspace — it is addressed to a person who is not a member of the workspace that sent it, and filtering it away hides it from everybody who already has one. `user_id = ?` is the access check; the workspace filter is a view preference
+- Never render an invitation's Accept from the notification row's own `title`/`body` — join `workspace_members` back on and read the live status, or the feed keeps offering an invitation that was answered months ago
+- Never put a consent token in a notification row, an href or a push payload — `ref_id` is the membership id, and the token rotates on every re-send
+- Never make `membership` workspace-switchable — `notify()` would let the workspace sending an invitation drop the recipient's copy of it
+- Never nest a button inside `NotificationRow`'s row button — the actions strip is a sibling, because the outer click swallows the inner control
 - Never add a second workspace picker to a `/me` screen — the top-bar pill is the only one
 - Never print the workspace name inside `/me` content already scoped to the active workspace
 - Never seed a workspace colour on the slug — `swatchColor()` takes the workspace **id**

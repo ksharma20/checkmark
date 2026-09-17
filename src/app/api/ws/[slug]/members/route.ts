@@ -12,6 +12,10 @@ import { listWorkspaceRoles } from '@/lib/db/queries/roles'
 import { can } from '@/lib/permissions/can'
 import { canGrant } from '@/lib/permissions/ranks'
 import { sendConsentEmail } from '@/lib/email'
+import { getUserByEmail } from '@/lib/db/queries/users'
+import { deleteNotificationsByRef } from '@/lib/db/queries/notifications'
+import { notify } from '@/lib/notify'
+import { invitationNotification } from '@/locales/en/notifications'
 import { findEmployeeByWorkEmail } from '@/lib/db/queries/employees'
 import { Action, Resource } from '@/lib/permissions/catalogue'
 
@@ -183,12 +187,58 @@ export async function POST(request: NextRequest, { params }: Props) {
   const consentToken = crypto.randomUUID()
   const consentTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  await upsertInvitedMember({
+  const member = await upsertInvitedMember({
     workspaceId: ctx.workspace.id,
     email,
     consentToken,
     consentTokenExpiresAt,
   })
+
+  // THE IN-APP HALF OF THE INVITATION.
+  //
+  // Only for an address that already has an account - a notification needs a
+  // `user_id`, and there is nobody to write one for otherwise. For a stranger
+  // the email below stays the only channel, and the in-app row is written at
+  // registration instead (`POST /api/auth/register`), once there is an account
+  // to address.
+  //
+  // Through `notify()` rather than `createNotification` + `sendPushToUser`
+  // (invariant 24). The `membership` category is deliberately not
+  // `workspaceSwitchable`, so `notify()` cannot return at its step 2 and drop
+  // this: a workspace must not be able to silence the invitation it is itself
+  // sending. See `CATEGORY_DEFS.membership`.
+  //
+  // `refId` is the MEMBERSHIP id, which is what `POST /api/me/consent` is keyed
+  // on and what the feed's LEFT JOIN reads the live status back through. Never
+  // the consent token: that is a credential, it is issued to an inbox, and it
+  // rotates on every re-send.
+  const invitee = await getUserByEmail(email)
+  if (invitee) {
+    // Re-sending is the normal repair for a lost or expired link, and every
+    // send mints a fresh token. Without this, three re-sends leave three rows
+    // in the feed pointing at one membership - all looking equally live, two of
+    // them describing a token that is already dead. Nothing is being unsent
+    // (invariant 22): the same offer is being replaced by the same offer with a
+    // longer deadline, in one breath.
+    await deleteNotificationsByRef({
+      userId: invitee.id,
+      type: 'invitation',
+      refId: member.id,
+    })
+    await notify({
+      userIds: [invitee.id],
+      workspaceId: ctx.workspace.id,
+      workspaceSlug: ctx.workspace.slug,
+      type: 'invitation',
+      title: invitationNotification.title(ctx.workspace.name),
+      body: invitationNotification.body(ctx.workspace.name),
+      refId: member.id,
+      refType: 'workspace_member',
+      // `/me`, always. The recipient is not a member of this workspace yet, so
+      // every `/ws/:slug` screen would refuse them.
+      surface: 'me',
+    })
+  }
 
   // If HR already filled their record in - the usual order now that People has
   // an Add employee flow - greet them by the name on it.

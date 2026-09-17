@@ -1,6 +1,7 @@
 'use client'
 
-import { Bell, CalendarDays, Clock, FileText, Megaphone } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Bell, CalendarDays, Clock, FileText, Mail, Megaphone } from 'lucide-react'
 import type { Notification } from '@/lib/db/queries/notifications'
 import { swatchColor } from '@/lib/workspace-color'
 import { notificationsUi } from '@/locales/en/notifications'
@@ -35,6 +36,11 @@ function TypeIcon({ type }: { type: Notification['type'] }) {
   if (type.startsWith('regularization_')) return <Clock {...props} />
   if (type.startsWith('document_')) return <FileText {...props} />
   if (type === 'announcement') return <Megaphone {...props} />
+  // An invitation is the one row that is an OFFER rather than a record of
+  // something that already happened, and an envelope is the only glyph in the
+  // set that reads as "somebody is waiting on you" rather than "here is what
+  // occurred".
+  if (type === 'invitation') return <Mail {...props} />
   // An unknown type is still a notification: a bell is the honest default.
   //
   // That fallback is what carries the retired reminder types. `checkin_reminder`
@@ -102,17 +108,36 @@ interface Props {
    * there is noise repeated on every row. Only the unified view turns it on.
    */
   showWorkspace?: boolean
+  /**
+   * Controls that belong to this row - today, an invitation's Accept / Decline
+   * or the chip that says how it was answered.
+   *
+   * Rendered as a SIBLING of the row button, not inside it. The row was a single
+   * `<button>` wrapping everything, and a button inside a button is invalid HTML
+   * that browsers resolve by silently dropping the inner one; the outer click
+   * would have swallowed Accept. So the clickable area is now the content half
+   * only, and this sits beneath it inside the same bordered container.
+   *
+   * A `ReactNode` rather than an `invitation` prop, so this component keeps
+   * knowing nothing about consent: the screen that owns the endpoint owns the
+   * buttons. The `/ws` bell panel passes nothing and is unchanged.
+   */
+  actions?: ReactNode
 }
 
-export default function NotificationRow({ notification, onClick, showWorkspace = false }: Props) {
+export default function NotificationRow({ notification, onClick, showWorkspace = false, actions }: Props) {
   const unread = notification.read_at === null
   return (
+    <div style={{
+      background: unread ? 'var(--surface-2)' : 'var(--surface-0)',
+      borderBottom: '1px solid var(--border)',
+      borderLeft: unread ? '3px solid var(--brand)' : '3px solid transparent',
+    }}>
     <button type="button" onClick={onClick} style={{
       display: 'flex', alignItems: 'flex-start', gap: '10px',
       padding: '12px 16px', width: '100%', textAlign: 'left',
-      background: unread ? 'var(--surface-2)' : 'var(--surface-0)',
-      border: 'none', borderBottom: '1px solid var(--border)',
-      borderLeft: unread ? '3px solid var(--brand)' : '3px solid transparent',
+      background: 'transparent',
+      border: 'none',
       cursor: 'pointer',
     }}>
       <span style={{ color: iconColor(notification.type), flexShrink: 0, marginTop: '2px' }}>
@@ -134,5 +159,9 @@ export default function NotificationRow({ notification, onClick, showWorkspace =
       </div>
       {unread && <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--brand)', flexShrink: 0, marginTop: '5px' }} />}
     </button>
+    {/* Indented to the text column, so the controls line up under the title
+        rather than under the icon gutter. */}
+    {actions && <div style={{ padding: '0 16px 12px 41px' }}>{actions}</div>}
+    </div>
   )
 }

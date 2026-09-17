@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NotificationRow from '@/components/notifications/NotificationRow'
+import InviteActions from '@/components/notifications/InviteActions'
 import type { Notification } from '@/lib/db/queries/notifications'
 import {
   fetchMeNotifications,
@@ -62,6 +63,18 @@ export default function NotificationsClient({ scopedSlug, scopedName }: Props) {
     setUnreadCount(0)
   }
 
+  // Mark one row read, wherever that is triggered from - tapping it, or
+  // answering an invitation inside it. Split out of `handleRow` so the second
+  // caller does not also navigate.
+  const markOneRead = useCallback(async (id: string) => {
+    const target = notifications.find(n => n.id === id)
+    if (!target || target.read_at) return
+    const ok = await markRead([id])
+    if (!ok) return
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read_at: new Date().toISOString() } : n))
+    setUnreadCount(prevCount => Math.max(0, prevCount - 1))
+  }, [notifications, markRead])
+
   const handleRow = async (notification: Notification) => {
     if (!notification.read_at) {
       const ok = await markRead([notification.id])
@@ -70,6 +83,12 @@ export default function NotificationsClient({ scopedSlug, scopedName }: Props) {
         setUnreadCount(prevCount => Math.max(0, prevCount - 1))
       }
     }
+    // An invitation is answered IN the row, so there is nowhere to send the
+    // reader - `notificationHref` resolves it to this very screen. Navigating
+    // anyway would be worse than a no-op from the `?ws=` view: the resolver
+    // returns the UNSCOPED path, so a tap would drop the scope and remount the
+    // list under a different heading.
+    if (notification.type === 'invitation') return
     // Every row used to open `/me/ws/:slug` regardless of what it said, and an
     // account-level notification - which has no workspace - navigated to the
     // literal `/me/ws/null`. The resolver picks the screen the notification is
@@ -124,6 +143,19 @@ export default function NotificationsClient({ scopedSlug, scopedName }: Props) {
               // already names the workspace, so a per-row badge is repetition.
               showWorkspace={!scopedSlug}
               onClick={() => handleRow(notification)}
+              // Only an invitation carries controls, and the test is here
+              // rather than inside `InviteActions` because a JSX element is
+              // truthy even when it renders null - passing one unconditionally
+              // would put the actions strip's padding under every row in the
+              // feed.
+              actions={
+                notification.type === 'invitation' ? (
+                  <InviteActions
+                    notification={notification}
+                    onAnswered={(id) => void markOneRead(id)}
+                  />
+                ) : undefined
+              }
             />
           ))}
         </Card>

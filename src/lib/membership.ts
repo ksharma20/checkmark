@@ -36,15 +36,19 @@ export type AcceptResult =
  * Has this invitation's 7-day window closed?
  *
  * One rule, one spelling. The emailed consent page needs it BEFORE it sends a
- * logged-out visitor round the login flow, and `acceptMembership` needs it at
- * the moment of the write; two hand-written date comparisons would be two
- * things to keep in step. A NULL expiry is an invitation with no deadline and
- * never expires - the column is nullable and old rows carry nothing.
+ * logged-out visitor round the login flow, `acceptMembership` needs it at the
+ * moment of the write, and the `/me` notification feed needs it to decide
+ * whether to draw an Accept button; three hand-written date comparisons would be
+ * three things to keep in step.
+ *
+ * The implementation moved to `src/lib/client/invite-state.ts` and is
+ * re-exported here, which is a bundling constraint rather than a preference:
+ * the feed's renderer is a CLIENT component, and importing this module from it
+ * would pull `lib/db/**` - better-sqlite3 and libSQL - into the browser bundle.
+ * Every existing server-side caller keeps importing it from here.
  */
-export function isInviteExpired(expiresAt: string | null): boolean {
-  if (!expiresAt) return false
-  return new Date(expiresAt).getTime() < Date.now()
-}
+import { isInviteExpired } from '@/lib/client/invite-state'
+export { isInviteExpired }
 
 /**
  * Accept one invitation and attach any HR record waiting on that email.

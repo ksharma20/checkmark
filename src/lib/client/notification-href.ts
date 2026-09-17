@@ -89,6 +89,25 @@ export function notificationHref(n: NotificationTarget, surface: NotificationSur
     return '/me/documents'
   }
 
+  if (type === 'invitation') {
+    // An invitation to join a workspace. It opens the notification list, where
+    // the row itself carries Accept and Decline - there is no other screen to
+    // send it to: `/me/orgs` lists invitations but the notification is already
+    // in the feed, and the workspace it names is one the reader is not a member
+    // of, so every `/me/ws/:slug/*` screen would 403.
+    //
+    // NEVER the emailed consent link. `/consent/[token]` is keyed on
+    // `consent_token`, which is the credential that invitation is carried by;
+    // putting it in a push payload or an href would copy a secret into a place
+    // it was never issued for, and the token rotates on every re-send so the
+    // link would rot anyway. The row carries `ref_id` (a membership id), and
+    // `POST /api/me/consent` re-resolves everything from it server-side.
+    //
+    // Unscoped `/me/notifications` on purpose: the scoped `?ws=` view is the
+    // ACTIVE workspace, and an invitation is by definition from another one.
+    return '/me/notifications'
+  }
+
   if (type === 'announcement') {
     // The member-facing archive at /me/announcements. It used to reopen the
     // scoped notification list, because an announcement had no screen of its

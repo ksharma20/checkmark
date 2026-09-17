@@ -50,12 +50,21 @@ export default function MeTopbar({ workspaces, userName, userEmail }: Props) {
   // With no workspace at all there is no slug to scope by, so it falls back to
   // the unified feed across every workspace.
   //
-  // That feed does NOT contain pending invitations. An invitation is a
-  // `workspace_members` row, not a `notifications` row, and nothing fans one out
-  // - this comment used to claim otherwise, which made the empty bell look like
-  // a bug rather than the truth. Invitations are answered on `/me` home's
-  // create-or-join card and on `/me/orgs`; putting them in the feed is its own
-  // piece of work.
+  // WITH ONE DELIBERATE EXCEPTION, and it is the reason the in-app invitation
+  // exists. Sending an invitation now writes an ordinary `notifications` row
+  // (`type: 'invitation'`, `ref_id` the membership id) for any address that
+  // already has an account, and the scoped endpoints below count and list those
+  // rows ALONGSIDE the active workspace's own - see `SCOPED_WHERE` in
+  // `db/queries/notifications.ts`. An invitation is addressed to a person, not
+  // to a membership, and it is by definition from a workspace they are not in
+  // yet: scoping it to the active one would hide it from precisely the people it
+  // is for. The ownership filter (`user_id = ?`) is untouched and is still what
+  // decides every row.
+  //
+  // So the bell moves for a second workspace's invitation whichever state this
+  // account is in, and the row it opens carries Accept and Decline. `/me` home's
+  // create-or-join card and `/me/orgs` still list invitations too; all three
+  // post to the same `POST /api/me/consent`.
   const bellPollUrl = active
     ? `/api/me/ws/${active.slug}/notifications/unread-count`
     : '/api/me/notifications/unread-count'

@@ -146,12 +146,19 @@ export default function NotificationsTab({ slug, canWrite }: { slug: string; can
       <p className="t-muted mb-12">{s.notifPageHint}</p>
 
       {/*
-        Only what this workspace decides. The filter is the same shape as the
-        one on `/me/settings`, and the opposite half of it: a category the
-        workspace cannot switch is not rendered here locked, it is not rendered
-        - it belongs to the member and appears on their screen instead. So
+        Only what this workspace decides. A category the workspace cannot
+        switch is not rendered here locked, it is not rendered at all - so
         nothing in this loop is ever disabled for being locked, only for
         `!canWrite`.
+
+        That used to mean "it belongs to the member and appears on their screen
+        instead", and no longer does. `membership` (the workspace invitation) is
+        switchable by nobody: not here, because the workspace sending an
+        invitation must not be able to silence the recipient's copy of it, and
+        not on `/me/settings`, because `memberMutable` is false too. It is
+        filtered out by the same expression as ever; there is simply no second
+        screen it turns up on. Invariant 29 holds either way - a switch nobody
+        may throw is not drawn.
       */}
       <div className="mb-16">
         {ALL_CATEGORIES.filter((key) => CATEGORY_DEFS[key].workspaceSwitchable).map((key) => {

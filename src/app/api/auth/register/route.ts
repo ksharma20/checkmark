@@ -4,7 +4,11 @@ import {
   getVerifiedDomainsForEmail,
   getWorkspaceMemberByEmail,
   getAdminWorkspacesForUser,
+  getMembershipsByEmail,
+  getWorkspacesByIds,
 } from '@/lib/db/queries/workspaces'
+import { notify } from '@/lib/notify'
+import { invitationNotification } from '@/locales/en/notifications'
 import { autoEnrolIntoWorkspace, claimPendingMemberships } from '@/lib/membership'
 import { hashPassword, createJwt, setSessionCookie, verifyOtpCookie, clearOtpCookie } from '@/lib/auth'
 import { validatePassword } from '@/lib/password'
@@ -91,6 +95,51 @@ export async function POST(request: NextRequest) {
       existingMemberId: alreadyMember?.id ?? null,
       existingStatus: alreadyMember?.status ?? null,
     })
+  }
+
+  // Any invitation still waiting on this address now has an account to reach.
+  //
+  // It was sent by email before there was a user row to write a notification
+  // for, so this is the first moment the in-app half can exist at all - without
+  // it, somebody who signed up from the emailed link and then closed the tab has
+  // an invitation the product never mentions again.
+  //
+  // Read AFTER the auto-enrol loop above, not before: a verified-domain
+  // workspace may have just turned a `pending_consent` row `active`, and
+  // inviting somebody to a workspace they were joined to four lines earlier is
+  // a notification about nothing. Re-reading is one query and cannot go stale.
+  //
+  // Through `notify()` (invariant 24), one call for the whole set - it takes a
+  // list of recipients, and here it is one recipient across several workspaces,
+  // so it is one call per workspace and each reads its own switchboard once.
+  // `membership` is not workspace-switchable, so none of them can drop it.
+  const stillPending = (await getMembershipsByEmail(email)).filter(
+    (m) => m.status === 'pending_consent',
+  )
+  if (stillPending.length > 0) {
+    const pendingWorkspaces = await getWorkspacesByIds(
+      stillPending.map((m) => m.workspace_id),
+    )
+    const byId = new Map(pendingWorkspaces.map((w) => [w.id, w]))
+    for (const membership of stillPending) {
+      const workspace = byId.get(membership.workspace_id)
+      // An archived workspace is not joinable, so it is not announced either.
+      if (!workspace || workspace.archived_at) continue
+      await notify({
+        userIds: [user.id],
+        workspaceId: workspace.id,
+        workspaceSlug: workspace.slug,
+        type: 'invitation',
+        title: invitationNotification.title(workspace.name),
+        // Past tense: the invitation is older than the account, and "invited
+        // you to join" beside a sign-up that just happened reads as a message
+        // that arrived late.
+        body: invitationNotification.waitingBody(workspace.name),
+        refId: membership.id,
+        refType: 'workspace_member',
+        surface: 'me',
+      })
+    }
   }
 
   await clearOtpCookie()

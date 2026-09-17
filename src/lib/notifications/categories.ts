@@ -20,7 +20,7 @@
 
 import type { NotificationType } from '@/lib/db/queries/notifications'
 
-export type NotificationCategory = 'approvals' | 'announcements'
+export type NotificationCategory = 'approvals' | 'announcements' | 'membership'
 
 /**
  * Which category each notification type belongs to.
@@ -53,6 +53,11 @@ export const CATEGORY_OF: Record<NotificationType, NotificationCategory> = {
   extension_rejected: 'approvals',
 
   announcement: 'announcements',
+
+  // An invitation to join a workspace. Its own category because it is the only
+  // message class the RECIPIENT is not yet a member of anything for - see
+  // `CATEGORY_DEFS.membership` for why it is neither switchable nor mutable.
+  invitation: 'membership',
 }
 
 export interface CategoryDef {
@@ -164,11 +169,20 @@ export interface CategoryDef {
  * |-----------------|---------------------|---------------|---------|-------------------|
  * | `approvals`     | yes                 | no            | on      | `/ws/../settings` |
  * | `announcements` | yes                 | no            | on      | `/ws/../settings` |
+ * | `membership`    | **no**              | no            | on      | nowhere           |
  *
- * Both remaining categories are workspace-switchable and member-immutable, so
- * the ENTIRE catalogue is configured on `/ws/[slug]/settings` and **nothing
- * appears on `/me/settings` as a category at all**. There is no second column to
- * keep in sync and no diagonal to maintain: one screen owns the whole table.
+ * The two switchable categories are member-immutable, so everything that CAN be
+ * configured is configured on `/ws/[slug]/settings` and **nothing appears on
+ * `/me/settings` as a category at all**. There is no second column to keep in
+ * sync and no diagonal to maintain: one screen owns every switch there is.
+ *
+ * `membership` is the row with no switch anywhere, and that is not an omission -
+ * it is the answer. Both screens resolve what they render from these two flags,
+ * so a category carrying `false` for both simply appears on neither, which is
+ * exactly invariant 29 ("never render a category the screen's flag does not
+ * carry") reaching its logical end. The entry still exists because `CATEGORY_OF`
+ * is total and `notify()` resolves every type through it; what it buys is that
+ * an invitation cannot be silenced by the organisation sending it.
  *
  * `approvals` covers both halves of an approval - the request reaching an
  * approver and the outcome reaching the person who filed it. Member-immutable
@@ -265,6 +279,47 @@ export const CATEGORY_DEFS: Record<NotificationCategory, CategoryDef> = {
     // Declarative only, exactly as above - nothing reads it.
     defaultOn: true,
     lockedReason: 'always_on_announcement',
+  },
+  /**
+   * An invitation to join a workspace, delivered to an account that already
+   * exists. The first category in the catalogue that is locked on BOTH sides,
+   * and each half is locked for a different reason.
+   *
+   * `workspaceSwitchable: false` is the load-bearing one. `notify()` returns at
+   * step 2 for a workspace-disabled category - no row, no push, nothing - so a
+   * workspace that had switched this off would send an invitation by email and
+   * silently drop the in-app half of its own invitation. The switch would let
+   * the SENDER mute the message on the RECIPIENT's behalf, which is not what a
+   * workspace switch means anywhere else in the catalogue: `approvals` and
+   * `announcements` silence messages the workspace produces for people already
+   * inside it. Here the recipient is not inside it yet, and this row is how they
+   * get in.
+   *
+   * `memberMutable: false` for the reason the flag exists at all. An invitation
+   * is not noise a member can afford to opt out of and then wonder why they
+   * never heard from an employer; it expires in seven days, and the remedy for a
+   * missed one is asking an admin to send another.
+   *
+   * Because it is not `workspaceSwitchable`, `/ws/[slug]/settings` does not
+   * render it - that screen filters on this exact flag - and because it is not
+   * `memberMutable`, `/me/settings` does not either. Invariant 29 holds: neither
+   * screen shows a switch nobody may throw. The catalogue is still the whole
+   * truth; it is just that one of its three entries has no switch anywhere.
+   *
+   * `scope: 'workspace'` because the notification names one - the invitation is
+   * from somewhere - even though no workspace preference applies to it.
+   *
+   * No `lockedReason`: that field captions a RENDERED lock, and this category is
+   * never rendered on either screen. Setting one would be a string nothing reads
+   * in a file that already carries two.
+   */
+  membership: {
+    key: 'membership',
+    scope: 'workspace',
+    workspaceSwitchable: false,
+    memberMutable: false,
+    // Declarative only, exactly as above - nothing reads it.
+    defaultOn: true,
   },
 }
 
