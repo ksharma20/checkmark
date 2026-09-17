@@ -299,10 +299,12 @@ export default async function MePage() {
         </div>
       )}
 
-      {primaryWorkspace && primaryWorkspace.leaves_enabled ? (
+      {primaryWorkspace ? (
         /* LEAVE LIVES HERE, not in the bottom nav. It exists only inside a
-           workspace, and only when that workspace runs leave through CheckMark,
-           so as a tab it was dead for every member without one. It sits below
+           workspace, so as a tab it was dead for every member without one. It is
+           NOT gated on `leaves_enabled`: the screen behind it also holds day
+           corrections and the holiday calendar, which a workspace that runs
+           leave elsewhere still uses - which is why the label names both. It sits below
            the stat grid, inside the part of this page already scoped to the
            active workspace - the two "Leave taken" / "Leave left" cards above it
            are what it acts on. The workspace is NOT named here: the top-bar pill
