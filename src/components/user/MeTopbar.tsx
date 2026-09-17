@@ -138,8 +138,11 @@ export default function MeTopbar({ workspaces, userName, userEmail }: Props) {
              verified domain) - rather than at `/me/orgs`, which lists
              invitations but cannot create anything. */
           <Link href="/me#join" className="ws-pill pressable" style={{ textDecoration: 'none' }}>
-            <span className="swatch" style={{ background: 'var(--text-muted)' }} aria-hidden="true">
-              +
+            <span className="swatch-add" aria-hidden="true">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
             </span>
             {me.topbar.noWorkspace}
           </Link>

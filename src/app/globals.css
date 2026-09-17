@@ -1787,3 +1787,32 @@ table.datatable th:last-child,  table.datatable td:last-child  { padding-right: 
 .focus-dot.is-done { background: var(--brand); border-color: var(--brand); }
 .focus-controls { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
 .focus-stats { margin-top: 12px; }
+
+/* ── /me home: workspace action row (Leave) ──────────────────────────────── */
+/* A row, not a tab. It is only rendered when a workspace is active and runs
+   leave, so it never needs a disabled state. Matches `.rowlink`'s press and
+   hover, and clears 44px on its own without padding tricks. */
+.me-actionrow {
+  margin-top: 10px; display: flex; align-items: center; gap: 11px;
+  min-height: 56px; padding: 10px 12px; text-decoration: none;
+  color: var(--text-primary);
+}
+.me-actionrow-icon {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface-2); color: var(--brand);
+}
+.me-actionrow-text { display: flex; flex-direction: column; min-width: 0; }
+.me-actionrow-title { font-weight: 700; font-size: 14px; }
+.me-actionrow-hint { font-size: 12px; margin-top: 1px; }
+.me-actionrow-chev { margin-left: auto; font-size: 18px; flex-shrink: 0; }
+
+/* ── /me top bar: the "add a workspace" mark ─────────────────────────────── */
+/* NOT an avatar. A member with no workspace has nothing to show a mark for, and
+   a filled grey disc reads as an avatar that failed to load. A dashed ring with
+   a plus is the standard "add" affordance and says what the pill does. */
+.ws-pill .swatch-add {
+  width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  border: 1.5px dashed var(--brand); color: var(--brand); background: transparent;
+}

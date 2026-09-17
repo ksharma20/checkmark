@@ -299,6 +299,35 @@ export default async function MePage() {
         </div>
       )}
 
+      {primaryWorkspace && primaryWorkspace.leaves_enabled ? (
+        /* LEAVE LIVES HERE, not in the bottom nav. It exists only inside a
+           workspace, and only when that workspace runs leave through CheckMark,
+           so as a tab it was dead for every member without one. It sits below
+           the stat grid, inside the part of this page already scoped to the
+           active workspace - the two "Leave taken" / "Leave left" cards above it
+           are what it acts on. The workspace is NOT named here: the top-bar pill
+           above already answers which one. */
+        <Link
+          href="/me/leave"
+          className="card rowlink fx-spring me-actionrow"
+          aria-label={me.home.leaveCtaHint}
+        >
+          <span className="me-actionrow-icon" aria-hidden="true">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="4" width="18" height="17" rx="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="8" y1="2" x2="8" y2="6" />
+              <line x1="16" y1="2" x2="16" y2="6" />
+            </svg>
+          </span>
+          <span className="me-actionrow-text">
+            <span className="me-actionrow-title">{me.home.leaveCta}</span>
+            <span className="t-muted me-actionrow-hint">{me.home.leaveCtaHint}</span>
+          </span>
+          <span className="t-muted me-actionrow-chev" aria-hidden="true">›</span>
+        </Link>
+      ) : null}
+
       {primaryWorkspace && (
         <Link
           href="/me/workspace"

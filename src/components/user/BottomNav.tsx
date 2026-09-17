@@ -6,7 +6,7 @@ import { me } from '@/locales/en/me'
 import { meSpace } from '@/locales/en/me-space'
 
 /**
- * The `/me` bottom navigation: four tabs, Home raised among them.
+ * The `/me` bottom navigation: three tabs, Home raised among them.
  *
  * It was THREE, and CLAUDE.md described that as deliberate. The reason it is now
  * four is that `/me/space` is a destination rather than a detail: notes, to-dos
@@ -14,7 +14,12 @@ import { meSpace } from '@/locales/en/me-space'
  * reach from anything already on screen. The avatar sheet - where Orgs,
  * Documents, Announcements and Settings live - is the right home for a screen
  * you visit occasionally, and the wrong one for a screen you visit constantly.
- * The bar stays at four; a fifth would put every label under 64px at 320px wide.
+ * LEAVE IS NOT HERE, and that is the rule this bar follows: every tab must work
+ * for every member. Leave only exists inside a workspace and only when that
+ * workspace has it switched on, so as a tab it was dead for anyone with no
+ * workspace and for any workspace that does not run leave through CheckMark. It
+ * lives on `/me` home now, in the part of the page that is already scoped to the
+ * active workspace, where its absence is self-explanatory.
  *
  * `/me/orgs`, `/me/settings` and `/me/notifications` are deliberately NOT tabs
  * any more — they stay reachable by URL and from the profile sheet in
@@ -78,19 +83,6 @@ const NAV_ITEMS: NavItem[] = [
         <rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5" />
         <rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5" />
         <rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5" />
-      </svg>
-    ),
-  },
-  {
-    href: '/me/leave',
-    label: me.nav.leave,
-    prefix: true,
-    icon: (
-      <svg className="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <rect x="3" y="4" width="18" height="17" rx="2" />
-        <line x1="3" y1="9" x2="21" y2="9" />
-        <line x1="8" y1="2" x2="8" y2="6" />
-        <line x1="16" y1="2" x2="16" y2="6" />
       </svg>
     ),
   },

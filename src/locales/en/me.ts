@@ -12,7 +12,6 @@ export const me = {
     label: 'Primary',
     timeline: 'Timeline',
     home: 'Home',
-    leave: 'Leave',
   },
 
   topbar: {
@@ -47,6 +46,8 @@ export const me = {
     statWfh: 'WFH days',
     statLeaveTaken: 'Leave taken',
     statLeaveLeft: 'Leave left',
+    leaveCta: 'Leave',
+    leaveCtaHint: 'Request time off and see your balance',
     workspaceEyebrow: 'Workspace',
     inOfficeNow: (n: number) => `${n} in office right now`,
     openWorkspace: 'Open workspace presence',
